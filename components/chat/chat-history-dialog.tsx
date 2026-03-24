@@ -27,14 +27,14 @@ export function ChatHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Chat History</DialogTitle>
+          <DialogTitle>Lịch sử trò chuyện</DialogTitle>
           <DialogDescription>
-            Switch to a previous conversation or delete old ones.
+            Chuyển sang cuộc trò chuyện trước hoặc xóa các cuộc cũ.
           </DialogDescription>
         </DialogHeader>
         {conversations.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No conversations yet.
+            Chưa có cuộc trò chuyện.
           </p>
         ) : (
           <div className="max-h-80 overflow-y-auto">
@@ -67,7 +67,7 @@ export function ChatHistoryDialog({
                   type="button"
                   onClick={() => onDelete(convo.id)}
                   className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover/item:opacity-100"
-                  title="Delete conversation"
+                  title="Xóa cuộc trò chuyện"
                 >
                   <Trash2Icon size={14} />
                 </button>

@@ -11,6 +11,7 @@ import {
   ServerIcon,
   ScrollTextIcon,
 } from "lucide-react";
+import { useNovels } from "@/lib/hooks";
 import {
   Sidebar,
   SidebarContent,
@@ -26,12 +27,12 @@ import {
 } from "@/components/ui/sidebar";
 
 export const navConfig = [
-  { title: "Home", href: "/", icon: HomeIcon },
-  { title: "Library", href: "/library", icon: LibraryIcon },
-  { title: "Import", href: "/import", icon: UploadIcon },
-  { title: "Providers", href: "/settings/providers", icon: ServerIcon },
+  { title: "Trang chủ", href: "/", icon: HomeIcon },
+  { title: "Thư viện", href: "/library", icon: LibraryIcon },
+  { title: "Nhập sách", href: "/import", icon: UploadIcon },
+  { title: "Nhà cung cấp AI", href: "/settings/providers", icon: ServerIcon },
   {
-    title: "Global Instruction",
+    title: "Chỉ thị chung",
     href: "/settings/instructions",
     icon: ScrollTextIcon,
   },
@@ -39,6 +40,8 @@ export const navConfig = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const novels = useNovels();
+  const recentNovels = novels?.slice(0, 5);
 
   const mainNav = navConfig.filter(
     (item) => !item.href.startsWith("/settings"),
@@ -62,7 +65,7 @@ export function AppSidebar() {
               Novel Studio
             </span>
             <span className="text-[11px] text-sidebar-foreground/50">
-              Writing workspace
+              Không gian sáng tác
             </span>
           </div>
         </Link>
@@ -72,7 +75,7 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Điều hướng</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNav.map((item) => (
@@ -94,24 +97,41 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Quick Access</SidebarGroupLabel>
+          <SidebarGroupLabel>Tiểu thuyết gần đây</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip="Recent novels"
-                  className="text-sidebar-foreground/60"
-                >
-                  <BookOpenIcon />
-                  <span className="italic">No recent novels</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {recentNovels && recentNovels.length > 0 ? (
+                recentNovels.map((novel) => (
+                  <SidebarMenuItem key={novel.id}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === `/novels/${novel.id}`}
+                      tooltip={novel.title}
+                    >
+                      <Link href={`/novels/${novel.id}`}>
+                        <BookOpenIcon />
+                        <span className="truncate">{novel.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))
+              ) : (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip="Chưa có tiểu thuyết"
+                    className="text-sidebar-foreground/60"
+                  >
+                    <BookOpenIcon />
+                    <span className="italic">Chưa có tiểu thuyết</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
+          <SidebarGroupLabel>Cài đặt</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {settingsNav.map((item) => (

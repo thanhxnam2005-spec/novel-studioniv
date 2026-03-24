@@ -34,23 +34,23 @@ interface PromptField {
 const PROMPT_FIELDS: PromptField[] = [
   {
     key: "chapterAnalysisPrompt",
-    label: "Chapter Analysis",
+    label: "Phân tích chương",
     description:
-      "System instruction for analyzing each chapter. Controls what gets extracted (summary, scenes, characters).",
+      "Chỉ thị hệ thống để phân tích từng chương. Kiểm soát những gì được trích xuất (tóm tắt, cảnh, nhân vật).",
     defaultValue: DEFAULT_CHAPTER_ANALYSIS_SYSTEM,
   },
   {
     key: "novelAggregationPrompt",
-    label: "Novel Overview",
+    label: "Tổng quan tiểu thuyết",
     description:
-      "System instruction for the overall novel analysis. Controls genre detection, synopsis writing, and world-building extraction.",
+      "Chỉ thị hệ thống cho phân tích tổng quan. Kiểm soát phát hiện thể loại, viết tóm tắt và trích xuất thế giới quan.",
     defaultValue: DEFAULT_NOVEL_AGGREGATION_SYSTEM,
   },
   {
     key: "characterProfilingPrompt",
-    label: "Character Profiling",
+    label: "Lập hồ sơ nhân vật",
     description:
-      "System instruction for building character profiles from cross-chapter data.",
+      "Chỉ thị hệ thống để xây dựng hồ sơ nhân vật từ dữ liệu xuyên chương.",
     defaultValue: DEFAULT_CHARACTER_PROFILING_SYSTEM,
   },
 ];
@@ -99,9 +99,9 @@ export function AnalysisPromptEditor() {
       }
       await updateAnalysisSettings(updates);
       setDrafts({});
-      toast.success("Prompts saved");
+      toast.success("Đã lưu prompt");
     } catch {
-      toast.error("Failed to save prompts");
+      toast.error("Lưu prompt thất bại");
     } finally {
       setSaving(false);
     }
@@ -114,7 +114,7 @@ export function AnalysisPromptEditor() {
       delete next[field.key];
       return next;
     });
-    toast.success(`${field.label} prompt reset to default`);
+    toast.success(`Đã đặt lại prompt ${field.label} về mặc định`);
   };
 
   const hasAnyDraft = PROMPT_FIELDS.some((f) => isModified(f));
@@ -132,9 +132,9 @@ export function AnalysisPromptEditor() {
             <ChevronRightIcon className="size-4 text-muted-foreground" />
           )}
           <div>
-            <CardTitle className="text-base">Custom Prompts</CardTitle>
+            <CardTitle className="text-base">Prompt tùy chỉnh</CardTitle>
             <CardDescription>
-              Customize system instructions for each analysis step
+              Tùy chỉnh chỉ thị hệ thống cho từng bước phân tích
             </CardDescription>
           </div>
         </div>
@@ -159,7 +159,7 @@ export function AnalysisPromptEditor() {
                     className="h-7 text-xs"
                   >
                     <RotateCcwIcon className="mr-1 size-3" />
-                    Reset
+                    Đặt lại
                   </Button>
                 )}
               </div>
@@ -175,14 +175,14 @@ export function AnalysisPromptEditor() {
           {hasAnyDraft && (
             <div className="flex justify-end">
               <Button onClick={handleSave} disabled={saving} size="sm">
-                {saving ? "Saving..." : "Save Prompts"}
+                {saving ? "Đang lưu..." : "Lưu prompt"}
               </Button>
             </div>
           )}
 
           <p className="text-xs text-muted-foreground">
-            Leave empty to use the default prompt. The output format (JSON
-            schema) is fixed — only the instructions change.
+            Để trống để sử dụng prompt mặc định. Định dạng đầu ra (JSON
+            schema) cố định — chỉ thay đổi chỉ thị.
           </p>
         </CardContent>
       )}

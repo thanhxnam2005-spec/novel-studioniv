@@ -128,7 +128,7 @@ function ProviderFormDialog({
 
       if (isEditing) {
         await updateAIProvider(provider.id, data);
-        toast.success("Provider updated");
+        toast.success("Đã cập nhật nhà cung cấp");
       } else {
         const id = await createAIProvider({ ...data, isActive: true });
 
@@ -146,11 +146,11 @@ function ProviderFormDialog({
           );
         }
 
-        toast.success("Provider added");
+        toast.success("Đã thêm nhà cung cấp");
       }
       onOpenChange(false);
     } catch {
-      toast.error("Failed to save provider");
+      toast.error("Lưu nhà cung cấp thất bại");
     } finally {
       setSaving(false);
     }
@@ -161,12 +161,12 @@ function ProviderFormDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? "Edit Provider" : "Add Provider"}
+            {isEditing ? "Sửa nhà cung cấp" : "Thêm nhà cung cấp"}
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update your provider configuration."
-              : "Choose a platform or configure a custom endpoint."}
+              ? "Cập nhật cấu hình nhà cung cấp."
+              : "Chọn nền tảng hoặc cấu hình endpoint tùy chỉnh."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -175,7 +175,7 @@ function ProviderFormDialog({
               {/* Platform selector — only for new providers */}
               {!isEditing && (
                 <Field>
-                  <FieldLabel>Platform</FieldLabel>
+                  <FieldLabel>Nền tảng</FieldLabel>
                   <div className="flex flex-wrap gap-1.5">
                     {PROVIDER_PRESETS.map((p) => (
                       <Tooltip key={p.type}>
@@ -211,9 +211,9 @@ function ProviderFormDialog({
               )}
 
               <Field>
-                <FieldLabel>Name</FieldLabel>
+                <FieldLabel>Tên</FieldLabel>
                 <Input
-                  placeholder="My Provider"
+                  placeholder="Nhà cung cấp của tôi"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -232,22 +232,22 @@ function ProviderFormDialog({
                   />
                   <FieldDescription>
                     {providerType === "openai-compatible"
-                      ? "The base URL for the OpenAI-compatible API"
-                      : `Default: ${preset?.defaultBaseUrl}`}
+                      ? "URL gốc cho API tương thích OpenAI"
+                      : `Mặc định: ${preset?.defaultBaseUrl}`}
                   </FieldDescription>
                 </Field>
               )}
 
               <Field>
-                <FieldLabel>API Key</FieldLabel>
+                <FieldLabel>Khóa API</FieldLabel>
                 <Input
                   type="password"
-                  placeholder={preset?.apiKeyPlaceholder ?? "API key"}
+                  placeholder={preset?.apiKeyPlaceholder ?? "Khóa API"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
                 <FieldDescription>
-                  Stored locally in your browser only.
+                  Chỉ lưu trữ cục bộ trong trình duyệt của bạn.
                   {preset?.apiKeyHelpUrl && (
                     <>
                       {" "}
@@ -257,7 +257,7 @@ function ProviderFormDialog({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-0.5 text-primary underline"
                       >
-                        Get API key
+                        Lấy khóa API
                         <ExternalLinkIcon className="size-3" />
                       </a>
                     </>
@@ -272,14 +272,14 @@ function ProviderFormDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Hủy
             </Button>
             <Button type="submit" disabled={saving}>
               {saving
-                ? "Saving..."
+                ? "Đang lưu..."
                 : isEditing
-                  ? "Save Changes"
-                  : "Add Provider"}
+                  ? "Lưu thay đổi"
+                  : "Thêm nhà cung cấp"}
             </Button>
           </DialogFooter>
         </form>
@@ -303,10 +303,10 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
     setFetching(true);
     try {
       const count = await fetchAndSyncModels(provider);
-      toast.success(`Fetched ${count} model${count !== 1 ? "s" : ""}`);
+      toast.success(`Đã tải ${count} mô hình`);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to fetch models",
+        err instanceof Error ? err.message : "Tải mô hình thất bại",
       );
     } finally {
       setFetching(false);
@@ -316,15 +316,15 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
   async function handleDelete() {
     try {
       await deleteAIProvider(provider.id);
-      toast.success("Provider deleted");
+      toast.success("Đã xóa nhà cung cấp");
     } catch {
-      toast.error("Failed to delete provider");
+      toast.error("Xóa nhà cung cấp thất bại");
     }
   }
 
   const maskedKey = provider.apiKey
     ? `${provider.apiKey.slice(0, 7)}${"•".repeat(Math.max(0, provider.apiKey.length - 11))}${provider.apiKey.slice(-4)}`
-    : "Not set";
+    : "Chưa đặt";
 
   return (
     <>
@@ -363,9 +363,9 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
 
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-medium">API Key:</span>
+            <span className="font-medium">Khóa API:</span>
             <code className="flex-1 truncate">
-              {showKey ? provider.apiKey || "Not set" : maskedKey}
+              {showKey ? provider.apiKey || "Chưa đặt" : maskedKey}
             </code>
             {provider.apiKey && (
               <Button
@@ -381,7 +381,7 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
-                Models ({models?.length ?? 0})
+                Mô hình ({models?.length ?? 0})
               </span>
               <Button
                 variant="outline"
@@ -394,7 +394,7 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
                 ) : (
                   <RefreshCwIcon />
                 )}
-                {fetching ? "Fetching..." : "Fetch Models"}
+                {fetching ? "Đang tải..." : "Tải mô hình"}
               </Button>
             </div>
             {models && models.length > 0 ? (
@@ -420,15 +420,15 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                No models fetched yet. Click &quot;Fetch Models&quot; to load
-                available models.
+                Chưa tải mô hình. Nhấn &quot;Tải mô hình&quot; để tải danh
+                sách mô hình có sẵn.
               </p>
             )}
           </div>
         </CardContent>
 
         <CardFooter className="text-xs text-muted-foreground">
-          Added {provider.createdAt.toLocaleDateString()}
+          Thêm ngày {provider.createdAt.toLocaleDateString("vi-VN")}
         </CardFooter>
       </Card>
 
@@ -444,16 +444,16 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Provider</AlertDialogTitle>
+              <AlertDialogTitle>Xóa nhà cung cấp</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete &quot;{provider.name}&quot; and all
-                its fetched models. This action cannot be undone.
+                Thao tác này sẽ xóa vĩnh viễn &quot;{provider.name}&quot; và tất
+                cả mô hình đã tải. Không thể hoàn tác.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>Hủy</AlertDialogCancel>
               <AlertDialogAction variant="destructive" onClick={handleDelete}>
-                Delete
+                Xóa
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -473,14 +473,14 @@ export function AIProviderSettings() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-medium">AI Providers</h2>
+          <h2 className="text-lg font-medium">Nhà cung cấp AI</h2>
           <p className="text-sm text-muted-foreground">
-            Configure AI platforms for chat and analysis.
+            Cấu hình nền tảng AI cho trò chuyện và phân tích.
           </p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <PlusIcon />
-          Add Provider
+          Thêm nhà cung cấp
         </Button>
       </div>
 
@@ -494,15 +494,15 @@ export function AIProviderSettings() {
             <EmptyMedia variant="icon">
               <ServerIcon />
             </EmptyMedia>
-            <EmptyTitle>No providers configured</EmptyTitle>
+            <EmptyTitle>Chưa cấu hình nhà cung cấp</EmptyTitle>
             <EmptyDescription>
-              Add an AI provider to get started. Supports OpenAI, Anthropic,
-              Google, Groq, and any OpenAI-compatible endpoint.
+              Thêm nhà cung cấp AI để bắt đầu. Hỗ trợ OpenAI, Anthropic,
+              Google, Groq và bất kỳ endpoint tương thích OpenAI.
             </EmptyDescription>
           </EmptyHeader>
           <Button variant="outline" onClick={() => setAddOpen(true)}>
             <PlusIcon />
-            Add Provider
+            Thêm nhà cung cấp
           </Button>
         </Empty>
       ) : (

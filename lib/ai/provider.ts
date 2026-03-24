@@ -18,8 +18,8 @@ import type { AIProvider, ProviderType } from "@/lib/db";
  * the SDK can still extract and parse the JSON correctly.
  */
 function withJsonExtraction(model: LanguageModel): LanguageModel {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return wrapLanguageModel({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: model as any,
     middleware: extractJsonMiddleware(),
   });

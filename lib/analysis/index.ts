@@ -1,4 +1,9 @@
 export { analyzeNovel, type AnalyzeNovelOptions } from "./novel-analyzer";
+export {
+  analyzeNovelIncremental,
+  type IncrementalAnalyzeOptions,
+} from "./incremental-analyzer";
+export { getChaptersNeedingAnalysis } from "./incremental";
 export { analyzeChapter, analyzeBatchChapters } from "./chapter-analyzer";
 export {
   type AnalysisDepth,

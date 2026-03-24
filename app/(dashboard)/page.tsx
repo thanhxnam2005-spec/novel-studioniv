@@ -16,7 +16,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { useNovels } from "@/lib/hooks";
-import { BookOpenIcon, PlusIcon, SearchIcon, UploadIcon } from "lucide-react";
+import { BookOpenIcon, PlusIcon, UploadIcon } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -26,10 +26,10 @@ export default function DashboardPage() {
     <main className="mx-auto w-full max-w-4xl px-6 py-8">
       <div className="mb-8">
         <h1 className="font-heading text-3xl font-bold tracking-tight">
-          Welcome back
+          Chào mừng trở lại
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Pick up where you left off, or start something new.
+          Tiếp tục nơi bạn đã dừng lại, hoặc bắt đầu một câu chuyện mới.
         </p>
       </div>
 
@@ -39,9 +39,9 @@ export default function DashboardPage() {
             <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10">
               <PlusIcon className="size-5 text-primary" />
             </div>
-            <p className="text-sm font-medium">New Novel</p>
+            <p className="text-sm font-medium">Tiểu thuyết mới</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Start a fresh story
+              Bắt đầu một câu chuyện mới
             </p>
           </CardContent>
         </Card>
@@ -52,9 +52,9 @@ export default function DashboardPage() {
               <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10">
                 <UploadIcon className="size-5 text-primary" />
               </div>
-              <p className="text-sm font-medium">Import Novel</p>
+              <p className="text-sm font-medium">Nhập tiểu thuyết</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Upload or paste existing text
+                Tải lên hoặc dán văn bản có sẵn
               </p>
             </CardContent>
           </Card>
@@ -80,9 +80,9 @@ export default function DashboardPage() {
                   <EmptyMedia variant="icon">
                     <BookOpenIcon />
                   </EmptyMedia>
-                  <EmptyTitle>Your library is empty</EmptyTitle>
+                  <EmptyTitle>Thư viện trống</EmptyTitle>
                   <EmptyDescription>
-                    Create your first novel or import an existing one.
+                    Tạo tiểu thuyết đầu tiên hoặc nhập từ nguồn có sẵn.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -90,30 +90,21 @@ export default function DashboardPage() {
           </Card>
         ) : (
           novels.slice(0, 5).map((novel) => (
-            <Card
-              key={novel.id}
-              className="transition-colors hover:bg-muted/30"
-            >
-              <CardHeader>
-                <CardTitle>{novel.title}</CardTitle>
-                {novel.genre && (
-                  <CardDescription>{novel.genre}</CardDescription>
-                )}
-              </CardHeader>
-              <CardContent>
-                <p className="line-clamp-2 text-sm text-muted-foreground">
-                  {novel.description || "No description yet."}
-                </p>
-                <div className="mt-3">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/novels/${novel.id}/analysis`}>
-                      <SearchIcon className="mr-1.5 size-3.5" />
-                      Analyze
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <Link key={novel.id} href={`/novels/${novel.id}`}>
+              <Card className="h-full transition-colors hover:bg-muted/30">
+                <CardHeader>
+                  <CardTitle>{novel.title}</CardTitle>
+                  {novel.genre && (
+                    <CardDescription>{novel.genre}</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <p className="line-clamp-2 text-sm text-muted-foreground">
+                    {novel.description || "Chưa có mô tả."}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           ))
         )}
       </div>
@@ -121,7 +112,7 @@ export default function DashboardPage() {
       {novels && novels.length > 0 && (
         <div className="mt-6 flex justify-center">
           <Button variant="outline" asChild>
-            <a href="/library">View all novels</a>
+            <a href="/library">Xem tất cả tiểu thuyết</a>
           </Button>
         </div>
       )}

@@ -225,7 +225,7 @@ export function ChatPanel() {
         if (err instanceof Error && err.name === "AbortError") return;
         if (assistantMsgId) {
           const errorText =
-            err instanceof Error ? err.message : "Failed to get response";
+            err instanceof Error ? err.message : "Không nhận được phản hồi";
           await updateMessage(assistantMsgId, {
             content: streamingContent || `Error: ${errorText}`,
           });
@@ -356,14 +356,14 @@ export function ChatPanel() {
         <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
           <div className="flex items-center gap-2">
             <SparklesIcon className="size-4 text-muted-foreground" />
-            <span className="text-sm font-medium">AI Chat</span>
+            <span className="text-sm font-medium">Trò chuyện AI</span>
           </div>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon-xs"
               onClick={handleNewConversation}
-              title="New conversation"
+              title="Cuộc trò chuyện mới"
             >
               <PlusIcon />
             </Button>
@@ -371,7 +371,7 @@ export function ChatPanel() {
               variant="ghost"
               size="icon-xs"
               onClick={() => setHistoryOpen(true)}
-              title="Chat history"
+              title="Lịch sử trò chuyện"
             >
               <HistoryIcon />
             </Button>
@@ -379,7 +379,7 @@ export function ChatPanel() {
               variant="ghost"
               size="icon-xs"
               onClick={() => setSettingsOpen(true)}
-              title="Chat settings"
+              title="Cài đặt trò chuyện"
             >
               <SettingsIcon />
             </Button>
@@ -432,9 +432,9 @@ export function ChatPanel() {
                   <EmptyMedia variant="icon">
                     <BotIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No AI provider configured</EmptyTitle>
+                  <EmptyTitle>Chưa cấu hình nhà cung cấp AI</EmptyTitle>
                   <EmptyDescription>
-                    Add a provider in Settings to start chatting.
+                    Thêm nhà cung cấp trong Cài đặt để bắt đầu trò chuyện.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -444,10 +444,10 @@ export function ChatPanel() {
                   <EmptyMedia variant="icon">
                     <SparklesIcon />
                   </EmptyMedia>
-                  <EmptyTitle>Writing assistant</EmptyTitle>
+                  <EmptyTitle>Trợ lý sáng tác</EmptyTitle>
                   <EmptyDescription>
-                    Ask questions, brainstorm ideas, or get help with your
-                    writing.
+                    Đặt câu hỏi, brainstorm ý tưởng, hoặc nhận trợ giúp với
+                    bài viết của bạn.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -475,7 +475,7 @@ export function ChatPanel() {
             {isStreaming && !streamingContent && !streamingReasoning && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <LoaderIcon className="size-3 animate-spin" />
-                Thinking...
+                Đang suy nghĩ...
               </div>
             )}
           </StickToBottom.Content>
@@ -492,8 +492,8 @@ export function ChatPanel() {
               onKeyDown={handleKeyDown}
               placeholder={
                 hasProvider
-                  ? "Ask your writing assistant..."
-                  : "Configure a provider first"
+                  ? "Hỏi trợ lý sáng tác..."
+                  : "Vui lòng cấu hình nhà cung cấp trước"
               }
               disabled={!hasProvider || !hasModels}
               rows={1}
@@ -504,7 +504,7 @@ export function ChatPanel() {
                 size="icon"
                 variant="outline"
                 onClick={handleStop}
-                title="Stop generating"
+                title="Dừng tạo"
               >
                 <XIcon />
               </Button>
@@ -513,7 +513,7 @@ export function ChatPanel() {
                 size="icon"
                 onClick={handleSend}
                 disabled={!canSend}
-                title="Send message"
+                title="Gửi tin nhắn"
               >
                 <SendIcon />
               </Button>
@@ -528,7 +528,7 @@ export function ChatPanel() {
               disabled={!hasModels || isStreaming}
             >
               {!hasModels && (
-                <NativeSelectOption value="">No models</NativeSelectOption>
+                <NativeSelectOption value="">Không có model</NativeSelectOption>
               )}
               {models?.map((m) => (
                 <NativeSelectOption key={m.id} value={m.modelId}>
@@ -537,7 +537,7 @@ export function ChatPanel() {
               ))}
             </NativeSelect>
             <span className="text-[10px] text-muted-foreground/60">
-              <kbd className="font-mono">Shift+Enter</kbd> new line
+              <kbd className="font-mono">Shift+Enter</kbd> dòng mới
             </span>
           </div>
         </div>

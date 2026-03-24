@@ -41,9 +41,9 @@ export function GlobalInstructionSettings() {
         globalSystemInstruction: draft.trim() || undefined,
       });
       setHasEdited(false);
-      toast.success("Global instruction saved");
+      toast.success("Đã lưu chỉ thị chung");
     } catch {
-      toast.error("Failed to save");
+      toast.error("Lưu thất bại");
     } finally {
       setSaving(false);
     }
@@ -52,16 +52,16 @@ export function GlobalInstructionSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Global System Instruction</CardTitle>
+        <CardTitle>Chỉ thị hệ thống chung</CardTitle>
         <CardDescription>
-          This instruction is prepended to every system prompt — both chat and
-          analysis. Use it for language preferences, tone, or constraints that
-          should always apply.
+          Chỉ thị này được thêm vào đầu mọi system prompt — cả trò chuyện và
+          phân tích. Sử dụng cho tùy chọn ngôn ngữ, giọng điệu, hoặc ràng buộc
+          cần luôn áp dụng.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <Textarea
-          placeholder="e.g. Always respond in Vietnamese. Use formal tone."
+          placeholder="VD: Luôn trả lời bằng Tiếng Việt. Sử dụng giọng văn trang trọng."
           value={draft}
           onChange={(e) => handleChange(e.target.value)}
           className="min-h-[100px] font-mono text-sm"
@@ -69,7 +69,7 @@ export function GlobalInstructionSettings() {
         {isDirty && (
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving} size="sm">
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Đang lưu..." : "Lưu"}
             </Button>
           </div>
         )}

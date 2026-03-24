@@ -41,10 +41,10 @@ import { toast } from "sonner";
 type Step = "input" | "configure" | "preview" | "confirm";
 
 const STEPS: { key: Step; label: string; icon: React.ElementType }[] = [
-  { key: "input", label: "Input", icon: UploadIcon },
-  { key: "configure", label: "Configure", icon: SettingsIcon },
-  { key: "preview", label: "Preview", icon: EyeIcon },
-  { key: "confirm", label: "Confirm", icon: CheckIcon },
+  { key: "input", label: "Nhập liệu", icon: UploadIcon },
+  { key: "configure", label: "Cấu hình", icon: SettingsIcon },
+  { key: "preview", label: "Xem trước", icon: EyeIcon },
+  { key: "confirm", label: "Xác nhận", icon: CheckIcon },
 ];
 
 function countWords(text: string): number {
@@ -112,7 +112,7 @@ export function NovelImportWizard() {
   const handleTest = useCallback(() => {
     const pattern = getActivePattern();
     if (!pattern) {
-      toast.error("Invalid regex pattern");
+      toast.error("Biểu thức regex không hợp lệ");
       return;
     }
     const count = testPattern(rawText, pattern);
@@ -122,7 +122,7 @@ export function NovelImportWizard() {
   const handleSplit = useCallback(() => {
     const pattern = getActivePattern();
     if (!pattern) {
-      toast.error("Invalid regex pattern");
+      toast.error("Biểu thức regex không hợp lệ");
       return;
     }
     const result = splitChapters(rawText, pattern);
@@ -155,11 +155,11 @@ export function NovelImportWizard() {
 
   const handleImport = async () => {
     if (!novelTitle.trim()) {
-      toast.error("Please enter a novel title");
+      toast.error("Vui lòng nhập tiêu đề tiểu thuyết");
       return;
     }
     if (chapters.length === 0) {
-      toast.error("No chapters to import");
+      toast.error("Không có chương để nhập");
       return;
     }
 
@@ -209,12 +209,12 @@ export function NovelImportWizard() {
       );
 
       toast.success(
-        `Imported "${novelTitle}" with ${chapters.length} chapters`,
+        `Đã nhập "${novelTitle}" với ${chapters.length} chương`,
       );
       router.push("/");
     } catch (error) {
       toast.error(
-        `Import failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Nhập thất bại: ${error instanceof Error ? error.message : "Lỗi không xác định"}`,
       );
     } finally {
       setIsImporting(false);
@@ -259,38 +259,38 @@ export function NovelImportWizard() {
       {step === "input" && (
         <Card>
           <CardHeader>
-            <CardTitle>Import Novel Text</CardTitle>
+            <CardTitle>Nhập văn bản tiểu thuyết</CardTitle>
             <CardDescription>
-              Paste your novel text or upload a .txt file.
+              Dán văn bản hoặc tải lên file .txt.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="novel-text">Novel Text</Label>
+              <Label htmlFor="novel-text">Văn bản tiểu thuyết</Label>
               <Textarea
                 id="novel-text"
-                placeholder="Paste your novel text here..."
+                placeholder="Dán văn bản tiểu thuyết tại đây..."
                 className="mt-1.5 h-[300px] max-h-[300px] resize-none overflow-y-auto font-mono text-sm"
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
               />
               {rawText && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {wordCount.toLocaleString()} words &middot;{" "}
-                  {rawText.length.toLocaleString()} characters
+                  {wordCount.toLocaleString()} từ &middot;{" "}
+                  {rawText.length.toLocaleString()} ký tự
                 </p>
               )}
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">or</span>
+              <span className="text-sm text-muted-foreground">hoặc</span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <FileTextIcon className="mr-1.5 size-3.5" />
-                Upload .txt file
+                Tải file .txt
               </Button>
               <input
                 ref={fileInputRef}
@@ -306,7 +306,7 @@ export function NovelImportWizard() {
                 onClick={() => setStep("configure")}
                 disabled={!rawText.trim()}
               >
-                Next
+                Tiếp
               </Button>
             </div>
           </CardContent>
@@ -317,15 +317,15 @@ export function NovelImportWizard() {
       {step === "configure" && (
         <Card>
           <CardHeader>
-            <CardTitle>Configure Chapter Splitting</CardTitle>
+            <CardTitle>Cấu hình tách chương</CardTitle>
             <CardDescription>
-              Choose a preset or enter a custom regex to detect chapter
-              headings.
+              Chọn mẫu có sẵn hoặc nhập regex tùy chỉnh để phát hiện tiêu đề
+              chương.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Preset Patterns</Label>
+              <Label>Mẫu có sẵn</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {Object.entries(CHAPTER_PRESETS).map(([key, preset]) => (
                   <button
@@ -364,7 +364,7 @@ export function NovelImportWizard() {
                   }}
                   className="size-4 rounded border-border"
                 />
-                <Label htmlFor="use-custom">Use custom regex</Label>
+                <Label htmlFor="use-custom">Sử dụng regex tùy chỉnh</Label>
               </div>
               {useCustom && (
                 <Input
@@ -380,20 +380,20 @@ export function NovelImportWizard() {
 
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={handleTest}>
-                Test Pattern
+                Kiểm tra mẫu
               </Button>
               {matchCount !== null && (
                 <Badge variant="secondary">
-                  {matchCount} match{matchCount !== 1 ? "es" : ""} found
+                  Tìm thấy {matchCount} kết quả
                 </Badge>
               )}
             </div>
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep("input")}>
-                Back
+                Quay lại
               </Button>
-              <Button onClick={handleSplit}>Split & Preview</Button>
+              <Button onClick={handleSplit}>Tách & Xem trước</Button>
             </div>
           </CardContent>
         </Card>
@@ -403,14 +403,13 @@ export function NovelImportWizard() {
       {step === "preview" && (
         <Card>
           <CardHeader>
-            <CardTitle>Preview Chapters</CardTitle>
+            <CardTitle>Xem trước chương</CardTitle>
             <CardDescription>
-              {chapters.length} chapter{chapters.length !== 1 ? "s" : ""}{" "}
-              detected &middot;{" "}
+              Phát hiện {chapters.length} chương &middot;{" "}
               {chapters
                 .reduce((sum, ch) => sum + ch.wordCount, 0)
                 .toLocaleString()}{" "}
-              total words
+              tổng số từ
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -460,7 +459,7 @@ export function NovelImportWizard() {
                         {ch.content.length > 150 ? "..." : ""}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground/60">
-                        {ch.wordCount.toLocaleString()} words
+                        {ch.wordCount.toLocaleString()} từ
                       </p>
                     </div>
                     <div className="flex gap-1">
@@ -486,13 +485,13 @@ export function NovelImportWizard() {
 
             <div className="mt-4 flex justify-between">
               <Button variant="outline" onClick={() => setStep("configure")}>
-                Back
+                Quay lại
               </Button>
               <Button
                 onClick={() => setStep("confirm")}
                 disabled={chapters.length === 0}
               >
-                Next
+                Tiếp
               </Button>
             </div>
           </CardContent>
@@ -503,27 +502,27 @@ export function NovelImportWizard() {
       {step === "confirm" && (
         <Card>
           <CardHeader>
-            <CardTitle>Confirm Import</CardTitle>
+            <CardTitle>Xác nhận nhập</CardTitle>
             <CardDescription>
-              Set your novel details and import.
+              Thiết lập thông tin tiểu thuyết và nhập.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="novel-title">Novel Title</Label>
+              <Label htmlFor="novel-title">Tiêu đề tiểu thuyết</Label>
               <Input
                 id="novel-title"
-                placeholder="Enter novel title"
+                placeholder="Nhập tiêu đề tiểu thuyết"
                 value={novelTitle}
                 onChange={(e) => setNovelTitle(e.target.value)}
                 className="mt-1.5"
               />
             </div>
             <div>
-              <Label htmlFor="novel-desc">Description (optional)</Label>
+              <Label htmlFor="novel-desc">Mô tả (tùy chọn)</Label>
               <Textarea
                 id="novel-desc"
-                placeholder="Brief description..."
+                placeholder="Mô tả ngắn..."
                 value={novelDescription}
                 onChange={(e) => setNovelDescription(e.target.value)}
                 className="mt-1.5"
@@ -532,25 +531,25 @@ export function NovelImportWizard() {
             </div>
 
             <div className="rounded-lg bg-muted/50 p-3">
-              <p className="text-sm font-medium">Import Summary</p>
+              <p className="text-sm font-medium">Tóm tắt nhập</p>
               <div className="mt-1.5 flex gap-3 text-xs text-muted-foreground">
-                <span>{chapters.length} chapters</span>
+                <span>{chapters.length} chương</span>
                 <span>&middot;</span>
                 <span>
                   {chapters
                     .reduce((sum, ch) => sum + ch.wordCount, 0)
                     .toLocaleString()}{" "}
-                  words
+                  từ
                 </span>
               </div>
             </div>
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep("preview")}>
-                Back
+                Quay lại
               </Button>
               <Button onClick={handleImport} disabled={isImporting}>
-                {isImporting ? "Importing..." : "Import Novel"}
+                {isImporting ? "Đang nhập..." : "Nhập tiểu thuyết"}
               </Button>
             </div>
           </CardContent>

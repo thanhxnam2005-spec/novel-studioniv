@@ -20,6 +20,7 @@ export interface Chapter {
   order: number;
   summary?: string;
   characterIds?: string[];
+  analyzedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -222,6 +223,9 @@ export class NovelStudioDB extends Dexie {
     this.version(6).stores({
       analysisSettings: "id",
     });
+
+    // v7: Add analyzedAt to Chapter (non-indexed field, no store changes needed)
+    this.version(7).stores({});
   }
 }
 

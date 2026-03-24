@@ -13,12 +13,12 @@ import { Progress } from "@/components/ui/progress";
 import { useAnalysisStore } from "@/lib/stores/analysis";
 
 const PHASE_LABELS: Record<string, string> = {
-  chapters: "Analyzing chapters",
-  aggregation: "Analyzing novel overview",
-  characters: "Profiling characters",
-  complete: "Analysis complete",
-  error: "Analysis failed",
-  idle: "Ready",
+  chapters: "Đang phân tích chương",
+  aggregation: "Đang phân tích tổng quan tiểu thuyết",
+  characters: "Đang lập hồ sơ nhân vật",
+  complete: "Phân tích hoàn tất",
+  error: "Phân tích thất bại",
+  idle: "Sẵn sàng",
 };
 
 export function AnalysisProgress() {
@@ -47,7 +47,7 @@ export function AnalysisProgress() {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Analysis Progress</CardTitle>
+          <CardTitle className="text-base">Tiến trình phân tích</CardTitle>
           {phase !== "complete" && phase !== "error" && phase !== "idle" && (
             <Button variant="ghost" size="icon-sm" onClick={cancel}>
               <XIcon className="size-4" />
@@ -64,23 +64,23 @@ export function AnalysisProgress() {
             <>
               <LoaderIcon className="size-3 animate-spin" />
               <span>
-                Chapter {chaptersCompleted} / {totalChapters}
+                Chương {chaptersCompleted} / {totalChapters}
               </span>
             </>
           )}
           {phase === "aggregation" && (
             <>
               <LoaderIcon className="size-3 animate-spin" />
-              <span>Building novel overview from chapter summaries...</span>
+              <span>Đang xây dựng tổng quan từ các tóm tắt chương...</span>
             </>
           )}
           {phase === "characters" && (
             <>
               <LoaderIcon className="size-3 animate-spin" />
-              <span>Creating character profiles...</span>
+              <span>Đang tạo hồ sơ nhân vật...</span>
             </>
           )}
-          {phase === "complete" && <span>All done!</span>}
+          {phase === "complete" && <span>Hoàn tất!</span>}
           {phase === "error" && (
             <span className="text-destructive">{error}</span>
           )}

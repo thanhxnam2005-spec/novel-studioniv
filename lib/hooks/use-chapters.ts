@@ -45,6 +45,43 @@ export async function deleteChapter(id: string) {
   });
 }
 
+export type ChapterAnalysisStatus = "analyzed" | "stale" | "unanalyzed";
+
+export function useChapterAnalysisStatus(novelId: string | undefined) {
+  return useLiveQuery(
+    async () => {
+      if (!novelId) return [];
+      const chapters = await db.chapters
+        .where("novelId")
+        .equals(novelId)
+        .sortBy("order");
+      const results: { chapterId: string; status: ChapterAnalysisStatus }[] =
+        [];
+      for (const ch of chapters) {
+        if (!ch.analyzedAt) {
+          results.push({ chapterId: ch.id, status: "unanalyzed" });
+          continue;
+        }
+        const scenes = await db.scenes
+          .where("chapterId")
+          .equals(ch.id)
+          .toArray();
+        const latestEdit = Math.max(
+          ...scenes.map((s) => s.updatedAt.getTime()),
+          0,
+        );
+        results.push({
+          chapterId: ch.id,
+          status:
+            latestEdit > ch.analyzedAt.getTime() ? "stale" : "analyzed",
+        });
+      }
+      return results;
+    },
+    [novelId],
+  );
+}
+
 export async function reorderChapters(
   chapters: { id: string; order: number }[]
 ) {

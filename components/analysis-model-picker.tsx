@@ -37,18 +37,18 @@ interface StepConfig {
 const STEPS: StepConfig[] = [
   {
     key: "chapterModel",
-    label: "Chapter Analysis",
-    description: "Analyzes each chapter for summary, scenes, and characters",
+    label: "Phân tích chương",
+    description: "Phân tích từng chương để lấy tóm tắt, cảnh và nhân vật",
   },
   {
     key: "aggregationModel",
-    label: "Novel Overview",
-    description: "Extracts genres, tags, synopsis, and world-building",
+    label: "Tổng quan tiểu thuyết",
+    description: "Trích xuất thể loại, nhãn, tóm tắt và thế giới quan",
   },
   {
     key: "characterModel",
-    label: "Character Profiling",
-    description: "Builds detailed character profiles from cross-chapter data",
+    label: "Lập hồ sơ nhân vật",
+    description: "Xây dựng hồ sơ nhân vật chi tiết từ dữ liệu xuyên chương",
   },
 ];
 
@@ -93,19 +93,19 @@ function StepModelSelector({
             className="h-7 text-xs"
           >
             <RotateCcwIcon className="mr-1 size-3" />
-            Default
+            Mặc định
           </Button>
         )}
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
-          <Label className="text-xs">Provider</Label>
+          <Label className="text-xs">Nhà cung cấp</Label>
           <NativeSelect
             className="mt-1 w-full"
             value={selectedProviderId}
             onChange={(e) => handleProviderChange(e.target.value)}
           >
-            <NativeSelectOption value="">Use default</NativeSelectOption>
+            <NativeSelectOption value="">Mặc định</NativeSelectOption>
             {providers?.map((p) => (
               <NativeSelectOption key={p.id} value={p.id}>
                 {p.name}
@@ -114,7 +114,7 @@ function StepModelSelector({
           </NativeSelect>
         </div>
         <div>
-          <Label className="text-xs">Model</Label>
+          <Label className="text-xs">Mô hình</Label>
           <NativeSelect
             className="mt-1 w-full"
             value={value?.modelId ?? ""}
@@ -122,7 +122,7 @@ function StepModelSelector({
             disabled={!selectedProviderId}
           >
             <NativeSelectOption value="">
-              {selectedProviderId ? "Select model" : "Select provider first"}
+              {selectedProviderId ? "Chọn mô hình" : "Chọn nhà cung cấp trước"}
             </NativeSelectOption>
             {models?.map((m) => (
               <NativeSelectOption key={m.id} value={m.modelId}>
@@ -167,9 +167,9 @@ export function AnalysisModelPicker() {
       }
       await updateAnalysisSettings(updates);
       setDrafts({});
-      toast.success("Model settings saved");
+      toast.success("Đã lưu cài đặt mô hình");
     } catch {
-      toast.error("Failed to save model settings");
+      toast.error("Lưu cài đặt mô hình thất bại");
     } finally {
       setSaving(false);
     }
@@ -191,15 +191,15 @@ export function AnalysisModelPicker() {
           )}
           <div>
             <CardTitle className="text-base">
-              Per-Step Models
+              Mô hình theo bước
               {hasAnyCustom && !isOpen && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  (customized)
+                  (đã tùy chỉnh)
                 </span>
               )}
             </CardTitle>
             <CardDescription>
-              Use different providers or models for each analysis step
+              Sử dụng nhà cung cấp hoặc mô hình khác nhau cho từng bước phân tích
             </CardDescription>
           </div>
         </div>
@@ -219,14 +219,14 @@ export function AnalysisModelPicker() {
           {hasAnyDraft && (
             <div className="flex justify-end">
               <Button onClick={handleSave} disabled={saving} size="sm">
-                {saving ? "Saving..." : "Save"}
+                {saving ? "Đang lưu..." : "Lưu"}
               </Button>
             </div>
           )}
 
           <p className="text-xs text-muted-foreground">
-            When set to &ldquo;Use default&rdquo;, inherits from your global
-            chat settings provider and model.
+            Khi đặt là &ldquo;Mặc định&rdquo;, sẽ kế thừa nhà cung cấp và
+            mô hình từ cài đặt trò chuyện chung.
           </p>
         </CardContent>
       )}

@@ -52,18 +52,18 @@ export function ChatSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Chat Settings</DialogTitle>
+          <DialogTitle>Cài đặt trò chuyện</DialogTitle>
           <DialogDescription>
-            Configure the AI model and behavior for this chat.
+            Cấu hình mô hình AI và hành vi cho cuộc trò chuyện.
           </DialogDescription>
         </DialogHeader>
         <FieldSet>
           <FieldGroup>
             <Field>
-              <FieldLabel>Provider</FieldLabel>
+              <FieldLabel>Nhà cung cấp</FieldLabel>
               {providers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No providers configured. Add one in Settings.
+                  Chưa cấu hình nhà cung cấp. Thêm trong Cài đặt.
                 </p>
               ) : (
                 <NativeSelect
@@ -80,10 +80,10 @@ export function ChatSettingsDialog({
               )}
             </Field>
             <Field>
-              <FieldLabel>Model</FieldLabel>
+              <FieldLabel>Mô hình</FieldLabel>
               {models.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No models available. Fetch models from your provider.
+                  Không có mô hình. Tải danh sách mô hình từ nhà cung cấp.
                 </p>
               ) : (
                 <NativeSelect
@@ -101,16 +101,16 @@ export function ChatSettingsDialog({
             </Field>
             <Separator />
             <Field>
-              <FieldLabel>System Prompt</FieldLabel>
+              <FieldLabel>Chỉ thị hệ thống</FieldLabel>
               <textarea
                 value={systemPrompt}
                 onChange={(e) => onSystemPromptChange(e.target.value)}
                 rows={3}
                 className="field-sizing-content max-h-40 min-h-16 w-full resize-none rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                placeholder="Instructions for the AI assistant..."
+                placeholder="Chỉ thị cho trợ lý AI..."
               />
               <FieldDescription>
-                Sets the AI&apos;s behavior and personality.
+                Thiết lập hành vi và tính cách của AI.
               </FieldDescription>
             </Field>
             <Field>
@@ -132,14 +132,14 @@ export function ChatSettingsDialog({
                 className="h-2 cursor-pointer accent-primary"
               />
               <FieldDescription>
-                Lower = more focused, higher = more creative.
+                Thấp = tập trung hơn, cao = sáng tạo hơn.
               </FieldDescription>
             </Field>
           </FieldGroup>
         </FieldSet>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Done
+            Xong
           </Button>
         </DialogFooter>
       </DialogContent>

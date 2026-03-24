@@ -66,7 +66,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   {
     type: "groq",
     label: "Groq",
-    description: "Ultra-fast inference — Llama, Mixtral",
+    description: "Suy luận siêu nhanh — Llama, Mixtral",
     defaultBaseUrl: "https://api.groq.com/openai/v1",
     baseUrlEditable: false,
     apiKeyPlaceholder: "gsk_...",
@@ -107,7 +107,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   {
     type: "openrouter",
     label: "OpenRouter",
-    description: "Access 200+ models through one API",
+    description: "Truy cập 200+ mô hình qua một API",
     defaultBaseUrl: "https://openrouter.ai/api/v1",
     baseUrlEditable: false,
     apiKeyPlaceholder: "sk-or-...",
@@ -117,11 +117,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
   {
     type: "openai-compatible",
-    label: "Custom",
-    description: "LM Studio, Ollama, Together, or any compatible endpoint",
+    label: "Tùy chỉnh",
+    description: "LM Studio, Ollama, Together, hoặc bất kỳ endpoint tương thích",
     defaultBaseUrl: "",
     baseUrlEditable: true,
-    apiKeyPlaceholder: "API key (optional for local)",
+    apiKeyPlaceholder: "Khóa API (tùy chọn cho local)",
     iconKey: "",
     popularModels: [],
   },

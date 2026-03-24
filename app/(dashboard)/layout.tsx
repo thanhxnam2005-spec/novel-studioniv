@@ -14,9 +14,9 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { useChatPanel } from "@/lib/stores/chat-panel";
 import { SparklesIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useChatPanel } from "@/lib/stores/chat-panel";
 
 const pageTitles: Record<string, string> = Object.fromEntries(
   navConfig.map((item) => [item.href, item.title]),
@@ -28,14 +28,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const pageTitle = pageTitles[pathname] ?? "Novel Studio";
+  let pageTitle = pageTitles[pathname] ?? "Novel Studio";
+  if (pathname.match(/^\/novels\/[^/]+$/)) pageTitle = "Tiểu thuyết";
+  if (pathname.match(/^\/novels\/[^/]+\/read$/)) pageTitle = "Đọc truyện";
+  if (pathname.match(/^\/novels\/[^/]+\/chapters\/.+$/))
+    pageTitle = "Soạn thảo";
   const toggleChat = useChatPanel((s) => s.toggle);
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1" />
           <Breadcrumb>
             <BreadcrumbList>
@@ -49,7 +53,7 @@ export default function DashboardLayout({
               variant="ghost"
               size="icon-sm"
               onClick={toggleChat}
-              title="Toggle AI Chat (⌘.)"
+              title="Bật/tắt AI Chat (⌘.)"
             >
               <SparklesIcon />
             </Button>

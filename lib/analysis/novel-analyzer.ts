@@ -228,9 +228,11 @@ export async function analyzeNovel({
         const chapter = allChapters[item.chapterIndex];
         const result = results[i];
 
+        const now = new Date();
         await db.chapters.update(chapter.id, {
           summary: result.summary,
-          updatedAt: new Date(),
+          analyzedAt: now,
+          updatedAt: now,
         });
 
         chapterResults.push({

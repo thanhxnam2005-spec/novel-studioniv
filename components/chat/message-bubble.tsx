@@ -74,7 +74,7 @@ export function MessageBubble({
       )}
     >
       <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        {isUser ? "You" : "Assistant"}
+        {isUser ? "Bạn" : "Trợ lý"}
       </span>
 
       {/* Reasoning / thinking block */}
@@ -92,8 +92,8 @@ export function MessageBubble({
               )}
             />
             {isStreaming && !message.content
-              ? "Thinking..."
-              : "Thought for a moment"}
+              ? "Đang suy nghĩ..."
+              : "Đã suy nghĩ một lúc"}
             {reasoningOpen ? (
               <ChevronUp size={12} />
             ) : (
@@ -177,7 +177,7 @@ export function MessageBubble({
               type="button"
               onClick={startEdit}
               className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title="Edit message"
+              title="Sửa tin nhắn"
             >
               <PencilIcon size={12} />
             </button>
@@ -187,7 +187,7 @@ export function MessageBubble({
               type="button"
               onClick={onRerun}
               className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              title="Rerun message"
+              title="Chạy lại tin nhắn"
             >
               <RefreshCwIcon size={12} />
             </button>
