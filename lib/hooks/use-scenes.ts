@@ -1,0 +1,84 @@
+"use client";
+
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, type Scene } from "@/lib/db";
+
+export function useScenes(chapterId: string | undefined) {
+  const scenes = useLiveQuery(
+    () =>
+      chapterId
+        ? db.scenes.where("chapterId").equals(chapterId).sortBy("order")
+        : [],
+    [chapterId]
+  );
+  return scenes;
+}
+
+export function useNovelScenes(novelId: string | undefined) {
+  const scenes = useLiveQuery(
+    () =>
+      novelId
+        ? db.scenes.where("novelId").equals(novelId).sortBy("order")
+        : [],
+    [novelId]
+  );
+  return scenes;
+}
+
+export function useScene(id: string | undefined) {
+  const scene = useLiveQuery(
+    () => (id ? db.scenes.get(id) : undefined),
+    [id]
+  );
+  return scene;
+}
+
+export function useNovelWordCount(novelId: string | undefined) {
+  const wordCount = useLiveQuery(
+    async () => {
+      if (!novelId) return 0;
+      const scenes = await db.scenes
+        .where("novelId")
+        .equals(novelId)
+        .toArray();
+      return scenes.reduce((sum, s) => sum + s.wordCount, 0);
+    },
+    [novelId]
+  );
+  return wordCount ?? 0;
+}
+
+export async function createScene(
+  data: Omit<Scene, "id" | "wordCount" | "createdAt" | "updatedAt">
+) {
+  const now = new Date();
+  const id = crypto.randomUUID();
+  const wordCount = data.content.split(/\s+/).filter(Boolean).length;
+  await db.scenes.add({ ...data, id, wordCount, createdAt: now, updatedAt: now });
+  return id;
+}
+
+export async function updateScene(
+  id: string,
+  data: Partial<Omit<Scene, "id" | "createdAt">>
+) {
+  const updates: Partial<Scene> = { ...data, updatedAt: new Date() };
+  if (data.content !== undefined) {
+    updates.wordCount = data.content.split(/\s+/).filter(Boolean).length;
+  }
+  await db.scenes.update(id, updates);
+}
+
+export async function deleteScene(id: string) {
+  await db.scenes.delete(id);
+}
+
+export async function reorderScenes(
+  scenes: { id: string; order: number }[]
+) {
+  await db.transaction("rw", db.scenes, async () => {
+    for (const { id, order } of scenes) {
+      await db.scenes.update(id, { order, updatedAt: new Date() });
+    }
+  });
+}
