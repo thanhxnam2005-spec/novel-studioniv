@@ -161,7 +161,6 @@ export default function ChapterEditorPage() {
             onReject={clearResult}
             onRegenerate={() => {
               clearResult();
-              // The mode component will show the action button again
             }}
           />
         ) : (

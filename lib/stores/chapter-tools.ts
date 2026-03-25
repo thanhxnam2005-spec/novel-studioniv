@@ -2,9 +2,13 @@ import { create } from "zustand";
 
 export type ChapterToolMode = "translate" | "review" | "edit";
 
+export const PANEL_MIN_WIDTH = 280;
+export const PANEL_MAX_WIDTH = 700;
+
 interface ChapterToolsState {
   // Panel state
   activeMode: ChapterToolMode | null;
+  panelWidth: number;
 
   // Streaming state
   isStreaming: boolean;
@@ -21,6 +25,7 @@ interface ChapterToolsState {
   // Actions
   setActiveMode: (mode: ChapterToolMode | null) => void;
   toggleMode: (mode: ChapterToolMode) => void;
+  setPanelWidth: (width: number) => void;
   startStreaming: () => void;
   setStreamingContent: (text: string) => void;
   finishStreaming: (result: string) => void;
@@ -32,12 +37,18 @@ interface ChapterToolsState {
 
 export const useChapterTools = create<ChapterToolsState>((set, get) => ({
   activeMode: null,
+  panelWidth: 400,
   isStreaming: false,
   streamingContent: "",
   abortController: null,
   reviewResult: null,
   reviewChapterId: null,
   completedResult: null,
+
+  setPanelWidth: (width) => {
+    const clamped = Math.max(PANEL_MIN_WIDTH, Math.min(width, PANEL_MAX_WIDTH));
+    if (clamped !== get().panelWidth) set({ panelWidth: clamped });
+  },
 
   setActiveMode: (mode) => {
     const { isStreaming } = get();

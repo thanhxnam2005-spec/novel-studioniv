@@ -12,6 +12,14 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { getModel } from "@/lib/ai/provider";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
 import {
@@ -52,6 +60,7 @@ import { parseThinkingTags } from "./thinking-parser";
 export function ChatPanel() {
   const { isOpen, close, activeConversationId, setActiveConversation } =
     useChatPanel();
+  const isMobile = useIsMobile();
 
   const providers = useAIProviders();
   const chatSettings = useChatSettings();
@@ -340,216 +349,245 @@ export function ChatPanel() {
       : m,
   );
 
-  return (
-    <div
-      className={cn(
-        "flex h-svh shrink-0 flex-col overflow-hidden border-l bg-card transition-[width] duration-200 ease-in-out sticky top-0",
-        isOpen ? "w-[400px]" : "w-0",
+  const panelContent = (
+    <>
+      {/* Header */}
+      <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+        <div className="flex items-center gap-2">
+          <SparklesIcon className="size-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Trò chuyện AI</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleNewConversation}
+            title="Cuộc trò chuyện mới"
+          >
+            <PlusIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => setHistoryOpen(true)}
+            title="Lịch sử trò chuyện"
+          >
+            <HistoryIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => setSettingsOpen(true)}
+            title="Cài đặt trò chuyện"
+          >
+            <SettingsIcon />
+          </Button>
+          <Button variant="ghost" size="icon-xs" onClick={close}>
+            <XIcon />
+          </Button>
+        </div>
+      </div>
+
+      {historyOpen && (
+        <ChatHistoryDialog
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          conversations={conversations ?? []}
+          activeConversationId={activeConversationId}
+          onSelect={(id) => {
+            setActiveConversation(id);
+            setHistoryOpen(false);
+          }}
+          onDelete={async (id) => {
+            await deleteConversation(id);
+            if (activeConversationId === id) setActiveConversation(null);
+          }}
+        />
       )}
-    >
-      <div
-        className={cn(
-          "flex h-full w-[400px] min-h-0 flex-col",
-          isOpen ? "opacity-100 delay-100" : "opacity-0",
-        )}
+
+      {settingsOpen && (
+        <ChatSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          providers={providers ?? []}
+          models={models ?? []}
+          selectedProviderId={selectedProviderId}
+          onProviderChange={(id) =>
+            updateChatSettings({ providerId: id, modelId: "" })
+          }
+          selectedModelId={selectedModelId}
+          onModelChange={(id) => updateChatSettings({ modelId: id })}
+          systemPrompt={systemPrompt}
+          onSystemPromptChange={(p) =>
+            updateChatSettings({ systemPrompt: p })
+          }
+          temperature={temperature}
+          onTemperatureChange={(t) => updateChatSettings({ temperature: t })}
+        />
+      )}
+
+      {/* Messages */}
+      <StickToBottom
+        className="relative min-h-0 flex-1"
+        resize="smooth"
+        initial="instant"
       >
-        {/* Header */}
-        <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
-          <div className="flex items-center gap-2">
-            <SparklesIcon className="size-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Trò chuyện AI</span>
-          </div>
-          <div className="flex items-center gap-1">
+        <StickToBottom.Content className="flex flex-col gap-4 p-4">
+          {!hasProvider ? (
+            <Empty className="my-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <BotIcon />
+                </EmptyMedia>
+                <EmptyTitle>Chưa cấu hình nhà cung cấp AI</EmptyTitle>
+                <EmptyDescription>
+                  Thêm nhà cung cấp trong Cài đặt để bắt đầu trò chuyện.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : displayMessages.length === 0 ? (
+            <Empty className="my-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <SparklesIcon />
+                </EmptyMedia>
+                <EmptyTitle>Trợ lý sáng tác</EmptyTitle>
+                <EmptyDescription>
+                  Đặt câu hỏi, brainstorm ý tưởng, hoặc nhận trợ giúp với bài
+                  viết của bạn.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            displayMessages
+              .filter((m) => m.role !== "system")
+              .map((msg) => (
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  isStreaming={isStreaming && msg.id === streamingMsgId}
+                  onEdit={
+                    msg.role === "user" && !isStreaming
+                      ? (newContent) => handleEditMessage(msg.id, newContent)
+                      : undefined
+                  }
+                  onRerun={
+                    msg.role === "user" && !isStreaming
+                      ? () => handleRerunMessage(msg.id, msg.content)
+                      : undefined
+                  }
+                />
+              ))
+          )}
+          {isStreaming && !streamingContent && !streamingReasoning && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <LoaderIcon className="size-3 animate-spin" />
+              Đang suy nghĩ...
+            </div>
+          )}
+        </StickToBottom.Content>
+        <ScrollToBottom />
+      </StickToBottom>
+
+      {/* Input */}
+      <div className="shrink-0 border-t p-3">
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              hasProvider
+                ? "Hỏi trợ lý sáng tác..."
+                : "Vui lòng cấu hình nhà cung cấp trước"
+            }
+            disabled={!hasProvider || !hasModels}
+            rows={1}
+            className="field-sizing-content max-h-32 min-h-8 flex-1 resize-none rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          />
+          {isStreaming ? (
             <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleNewConversation}
-              title="Cuộc trò chuyện mới"
+              size="icon"
+              variant="outline"
+              onClick={handleStop}
+              title="Dừng tạo"
             >
-              <PlusIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setHistoryOpen(true)}
-              title="Lịch sử trò chuyện"
-            >
-              <HistoryIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => setSettingsOpen(true)}
-              title="Cài đặt trò chuyện"
-            >
-              <SettingsIcon />
-            </Button>
-            <Button variant="ghost" size="icon-xs" onClick={close}>
               <XIcon />
             </Button>
-          </div>
-        </div>
-
-        {historyOpen && (
-          <ChatHistoryDialog
-            open={historyOpen}
-            onOpenChange={setHistoryOpen}
-            conversations={conversations ?? []}
-            activeConversationId={activeConversationId}
-            onSelect={(id) => {
-              setActiveConversation(id);
-              setHistoryOpen(false);
-            }}
-            onDelete={async (id) => {
-              await deleteConversation(id);
-              if (activeConversationId === id) setActiveConversation(null);
-            }}
-          />
-        )}
-
-        {settingsOpen && (
-          <ChatSettingsDialog
-            open={settingsOpen}
-            onOpenChange={setSettingsOpen}
-            providers={providers ?? []}
-            models={models ?? []}
-            selectedProviderId={selectedProviderId}
-            onProviderChange={(id) =>
-              updateChatSettings({ providerId: id, modelId: "" })
-            }
-            selectedModelId={selectedModelId}
-            onModelChange={(id) => updateChatSettings({ modelId: id })}
-            systemPrompt={systemPrompt}
-            onSystemPromptChange={(p) =>
-              updateChatSettings({ systemPrompt: p })
-            }
-            temperature={temperature}
-            onTemperatureChange={(t) => updateChatSettings({ temperature: t })}
-          />
-        )}
-
-        {/* Messages */}
-        <StickToBottom
-          className="relative min-h-0 flex-1"
-          resize="smooth"
-          initial="instant"
-        >
-          <StickToBottom.Content className="flex flex-col gap-4 p-4">
-            {!hasProvider ? (
-              <Empty className="my-8">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <BotIcon />
-                  </EmptyMedia>
-                  <EmptyTitle>Chưa cấu hình nhà cung cấp AI</EmptyTitle>
-                  <EmptyDescription>
-                    Thêm nhà cung cấp trong Cài đặt để bắt đầu trò chuyện.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : displayMessages.length === 0 ? (
-              <Empty className="my-8">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <SparklesIcon />
-                  </EmptyMedia>
-                  <EmptyTitle>Trợ lý sáng tác</EmptyTitle>
-                  <EmptyDescription>
-                    Đặt câu hỏi, brainstorm ý tưởng, hoặc nhận trợ giúp với bài
-                    viết của bạn.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              displayMessages
-                .filter((m) => m.role !== "system")
-                .map((msg) => (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isStreaming={isStreaming && msg.id === streamingMsgId}
-                    onEdit={
-                      msg.role === "user" && !isStreaming
-                        ? (newContent) => handleEditMessage(msg.id, newContent)
-                        : undefined
-                    }
-                    onRerun={
-                      msg.role === "user" && !isStreaming
-                        ? () => handleRerunMessage(msg.id, msg.content)
-                        : undefined
-                    }
-                  />
-                ))
-            )}
-            {isStreaming && !streamingContent && !streamingReasoning && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <LoaderIcon className="size-3 animate-spin" />
-                Đang suy nghĩ...
-              </div>
-            )}
-          </StickToBottom.Content>
-          <ScrollToBottom />
-        </StickToBottom>
-
-        {/* Input */}
-        <div className="shrink-0 border-t p-3">
-          <div className="flex items-end gap-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                hasProvider
-                  ? "Hỏi trợ lý sáng tác..."
-                  : "Vui lòng cấu hình nhà cung cấp trước"
-              }
-              disabled={!hasProvider || !hasModels}
-              rows={1}
-              className="field-sizing-content max-h-32 min-h-8 flex-1 resize-none rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-            />
-            {isStreaming ? (
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={handleStop}
-                title="Dừng tạo"
-              >
-                <XIcon />
-              </Button>
-            ) : (
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!canSend}
-                title="Gửi tin nhắn"
-              >
-                <SendIcon />
-              </Button>
-            )}
-          </div>
-          <div className="mt-1.5 flex items-center justify-between">
-            <NativeSelect
-              size="sm"
-              className="max-w-[160px] *:text-[11px]!"
-              value={selectedModelId}
-              onChange={(e) => updateChatSettings({ modelId: e.target.value })}
-              disabled={!hasModels || isStreaming}
+          ) : (
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={!canSend}
+              title="Gửi tin nhắn"
             >
-              {!hasModels && (
-                <NativeSelectOption value="">Không có model</NativeSelectOption>
-              )}
-              {models?.map((m) => (
-                <NativeSelectOption key={m.id} value={m.modelId}>
-                  {m.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            <span className="text-[10px] text-muted-foreground/60">
-              <kbd className="font-mono">Shift+Enter</kbd> dòng mới
-            </span>
-          </div>
+              <SendIcon />
+            </Button>
+          )}
         </div>
+        <div className="mt-1.5 flex items-center justify-between">
+          <NativeSelect
+            size="sm"
+            className="max-w-[160px] *:text-[11px]!"
+            value={selectedModelId}
+            onChange={(e) => updateChatSettings({ modelId: e.target.value })}
+            disabled={!hasModels || isStreaming}
+          >
+            {!hasModels && (
+              <NativeSelectOption value="">Không có model</NativeSelectOption>
+            )}
+            {models?.map((m) => (
+              <NativeSelectOption key={m.id} value={m.modelId}>
+                {m.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <span className="text-[10px] text-muted-foreground/60">
+            <kbd className="font-mono">Shift+Enter</kbd> dòng mới
+          </span>
+        </div>
+      </div>
+    </>
+  );
+
+  // Mobile: Sheet drawer (mirrors Sidebar mobile path)
+  if (isMobile) {
+    return (
+      <Sheet open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          className="w-[85vw] bg-card p-0"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Trò chuyện AI</SheetTitle>
+            <SheetDescription>Bảng trò chuyện AI</SheetDescription>
+          </SheetHeader>
+          <div className="flex h-full w-full flex-col">{panelContent}</div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  // Desktop: gap spacer + fixed container (mirrors Sidebar desktop path)
+  return (
+    <div className="hidden md:block">
+      {/* Gap spacer */}
+      <div
+        className={cn(
+          "relative bg-transparent transition-[width] duration-200 ease-linear",
+          isOpen ? "w-[400px]" : "w-0",
+        )}
+      />
+      {/* Fixed container */}
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-10 hidden h-svh w-[400px] border-l bg-card transition-[right] duration-200 ease-linear md:flex",
+          !isOpen && "right-[calc(400px*-1)]",
+        )}
+      >
+        <div className="flex size-full flex-col">{panelContent}</div>
       </div>
     </div>
   );

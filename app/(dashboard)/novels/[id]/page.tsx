@@ -19,7 +19,7 @@ import {
   useNovelAnalysis,
   useNovelScenes,
 } from "@/lib/hooks";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +27,10 @@ type AnalysisMode = "full" | "incremental" | "selected";
 
 export default function NovelDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") ?? "overview";
   const novel = useNovel(id);
   const chapters = useChapters(id);
   const scenes = useNovelScenes(id);
@@ -129,7 +133,21 @@ export default function NovelDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          const params = new URLSearchParams(searchParams.toString());
+          if (value === "overview") {
+            params.delete("tab");
+          } else {
+            params.set("tab", value);
+          }
+          const query = params.toString();
+          router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+            scroll: false,
+          });
+        }}
+      >
         <TabsList className="w-full justify-center">
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="world-building">Thế giới quan</TabsTrigger>
