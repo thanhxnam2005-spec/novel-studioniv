@@ -19,7 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { toast } from "sonner";
 import {
   useAnalysisSettings,
   updateAnalysisSettings,
@@ -139,40 +138,12 @@ function StepModelSelector({
 export function AnalysisModelPicker() {
   const settings = useAnalysisSettings();
   const [isOpen, setIsOpen] = useState(false);
-  const [drafts, setDrafts] = useState<
-    Record<string, StepModelConfig | undefined>
-  >({});
-  const [saving, setSaving] = useState(false);
-
-  const getValue = (step: StepConfig): StepModelConfig | undefined =>
-    step.key in drafts ? drafts[step.key] : settings[step.key];
 
   const handleChange = (
     step: StepConfig,
     value: StepModelConfig | undefined,
   ) => {
-    setDrafts((prev) => ({ ...prev, [step.key]: value }));
-  };
-
-  const hasAnyDraft = STEPS.some((s) => s.key in drafts);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updates: Record<string, StepModelConfig | undefined> = {};
-      for (const step of STEPS) {
-        if (step.key in drafts) {
-          updates[step.key] = drafts[step.key];
-        }
-      }
-      await updateAnalysisSettings(updates);
-      setDrafts({});
-      toast.success("Đã lưu cài đặt mô hình");
-    } catch {
-      toast.error("Lưu cài đặt mô hình thất bại");
-    } finally {
-      setSaving(false);
-    }
+    updateAnalysisSettings({ [step.key]: value });
   };
 
   const hasAnyCustom = STEPS.some((s) => settings[s.key]);
@@ -199,7 +170,7 @@ export function AnalysisModelPicker() {
               )}
             </CardTitle>
             <CardDescription>
-              Sử dụng nhà cung cấp hoặc mô hình khác nhau cho từng bước phân tích
+              Sử dụng nhà cung cấp hoặc mô hình khác nhau cho từng bước phân tích. Tự động lưu.
             </CardDescription>
           </div>
         </div>
@@ -211,18 +182,10 @@ export function AnalysisModelPicker() {
             <StepModelSelector
               key={step.key}
               step={step}
-              value={getValue(step)}
+              value={settings[step.key]}
               onChange={(v) => handleChange(step, v)}
             />
           ))}
-
-          {hasAnyDraft && (
-            <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={saving} size="sm">
-                {saving ? "Đang lưu..." : "Lưu"}
-              </Button>
-            </div>
-          )}
 
           <p className="text-xs text-muted-foreground">
             Khi đặt là &ldquo;Mặc định&rdquo;, sẽ kế thừa nhà cung cấp và

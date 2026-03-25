@@ -25,7 +25,8 @@ import {
   useChatSettings,
 } from "@/lib/hooks";
 import { useAnalysisStore } from "@/lib/stores/analysis";
-import { GaugeIcon, TelescopeIcon, ZapIcon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { GaugeIcon, InfoIcon, TelescopeIcon, ZapIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -68,6 +69,7 @@ export function AnalysisDialog({
     setPhase,
     addError,
     setError,
+    setResultSummary,
     reset,
   } = useAnalysisStore();
   const isDone =
@@ -139,7 +141,11 @@ export function AnalysisDialog({
       if (mode === "full") {
         await analyzeNovel(commonOpts);
       } else {
-        await analyzeNovelIncremental(commonOpts);
+        const result = await analyzeNovelIncremental({
+          ...commonOpts,
+          selectedChapterIds: mode === "selected" ? selectedChapterIds : undefined,
+        });
+        setResultSummary(result);
       }
       const storeErrors = useAnalysisStore.getState().errors;
       if (storeErrors.length > 0) {
@@ -175,6 +181,7 @@ export function AnalysisDialog({
     setPhase,
     addError,
     setError,
+    setResultSummary,
     reset,
     resolveStep,
   ]);
@@ -207,6 +214,17 @@ export function AnalysisDialog({
             {/* Config (when not running and not done) */}
             {!isAnalyzing && !isDone && (
               <>
+                <Alert>
+                  <InfoIcon />
+                  <AlertTitle>Lưu ý chọn mô hình</AlertTitle>
+                  <AlertDescription>
+                    Phân tích yêu cầu phản hồi có cấu trúc (JSON/tool calling).
+                    Nên dùng các mô hình mạnh như GPT-4o, Claude 3.5+, Gemini
+                    Pro, hoặc DeepSeek-V3. Các mô hình nhỏ có thể gây lỗi hoặc
+                    cho kết quả kém.
+                  </AlertDescription>
+                </Alert>
+
                 <div>
                   <p className="mb-2 text-xs font-medium">Độ sâu</p>
                   <div className="flex gap-2">

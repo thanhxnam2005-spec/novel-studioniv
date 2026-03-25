@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -55,69 +55,79 @@ const PROMPT_FIELDS: PromptField[] = [
   },
 ];
 
+function DebouncedTextarea({
+  field,
+  value,
+  onSave,
+  onReset,
+}: {
+  field: PromptField;
+  value: string;
+  onSave: (key: string, value: string) => void;
+  onReset: (field: PromptField) => void;
+}) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isCustomized = value.trim() !== "";
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const handleChange = useCallback(
+    (val: string) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        onSave(field.key, val);
+      }, 800);
+    },
+    [field.key, onSave],
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>{field.label}</Label>
+          <p className="text-xs text-muted-foreground">{field.description}</p>
+        </div>
+        {isCustomized && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onReset(field)}
+            className="h-7 text-xs"
+          >
+            <RotateCcwIcon className="mr-1 size-3" />
+            Đặt lại
+          </Button>
+        )}
+      </div>
+      <Textarea
+        key={value} // Reset textarea when value changes externally (e.g. reset)
+        defaultValue={value}
+        onChange={(e) => handleChange(e.target.value)}
+        placeholder={field.defaultValue}
+        className="min-h-[120px] font-mono text-xs leading-relaxed"
+      />
+    </div>
+  );
+}
+
 export function AnalysisPromptEditor() {
   const settings = useAnalysisSettings();
   const [isOpen, setIsOpen] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
 
-  const getValue = (field: PromptField) =>
-    drafts[field.key] ??
-    settings[field.key] ??
-    "";
+  const handleSave = useCallback(
+    async (key: string, value: string) => {
+      await updateAnalysisSettings({
+        [key]: value.trim() || undefined,
+      });
+    },
+    [],
+  );
 
-  const getPlaceholder = (field: PromptField) => field.defaultValue;
-
-  const isModified = (field: PromptField) => {
-    const draft = drafts[field.key];
-    if (draft !== undefined) {
-      // Has unsaved draft — compare to stored value
-      return draft !== (settings[field.key] ?? "");
-    }
-    return false;
-  };
-
-  const isCustomized = (field: PromptField) => {
-    const stored = settings[field.key];
-    return !!stored && stored.trim() !== "";
-  };
-
-  const handleChange = (field: PromptField, value: string) => {
-    setDrafts((prev) => ({ ...prev, [field.key]: value }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updates: Record<string, string | undefined> = {};
-      for (const field of PROMPT_FIELDS) {
-        const draft = drafts[field.key];
-        if (draft !== undefined) {
-          // Empty string means "use default" — store undefined
-          updates[field.key] = draft.trim() || undefined;
-        }
-      }
-      await updateAnalysisSettings(updates);
-      setDrafts({});
-      toast.success("Đã lưu prompt");
-    } catch {
-      toast.error("Lưu prompt thất bại");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleReset = async (field: PromptField) => {
+  const handleReset = useCallback(async (field: PromptField) => {
     await updateAnalysisSettings({ [field.key]: undefined });
-    setDrafts((prev) => {
-      const next = { ...prev };
-      delete next[field.key];
-      return next;
-    });
     toast.success(`Đã đặt lại prompt ${field.label} về mặc định`);
-  };
-
-  const hasAnyDraft = PROMPT_FIELDS.some((f) => isModified(f));
+  }, []);
 
   return (
     <Card>
@@ -134,7 +144,7 @@ export function AnalysisPromptEditor() {
           <div>
             <CardTitle className="text-base">Prompt tùy chỉnh</CardTitle>
             <CardDescription>
-              Tùy chỉnh chỉ thị hệ thống cho từng bước phân tích
+              Tùy chỉnh chỉ thị hệ thống cho từng bước phân tích. Tự động lưu khi chỉnh sửa.
             </CardDescription>
           </div>
         </div>
@@ -143,42 +153,14 @@ export function AnalysisPromptEditor() {
       {isOpen && (
         <CardContent className="space-y-5 pt-0">
           {PROMPT_FIELDS.map((field) => (
-            <div key={field.key} className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>{field.label}</Label>
-                  <p className="text-xs text-muted-foreground">
-                    {field.description}
-                  </p>
-                </div>
-                {isCustomized(field) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleReset(field)}
-                    className="h-7 text-xs"
-                  >
-                    <RotateCcwIcon className="mr-1 size-3" />
-                    Đặt lại
-                  </Button>
-                )}
-              </div>
-              <Textarea
-                value={getValue(field)}
-                onChange={(e) => handleChange(field, e.target.value)}
-                placeholder={getPlaceholder(field)}
-                className="min-h-[120px] font-mono text-xs leading-relaxed"
-              />
-            </div>
+            <DebouncedTextarea
+              key={field.key}
+              field={field}
+              value={settings[field.key] ?? ""}
+              onSave={handleSave}
+              onReset={handleReset}
+            />
           ))}
-
-          {hasAnyDraft && (
-            <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={saving} size="sm">
-                {saving ? "Đang lưu..." : "Lưu prompt"}
-              </Button>
-            </div>
-          )}
 
           <p className="text-xs text-muted-foreground">
             Để trống để sử dụng prompt mặc định. Định dạng đầu ra (JSON

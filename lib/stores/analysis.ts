@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AnalysisError, AnalysisPhase } from "@/lib/analysis";
+import type { IncrementalResultSummary } from "@/lib/analysis/incremental-analyzer";
 
 interface AnalysisState {
   isAnalyzing: boolean;
@@ -9,11 +10,13 @@ interface AnalysisState {
   totalChapters: number;
   errors: AnalysisError[];
   abortController: AbortController | null;
+  resultSummary: IncrementalResultSummary | null;
   start: (novelId: string, totalChapters: number) => void;
   updateProgress: (chaptersCompleted: number, totalChapters?: number) => void;
   setPhase: (phase: AnalysisPhase | "error" | "completed_with_errors") => void;
   addError: (error: AnalysisError) => void;
   setError: (error: string) => void;
+  setResultSummary: (summary: IncrementalResultSummary) => void;
   cancel: () => void;
   reset: () => void;
 }
@@ -26,6 +29,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   totalChapters: 0,
   errors: [],
   abortController: null,
+  resultSummary: null,
 
   start: (novelId, totalChapters) =>
     set({
@@ -35,6 +39,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       chaptersCompleted: 0,
       totalChapters,
       errors: [],
+      resultSummary: null,
       abortController: new AbortController(),
     }),
 
@@ -59,6 +64,8 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       isAnalyzing: false,
     }),
 
+  setResultSummary: (summary) => set({ resultSummary: summary }),
+
   cancel: () => {
     const { abortController } = get();
     abortController?.abort();
@@ -73,6 +80,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
       chaptersCompleted: 0,
       totalChapters: 0,
       errors: [],
+      resultSummary: null,
       abortController: null,
     }),
 }));

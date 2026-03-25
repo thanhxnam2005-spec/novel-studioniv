@@ -15,8 +15,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useChatPanel } from "@/lib/stores/chat-panel";
-import { SparklesIcon } from "lucide-react";
+import { MoonIcon, SparklesIcon, SunIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const pageTitles: Record<string, string> = Object.fromEntries(
   navConfig.map((item) => [item.href, item.title]),
@@ -35,6 +36,22 @@ export default function DashboardLayout({
     pageTitle = "Soạn thảo";
   const toggleChat = useChatPanel((s) => s.toggle);
 
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const isDark =
+      stored === "dark" ||
+      (!stored && matchMedia("(prefers-color-scheme:dark)").matches);
+    document.documentElement.classList.toggle("dark", isDark);
+    setDark(isDark);
+  }, []);
+  const toggleDark = () => {
+    const next = !dark;
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+    setDark(next);
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -48,7 +65,15 @@ export default function DashboardLayout({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={toggleDark}
+              title="Chế độ sáng/tối"
+            >
+              {dark ? <SunIcon /> : <MoonIcon />}
+            </Button>
             <Button
               variant="ghost"
               size="icon-sm"

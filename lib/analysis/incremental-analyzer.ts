@@ -41,6 +41,23 @@ async function runWithConcurrency<T>(
   return results;
 }
 
+// ─── Result Summary ─────────────────────────────────────────
+
+export interface IncrementalResultSummary {
+  chaptersAnalyzed: number;
+  charactersAdded: number;
+  charactersUpdated: number;
+  relationshipsAdded: number;
+  /** Names of aggregation fields that were updated */
+  updatedFields: string[];
+  factionsAdded: number;
+  factionsUpdated: number;
+  locationsAdded: number;
+  locationsUpdated: number;
+}
+
+// ─── Options ────────────────────────────────────────────────
+
 export interface IncrementalAnalyzeOptions {
   novelId: string;
   defaultModel: LanguageModel;
@@ -54,6 +71,8 @@ export interface IncrementalAnalyzeOptions {
     characters?: LanguageModel;
   };
   globalSystemInstruction?: string;
+  /** When provided, only analyze these specific chapters (ignoring stale detection) */
+  selectedChapterIds?: string[];
 }
 
 /**
@@ -61,6 +80,8 @@ export interface IncrementalAnalyzeOptions {
  * 1. Only analyze chapters that changed or are new
  * 2. Use tool calls to surgically update existing analysis (not regenerate)
  * 3. Use tool calls to update/add character profiles
+ *
+ * Returns a summary of what changed.
  */
 export async function analyzeNovelIncremental({
   novelId,
@@ -71,7 +92,8 @@ export async function analyzeNovelIncremental({
   customPrompts,
   stepModels,
   globalSystemInstruction,
-}: IncrementalAnalyzeOptions): Promise<void> {
+  selectedChapterIds,
+}: IncrementalAnalyzeOptions): Promise<IncrementalResultSummary> {
   const budget = getBudget(depth);
   const rawPrompts = resolvePrompts(customPrompts);
   const g = globalSystemInstruction?.trim();
@@ -81,12 +103,39 @@ export async function analyzeNovelIncremental({
   const aggregationModel = stepModels?.aggregation ?? defaultModel;
   const characterModel = stepModels?.characters ?? defaultModel;
 
+  // Track what changed
+  const summary: IncrementalResultSummary = {
+    chaptersAnalyzed: 0,
+    charactersAdded: 0,
+    charactersUpdated: 0,
+    relationshipsAdded: 0,
+    updatedFields: [],
+    factionsAdded: 0,
+    factionsUpdated: 0,
+    locationsAdded: 0,
+    locationsUpdated: 0,
+  };
+
   // Determine which chapters need work
-  const { needsAnalysis, upToDate } =
-    await getChaptersNeedingAnalysis(novelId);
+  let needsAnalysis: Awaited<ReturnType<typeof getChaptersNeedingAnalysis>>["needsAnalysis"];
+  let upToDate: Awaited<ReturnType<typeof getChaptersNeedingAnalysis>>["upToDate"];
+
+  if (selectedChapterIds && selectedChapterIds.length > 0) {
+    const allChaptersRaw = await db.chapters
+      .where("novelId")
+      .equals(novelId)
+      .sortBy("order");
+    const selectedSet = new Set(selectedChapterIds);
+    needsAnalysis = allChaptersRaw.filter((ch) => selectedSet.has(ch.id));
+    upToDate = allChaptersRaw.filter((ch) => !selectedSet.has(ch.id));
+  } else {
+    const result = await getChaptersNeedingAnalysis(novelId);
+    needsAnalysis = result.needsAnalysis;
+    upToDate = result.upToDate;
+  }
 
   if (needsAnalysis.length === 0) {
-    throw new Error("Tất cả chương đã được phân tích — không có gì cần phân tích");
+    throw new Error("Không có chương nào cần phân tích");
   }
 
   const allChapters = [...upToDate, ...needsAnalysis].sort(
@@ -242,6 +291,7 @@ export async function analyzeNovelIncremental({
   });
 
   await runWithConcurrency(batchTasks, CONCURRENCY_LIMIT);
+  summary.chaptersAnalyzed = newChapterResults.length;
 
   // ── Phase 2: Incremental aggregation via tool calls ─────
   if (newChapterResults.length > 0) {
@@ -262,11 +312,17 @@ export async function analyzeNovelIncremental({
       const aggregationResult = await generateText({
         model: aggregationModel,
         system: prepend(
-          `Bạn là nhà phân tích văn học đang cập nhật phân tích tiểu thuyết hiện có với nội dung chương mới.
-Bạn có các công cụ để cập nhật từng phần cụ thể của phân tích.
-Chỉ gọi công cụ cho các trường cần thay đổi dựa trên các chương mới.
-Nếu trường không bị ảnh hưởng, KHÔNG gọi công cụ đó.
-Bạn có thể gọi nhiều công cụ cùng lúc. Trả lời bằng Tiếng Việt.`,
+          `Bạn là nhà phân tích văn học đang cập nhật phân tích tiểu thuyết hiện có dựa trên nội dung chương mới.
+
+Quy tắc:
+- Bạn có các công cụ để cập nhật từng phần cụ thể. Chỉ gọi công cụ cho phần THỰC SỰ cần thay đổi.
+- Nếu chương mới không ảnh hưởng đến một trường, KHÔNG gọi công cụ cho trường đó.
+- Khi cập nhật synopsis, viết lại hoàn chỉnh (không chỉ thêm vào cuối), giữ hấp dẫn và không spoil.
+- Khi cập nhật genres/tags, giữ lại các mục cũ vẫn đúng, thêm mới nếu cần, bỏ mục không còn phù hợp.
+- Khi thêm/cập nhật phe phái hoặc địa điểm, kiểm tra xem đã tồn tại chưa trước khi thêm mới.
+- Bạn có thể gọi nhiều công cụ cùng lúc.
+
+Trả lời bằng Tiếng Việt.`,
         ),
         prompt: `## Phân tích hiện tại
 ${JSON.stringify(
@@ -293,47 +349,56 @@ Dựa trên các chương mới, hãy gọi các công cụ phù hợp để c�
         abortSignal: signal,
       });
 
-      // Apply aggregation tool calls
+      // Apply aggregation tool calls — batch DB reads
       for (const step of aggregationResult.steps) {
         for (const tc of step.toolCalls as any[]) {
+          const input = (tc as any).input;
           switch (tc.toolName) {
             case "update_synopsis":
-              await db.novels.update(novelId, { synopsis: (tc as any).input.synopsis, updatedAt: new Date() });
+              await db.novels.update(novelId, { synopsis: input.synopsis, updatedAt: new Date() });
+              summary.updatedFields.push("Tóm tắt");
               break;
             case "update_genres_tags":
-              await db.novels.update(novelId, { genres: (tc as any).input.genres, tags: (tc as any).input.tags, updatedAt: new Date() });
+              await db.novels.update(novelId, { genres: input.genres, tags: input.tags, updatedAt: new Date() });
+              summary.updatedFields.push("Thể loại & Nhãn");
               break;
             case "update_world_building": {
               const updates: any = { updatedAt: new Date() };
-              if ((tc as any).input.worldOverview !== undefined) updates.worldOverview = (tc as any).input.worldOverview;
-              if ((tc as any).input.powerSystem !== undefined) updates.powerSystem = (tc as any).input.powerSystem ?? undefined;
-              if ((tc as any).input.storySetting !== undefined) updates.storySetting = (tc as any).input.storySetting;
-              if ((tc as any).input.timePeriod !== undefined) updates.timePeriod = (tc as any).input.timePeriod ?? undefined;
-              if ((tc as any).input.worldRules !== undefined) updates.worldRules = (tc as any).input.worldRules ?? undefined;
-              if ((tc as any).input.technologyLevel !== undefined) updates.technologyLevel = (tc as any).input.technologyLevel ?? undefined;
+              const fields: string[] = [];
+              if (input.worldOverview !== undefined) { updates.worldOverview = input.worldOverview; fields.push("Thế giới quan"); }
+              if (input.powerSystem !== undefined) { updates.powerSystem = input.powerSystem ?? undefined; fields.push("Hệ thống sức mạnh"); }
+              if (input.storySetting !== undefined) { updates.storySetting = input.storySetting; fields.push("Bối cảnh"); }
+              if (input.timePeriod !== undefined) { updates.timePeriod = input.timePeriod ?? undefined; fields.push("Thời kỳ"); }
+              if (input.worldRules !== undefined) { updates.worldRules = input.worldRules ?? undefined; fields.push("Quy luật thế giới"); }
+              if (input.technologyLevel !== undefined) { updates.technologyLevel = input.technologyLevel ?? undefined; fields.push("Công nghệ"); }
               await db.novels.update(novelId, updates);
+              summary.updatedFields.push(...fields);
               break;
             }
             case "add_faction": {
               const n = await db.novels.get(novelId);
-              await db.novels.update(novelId, { factions: [...(n?.factions ?? []), (tc as any).input], updatedAt: new Date() });
+              await db.novels.update(novelId, { factions: [...(n?.factions ?? []), input], updatedAt: new Date() });
+              summary.factionsAdded++;
               break;
             }
             case "update_faction": {
               const n = await db.novels.get(novelId);
-              const factions = (n?.factions ?? []).map((f) => f.name.toLowerCase() === (tc as any).input.name.toLowerCase() ? { name: f.name, description: (tc as any).input.description } : f);
+              const factions = (n?.factions ?? []).map((f) => f.name.toLowerCase() === input.name.toLowerCase() ? { name: f.name, description: input.description } : f);
               await db.novels.update(novelId, { factions, updatedAt: new Date() });
+              summary.factionsUpdated++;
               break;
             }
             case "add_location": {
               const n = await db.novels.get(novelId);
-              await db.novels.update(novelId, { keyLocations: [...(n?.keyLocations ?? []), (tc as any).input], updatedAt: new Date() });
+              await db.novels.update(novelId, { keyLocations: [...(n?.keyLocations ?? []), input], updatedAt: new Date() });
+              summary.locationsAdded++;
               break;
             }
             case "update_location": {
               const n = await db.novels.get(novelId);
-              const locs = (n?.keyLocations ?? []).map((l) => l.name.toLowerCase() === (tc as any).input.name.toLowerCase() ? { name: l.name, description: (tc as any).input.description } : l);
+              const locs = (n?.keyLocations ?? []).map((l) => l.name.toLowerCase() === input.name.toLowerCase() ? { name: l.name, description: input.description } : l);
               await db.novels.update(novelId, { keyLocations: locs, updatedAt: new Date() });
+              summary.locationsUpdated++;
               break;
             }
           }
@@ -390,10 +455,17 @@ Dựa trên các chương mới, hãy gọi các công cụ phù hợp để c�
 
         const charResult = await generateText({
           model: characterModel,
-          system: prepend(`Bạn là nhà phân tích văn học đang cập nhật hồ sơ nhân vật với thông tin từ các chương mới.
-Bạn có các công cụ để thêm nhân vật mới hoặc cập nhật nhân vật đã có.
-Chỉ gọi công cụ cho nhân vật bị ảnh hưởng bởi các chương mới.
-Không tạo lại nhân vật đã có mà không thay đổi. Trả lời bằng Tiếng Việt.`),
+          system: prepend(`Bạn là nhà phân tích văn học đang cập nhật hồ sơ nhân vật dựa trên thông tin từ các chương mới.
+
+Quy tắc:
+- Dùng add_character cho nhân vật CHƯA có trong danh sách hiện có (so sánh tên, bao gồm biệt danh/danh xưng).
+- Dùng update_character cho nhân vật ĐÃ có — chỉ cập nhật trường có thông tin mới, không ghi đè trường cũ bằng giá trị kém hơn.
+- Dùng add_relationship khi phát hiện mối quan hệ mới giữa hai nhân vật.
+- KHÔNG tạo lại nhân vật đã có. KHÔNG gọi công cụ nếu không có thông tin mới.
+- Gộp nhân vật có nhiều tên gọi (biệt danh, danh xưng, họ/tên) — chọn tên đầy đủ nhất.
+- Bỏ qua nhân vật nền/quần chúng không tên.
+
+Trả lời bằng Tiếng Việt.`),
           prompt: `## Nhân vật hiện có\n${existingProfilesText || "Chưa có."}\n\n## Đề cập nhân vật mới (từ các chương vừa phân tích)\n${mentionsText}\n\nDựa trên các đề cập mới, hãy gọi các công cụ phù hợp để thêm hoặc cập nhật nhân vật.`,
           tools: characterTools,
           stopWhen: stepCountIs(10),
@@ -403,38 +475,44 @@ Không tạo lại nhân vật đã có mà không thay đổi. Trả lời bằ
         const ts = new Date();
         for (const step of charResult.steps) {
           for (const tc of step.toolCalls as any[]) {
+            const input = (tc as any).input;
             switch (tc.toolName) {
               case "add_character": {
-                const existing = await db.characters.where("novelId").equals(novelId).filter((c) => c.name.toLowerCase().trim() === (tc as any).input.name.toLowerCase().trim()).first();
+                const existing = await db.characters.where("novelId").equals(novelId).filter((c) => c.name.toLowerCase().trim() === input.name.toLowerCase().trim()).first();
                 if (!existing) {
                   await db.characters.add({
                     id: crypto.randomUUID(), novelId,
-                    name: (tc as any).input.name, role: (tc as any).input.role, description: (tc as any).input.description,
-                    age: (tc as any).input.age, sex: (tc as any).input.sex, appearance: (tc as any).input.appearance,
-                    personality: (tc as any).input.personality, hobbies: (tc as any).input.hobbies,
-                    relationshipWithMC: (tc as any).input.relationshipWithMC, relationships: (tc as any).input.relationships,
-                    characterArc: (tc as any).input.characterArc, strengths: (tc as any).input.strengths,
-                    weaknesses: (tc as any).input.weaknesses, motivations: (tc as any).input.motivations, goals: (tc as any).input.goals,
+                    name: input.name, role: input.role, description: input.description,
+                    age: input.age, sex: input.sex, appearance: input.appearance,
+                    personality: input.personality, hobbies: input.hobbies,
+                    relationshipWithMC: input.relationshipWithMC, relationships: input.relationships,
+                    characterArc: input.characterArc, strengths: input.strengths,
+                    weaknesses: input.weaknesses, motivations: input.motivations, goals: input.goals,
                     createdAt: ts, updatedAt: ts,
                   });
+                  summary.charactersAdded++;
                 }
                 break;
               }
               case "update_character": {
-                const char = await db.characters.where("novelId").equals(novelId).filter((c) => c.name.toLowerCase().trim() === (tc as any).input.name.toLowerCase().trim()).first();
+                const char = await db.characters.where("novelId").equals(novelId).filter((c) => c.name.toLowerCase().trim() === input.name.toLowerCase().trim()).first();
                 if (char) {
-                  const { name: _, ...updates } = (tc as any).input;
+                  const { name: _, ...updates } = input;
                   const filtered = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
-                  if (Object.keys(filtered).length > 0) await db.characters.update(char.id, { ...filtered, updatedAt: ts });
+                  if (Object.keys(filtered).length > 0) {
+                    await db.characters.update(char.id, { ...filtered, updatedAt: ts });
+                    summary.charactersUpdated++;
+                  }
                 }
                 break;
               }
               case "add_relationship": {
-                const char = await db.characters.where("novelId").equals(novelId).filter((c) => c.name.toLowerCase().trim() === (tc as any).input.characterName.toLowerCase().trim()).first();
+                const char = await db.characters.where("novelId").equals(novelId).filter((c) => c.name.toLowerCase().trim() === input.characterName.toLowerCase().trim()).first();
                 if (char) {
                   const rels = [...(char.relationships ?? [])];
-                  rels.push({ characterName: (tc as any).input.relatedTo, description: (tc as any).input.description });
+                  rels.push({ characterName: input.relatedTo, description: input.description });
                   await db.characters.update(char.id, { relationships: rels, updatedAt: ts });
+                  summary.relationshipsAdded++;
                 }
                 break;
               }
@@ -469,4 +547,6 @@ Không tạo lại nhân vật đã có mà không thay đổi. Trả lời bằ
     chaptersCompleted: totalToAnalyze,
     totalChapters: totalToAnalyze,
   });
+
+  return summary;
 }

@@ -60,6 +60,15 @@ export async function runChapterToolStream(opts: {
       }
     }
     cancelAnimationFrame(rafId);
+
+    // Empty response = content likely filtered/prohibited by provider
+    if (!accumulated.trim()) {
+      const msg = "Nhà cung cấp AI trả về nội dung trống — có thể nội dung đã bị chặn bởi bộ lọc an toàn. Hãy thử chỉnh sửa prompt tùy chỉnh, Chỉ thị chung, hoặc đổi mô hình AI khác.";
+      toast.error(msg);
+      useChapterTools.getState().cancelStreaming();
+      return null;
+    }
+
     useChapterTools.getState().setStreamingContent(accumulated);
     useChapterTools.getState().finishStreaming(accumulated);
     opts.onComplete?.(accumulated);

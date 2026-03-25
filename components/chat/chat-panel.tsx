@@ -224,13 +224,18 @@ export function ChatPanel() {
             (finalParsed.reasoning ? "\n\n" + finalParsed.reasoning : "")
           : finalParsed.reasoning;
 
+        // Empty response = content likely filtered/prohibited by provider
+        const finalContent = finalParsed.content.trim()
+          ? finalParsed.content
+          : "⚠️ Nhà cung cấp AI trả về nội dung trống — có thể nội dung đã bị chặn bởi bộ lọc an toàn. Hãy thử chỉnh sửa **Chỉ thị chung**, **system prompt** của cuộc hội thoại, hoặc **đổi mô hình AI** khác.";
+
         // Persist final content + reasoning
         await updateMessage(assistantMsgId, {
-          content: finalParsed.content,
+          content: finalContent,
           ...(finalReasoning ? { reasoning: finalReasoning } : {}),
         });
 
-        return { content: finalParsed.content, convoId };
+        return { content: finalContent, convoId };
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         if (assistantMsgId) {
@@ -417,7 +422,7 @@ export function ChatPanel() {
           }
           selectedModelId={selectedModelId}
           onModelChange={(id) => updateChatSettings({ modelId: id })}
-          systemPrompt={systemPrompt}
+          systemPrompt={chatSettings.systemPrompt ?? ""}
           onSystemPromptChange={(p) =>
             updateChatSettings({ systemPrompt: p })
           }

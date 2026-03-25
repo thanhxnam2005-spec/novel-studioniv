@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { useEffect, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -15,39 +13,19 @@ import { useChatSettings, updateChatSettings } from "@/lib/hooks";
 
 export function GlobalInstructionSettings() {
   const settings = useChatSettings();
-  const [draft, setDraft] = useState("");
-  const [hasEdited, setHasEdited] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync draft when settings load
-  useEffect(() => {
-    if (!hasEdited) {
-      setDraft(settings.globalSystemInstruction ?? "");
-    }
-  }, [settings.globalSystemInstruction, hasEdited]);
+  // Clean up timer on unmount
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
-  const handleChange = (value: string) => {
-    setDraft(value);
-    setHasEdited(true);
-  };
-
-  const isDirty =
-    hasEdited && draft !== (settings.globalSystemInstruction ?? "");
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
+  const save = useCallback((value: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
       await updateChatSettings({
-        globalSystemInstruction: draft.trim() || undefined,
+        globalSystemInstruction: value.trim() || undefined,
       });
-      setHasEdited(false);
-      toast.success("Đã lưu chỉ thị chung");
-    } catch {
-      toast.error("Lưu thất bại");
-    } finally {
-      setSaving(false);
-    }
-  };
+    }, 600);
+  }, []);
 
   return (
     <Card>
@@ -56,23 +34,16 @@ export function GlobalInstructionSettings() {
         <CardDescription>
           Chỉ thị này được thêm vào đầu mọi system prompt — cả trò chuyện và
           phân tích. Sử dụng cho tùy chọn ngôn ngữ, giọng điệu, hoặc ràng buộc
-          cần luôn áp dụng.
+          cần luôn áp dụng. Tự động lưu khi chỉnh sửa.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent>
         <Textarea
           placeholder="VD: Luôn trả lời bằng Tiếng Việt. Sử dụng giọng văn trang trọng."
-          value={draft}
-          onChange={(e) => handleChange(e.target.value)}
+          defaultValue={settings.globalSystemInstruction ?? ""}
+          onChange={(e) => save(e.target.value)}
           className="min-h-[100px] font-mono text-sm"
         />
-        {isDirty && (
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving} size="sm">
-              {saving ? "Đang lưu..." : "Lưu"}
-            </Button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

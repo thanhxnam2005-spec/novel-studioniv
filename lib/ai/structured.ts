@@ -39,6 +39,30 @@ function extractJson(text: string): string {
 }
 
 /**
+ * Try to extract `failed_generation` text from a tool_use_failed error.
+ * Some providers (e.g. OpenRouter) return the model's raw text in this field
+ * when the model fails to produce a valid tool call.
+ */
+function getFailedGeneration(err: unknown): string | null {
+  if (!(err instanceof Error)) return null;
+  // AI SDK wraps provider errors — check cause chain and message for the field
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyErr = err as any;
+  // Direct field on error data
+  const data = anyErr.data ?? anyErr.cause?.data ?? anyErr.responseBody?.error;
+  if (data?.failed_generation) return data.failed_generation;
+  // Some SDK versions put it in error.cause.error
+  const cause = anyErr.cause;
+  if (cause?.error?.failed_generation) return cause.error.failed_generation;
+  // Check if the message itself contains it (some wrappers stringify)
+  if (typeof err.message === "string" && err.message.includes("failed_generation")) {
+    const match = err.message.match(/"failed_generation"\s*:\s*"([\s\S]*?)(?:"|$)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
  * Generate structured output using a two-tier strategy:
  *
  * 1. **Tool calling** (primary): defines a tool whose input schema matches
@@ -47,6 +71,9 @@ function extractJson(text: string): string {
  * 2. **Content parsing** (fallback): if the model returns JSON in content
  *    instead of a tool call (some providers ignore tool_choice), extract
  *    and parse the JSON from the text response.
+ *
+ * 3. **failed_generation recovery**: if the provider throws tool_use_failed
+ *    with a `failed_generation` field, try to extract JSON from that text.
  */
 export async function generateStructured<T>({
   model,
@@ -63,19 +90,38 @@ export async function generateStructured<T>({
 }): Promise<{ object: T }> {
   const TOOL_NAME = "structured_output";
 
-  const result = await generateText({
-    model,
-    system,
-    prompt,
-    tools: {
-      [TOOL_NAME]: tool({
-        description: "Return the structured analysis result",
-        inputSchema: schema,
-      }),
-    },
-    toolChoice: { type: "tool", toolName: TOOL_NAME },
-    abortSignal,
-  });
+  let result;
+  try {
+    result = await generateText({
+      model,
+      system,
+      prompt,
+      tools: {
+        [TOOL_NAME]: tool({
+          description: "Return the structured analysis result",
+          inputSchema: schema,
+        }),
+      },
+      toolChoice: { type: "tool", toolName: TOOL_NAME },
+      abortSignal,
+    });
+  } catch (err) {
+    // Re-throw abort errors immediately
+    if (err instanceof Error && err.name === "AbortError") throw err;
+
+    // Try to recover from tool_use_failed with failed_generation
+    const failedText = getFailedGeneration(err);
+    if (failedText) {
+      try {
+        const json = extractJson(failedText);
+        return { object: JSON.parse(json) as T };
+      } catch {
+        // JSON extraction failed — fall through to re-throw original error
+      }
+    }
+
+    throw err;
+  }
 
   // Primary: extract from tool call
   const toolCall = result.toolCalls?.[0];
@@ -84,12 +130,13 @@ export async function generateStructured<T>({
   }
 
   // Fallback: parse JSON from content (provider ignored tool_choice)
-  if (result.text) {
+  if (result.text?.trim()) {
     const json = extractJson(result.text);
     return { object: JSON.parse(json) as T };
   }
 
+  // Empty response = content likely filtered/prohibited by provider
   throw new Error(
-    "Model produced neither a tool call nor parseable JSON content",
+    "Nhà cung cấp AI trả về nội dung trống — có thể nội dung đã bị chặn bởi bộ lọc an toàn. Hãy thử chỉnh sửa prompt tùy chỉnh, Chỉ thị chung, hoặc đổi mô hình AI khác.",
   );
 }

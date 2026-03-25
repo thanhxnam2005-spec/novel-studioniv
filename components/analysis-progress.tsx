@@ -1,6 +1,6 @@
 "use client";
 
-import { XIcon, LoaderIcon, AlertTriangleIcon } from "lucide-react";
+import { XIcon, LoaderIcon, AlertTriangleIcon, CheckCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAnalysisStore } from "@/lib/stores/analysis";
+import type { IncrementalResultSummary } from "@/lib/analysis/incremental-analyzer";
 
 const PHASE_LABELS: Record<string, string> = {
   chapters: "Đang phân tích chương",
@@ -29,10 +30,13 @@ export function AnalysisProgress() {
     chaptersCompleted,
     totalChapters,
     errors,
+    resultSummary,
     cancel,
   } = useAnalysisStore();
 
   const hasErrors = errors.length > 0;
+  const isDone =
+    phase === "complete" || phase === "completed_with_errors" || phase === "error";
   const isRunning =
     phase === "chapters" || phase === "aggregation" || phase === "characters";
 
@@ -126,7 +130,51 @@ export function AnalysisProgress() {
             </div>
           </ScrollArea>
         )}
+
+        {/* Result summary */}
+        {resultSummary && isDone && (
+          <ResultSummaryView summary={resultSummary} />
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function ResultSummaryView({ summary }: { summary: IncrementalResultSummary }) {
+  const items: string[] = [];
+
+  if (summary.chaptersAnalyzed > 0)
+    items.push(`${summary.chaptersAnalyzed} chương đã phân tích`);
+  if (summary.charactersAdded > 0)
+    items.push(`${summary.charactersAdded} nhân vật mới`);
+  if (summary.charactersUpdated > 0)
+    items.push(`${summary.charactersUpdated} nhân vật cập nhật`);
+  if (summary.relationshipsAdded > 0)
+    items.push(`${summary.relationshipsAdded} mối quan hệ mới`);
+  if (summary.factionsAdded > 0)
+    items.push(`${summary.factionsAdded} phe phái mới`);
+  if (summary.factionsUpdated > 0)
+    items.push(`${summary.factionsUpdated} phe phái cập nhật`);
+  if (summary.locationsAdded > 0)
+    items.push(`${summary.locationsAdded} địa điểm mới`);
+  if (summary.locationsUpdated > 0)
+    items.push(`${summary.locationsUpdated} địa điểm cập nhật`);
+  if (summary.updatedFields.length > 0)
+    items.push(`Cập nhật: ${summary.updatedFields.join(", ")}`);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-2.5">
+      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium">
+        <CheckCircleIcon className="size-3.5 text-green-500" />
+        Kết quả phân tích
+      </p>
+      <ul className="space-y-0.5 text-xs text-muted-foreground">
+        {items.map((item) => (
+          <li key={item}>• {item}</li>
+        ))}
+      </ul>
+    </div>
   );
 }

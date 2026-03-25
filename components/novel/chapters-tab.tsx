@@ -29,6 +29,11 @@ import {
   SearchIcon,
   TrashIcon,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -53,6 +58,28 @@ const STATUS_CONFIG: Record<
     className: "text-muted-foreground",
   },
 };
+
+function formatDateTime(date: Date | undefined) {
+  if (!date) return null;
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDateTimeFull(date: Date | undefined) {
+  if (!date) return "";
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
 
 export function ChaptersTab({
   novelId,
@@ -170,7 +197,9 @@ export function ChaptersTab({
             <span className="w-8">#</span>
             <span className="flex-1">Tiêu đề</span>
             <span className="w-16 text-right">Số từ</span>
-            <span className="w-20 text-right">Trạng thái</span>
+            <span className="hidden w-24 text-right sm:block">Chỉnh sửa</span>
+            <span className="hidden w-24 text-right sm:block">Phân tích</span>
+            <span className="w-8 sm:hidden" />
             <span className="w-24" />
           </div>
 
@@ -205,11 +234,35 @@ export function ChaptersTab({
                   <span className="w-16 text-right text-xs text-muted-foreground">
                     {(wordCounts.get(ch.id) ?? 0).toLocaleString()}
                   </span>
-                  <span className="flex w-20 items-center justify-end gap-1">
+
+                  {/* Edited time */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="hidden w-24 text-right text-xs text-muted-foreground sm:block">
+                        {formatDateTime(ch.updatedAt)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{formatDateTimeFull(ch.updatedAt)}</TooltipContent>
+                  </Tooltip>
+
+                  {/* Analyzed time */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={`hidden w-24 items-center justify-end gap-1 text-xs sm:flex ${statusCfg.className}`}>
+                        <StatusIcon className="size-3" />
+                        {ch.analyzedAt ? formatDateTime(ch.analyzedAt) : statusCfg.label}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {ch.analyzedAt
+                        ? `${statusCfg.label} — ${formatDateTimeFull(ch.analyzedAt)}`
+                        : statusCfg.label}
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Mobile: single status icon */}
+                  <span className="flex w-8 justify-end sm:hidden">
                     <StatusIcon className={`size-3.5 ${statusCfg.className}`} />
-                    <span className={`text-xs ${statusCfg.className}`}>
-                      {statusCfg.label}
-                    </span>
                   </span>
                   <div className="flex w-24 justify-end gap-1">
                     <Button variant="ghost" size="icon-xs" asChild>
