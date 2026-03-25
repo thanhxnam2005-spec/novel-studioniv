@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ScrollToBottom } from "@/components/chat/scroll-to-bottom";
 import { useChapterTools, type ChapterToolMode } from "@/lib/stores/chapter-tools";
-import { TranslateMode } from "./translate-mode";
+import { TranslateMode, type TranslateResult } from "./translate-mode";
 import { ReviewMode } from "./review-mode";
 import { EditMode } from "./edit-mode";
 
@@ -64,11 +64,15 @@ export function ChapterToolsPanel({
   novelId,
   chapterId,
   chapterOrder,
+  chapterTitle,
+  onTranslated,
 }: {
   content: string;
   novelId: string;
   chapterId: string;
   chapterOrder: number;
+  chapterTitle: string;
+  onTranslated: (result: TranslateResult) => void;
 }) {
   const activeMode = useChapterTools((s) => s.activeMode);
   const setActiveMode = useChapterTools((s) => s.setActiveMode);
@@ -108,6 +112,8 @@ export function ChapterToolsPanel({
                   content={content}
                   novelId={novelId}
                   chapterOrder={chapterOrder}
+                  chapterTitle={chapterTitle}
+                  onTranslated={onTranslated}
                 />
               )}
               {activeMode === "review" && (

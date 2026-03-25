@@ -35,11 +35,11 @@ export default function ChapterEditorPage() {
   const completedResult = useChapterTools((s) => s.completedResult);
   const clearResult = useChapterTools((s) => s.clearResult);
 
-  // Show diff in main area for translate/edit modes
+  // Show diff in main area for edit mode only (translate auto-applies)
   const showDiffInMain =
     !isStreaming &&
     !!completedResult &&
-    (activeMode === "translate" || activeMode === "edit");
+    activeMode === "edit";
 
   useEffect(() => {
     if (chapter && !titleInit) {
@@ -61,9 +61,9 @@ export default function ChapterEditorPage() {
     };
   }, []);
 
-  // Sync editedResult when AI completes
+  // Sync editedResult when AI completes (edit mode only)
   useEffect(() => {
-    if (completedResult && (activeMode === "translate" || activeMode === "edit")) {
+    if (completedResult && activeMode === "edit") {
       setEditedResult(completedResult);
     }
   }, [completedResult, activeMode]);
@@ -98,10 +98,15 @@ export default function ChapterEditorPage() {
   const handleAcceptDiff = () => {
     setContent(editedResult);
     clearResult();
-    toast.success(
-      activeMode === "translate" ? "Đã áp dụng bản dịch" : "Đã áp dụng chỉnh sửa",
-    );
+    toast.success("Đã áp dụng chỉnh sửa");
   };
+
+  const handleTranslated = useCallback((result: { content: string; title?: string }) => {
+    setContent(result.content);
+    if (result.title) {
+      setTitle(result.title);
+    }
+  }, []);
 
   if (chapter === undefined) {
     return (
@@ -183,6 +188,8 @@ export default function ChapterEditorPage() {
         novelId={novelId}
         chapterId={chapterId}
         chapterOrder={chapter.order}
+        chapterTitle={chapter.title}
+        onTranslated={handleTranslated}
       />
     </div>
   );

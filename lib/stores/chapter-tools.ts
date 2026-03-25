@@ -21,6 +21,7 @@ interface ChapterToolsState {
 
   // Completed result for diff view
   completedResult: string | null;
+  completedTitle: string | null;
 
   // Actions
   setActiveMode: (mode: ChapterToolMode | null) => void;
@@ -28,7 +29,7 @@ interface ChapterToolsState {
   setPanelWidth: (width: number) => void;
   startStreaming: () => void;
   setStreamingContent: (text: string) => void;
-  finishStreaming: (result: string) => void;
+  finishStreaming: (result: string, title?: string) => void;
   setReviewResult: (result: string | null, chapterId?: string) => void;
   cancelStreaming: () => void;
   clearResult: () => void;
@@ -44,6 +45,7 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
   reviewResult: null,
   reviewChapterId: null,
   completedResult: null,
+  completedTitle: null,
 
   setPanelWidth: (width) => {
     const clamped = Math.max(PANEL_MIN_WIDTH, Math.min(width, PANEL_MAX_WIDTH));
@@ -55,7 +57,7 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
     if (isStreaming) {
       get().cancelStreaming();
     }
-    set({ activeMode: mode, completedResult: null, streamingContent: "" });
+    set({ activeMode: mode, completedResult: null, completedTitle: null, streamingContent: "" });
   },
 
   toggleMode: (mode) => {
@@ -73,17 +75,19 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
       isStreaming: true,
       streamingContent: "",
       completedResult: null,
+      completedTitle: null,
       abortController: controller,
     });
   },
 
   setStreamingContent: (text) => set({ streamingContent: text }),
 
-  finishStreaming: (result) =>
+  finishStreaming: (result, title) =>
     set({
       isStreaming: false,
       streamingContent: "",
       completedResult: result,
+      completedTitle: title ?? null,
       abortController: null,
     }),
 
@@ -100,7 +104,7 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
     });
   },
 
-  clearResult: () => set({ completedResult: null, streamingContent: "" }),
+  clearResult: () => set({ completedResult: null, completedTitle: null, streamingContent: "" }),
 
   reset: () =>
     set({
@@ -111,5 +115,6 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
       reviewResult: null,
       reviewChapterId: null,
       completedResult: null,
+      completedTitle: null,
     }),
 }));

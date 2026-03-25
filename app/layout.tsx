@@ -1,11 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import {
-  Open_Sans,
-  JetBrains_Mono,
-  Playfair_Display,
-} from "next/font/google";
+import { JetBrains_Mono, Open_Sans, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const openSans = Open_Sans({
@@ -48,7 +46,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
+        <Toaster position="top-center" richColors />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

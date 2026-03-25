@@ -2,9 +2,9 @@
 
 import { AnalysisDialog } from "@/components/analysis-dialog";
 import { EditNovelDialog } from "@/components/edit-novel-dialog";
+import { EditableText } from "@/components/novel/editable-text";
 import { ChaptersTab } from "@/components/novel/chapters-tab";
 import { CharactersTab } from "@/components/novel/characters-tab";
-import { OverviewTab } from "@/components/novel/overview-tab";
 import { WorldBuildingTab } from "@/components/novel/world-building-tab";
 import {
   AlertDialog,
@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   deleteNovel,
+  updateNovel,
   useChapterAnalysisStatus,
   useChapters,
   useCharacters,
@@ -51,7 +52,7 @@ export default function NovelDetailPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") ?? "overview";
+  const activeTab = searchParams.get("tab") ?? "chapters";
   const novel = useNovel(id);
   const chapters = useChapters(id);
   const scenes = useNovelScenes(id);
@@ -214,22 +215,36 @@ export default function NovelDetailPage() {
           </div>
         </div>
 
-        {/* Genres + Tags (read-only) */}
-        {((novel.genres?.length ?? 0) > 0 ||
-          (novel.tags?.length ?? 0) > 0) && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {novel.genres?.map((g: string) => (
-              <Badge key={g} variant="default">
-                {g}
-              </Badge>
-            ))}
-            {novel.tags?.map((t: string) => (
-              <Badge key={t} variant="secondary">
-                {t}
-              </Badge>
-            ))}
-          </div>
-        )}
+        {/* Synopsis */}
+        <div className="mt-3">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            Tóm tắt
+          </p>
+          <EditableText
+            value={novel.synopsis ?? ""}
+            onSave={(v) => updateNovel(novel.id, { synopsis: v })}
+            placeholder="Chưa có tóm tắt. Chạy phân tích hoặc nhấn để viết..."
+            multiline
+            displayClassName="text-sm leading-relaxed"
+          />
+        </div>
+
+        {/* Stats + Genres + Tags */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <Badge variant="outline">{chapters?.length ?? 0} chương</Badge>
+          <Badge variant="outline">{totalWords.toLocaleString()} từ</Badge>
+          <Badge variant="outline">{characters?.length ?? 0} nhân vật</Badge>
+          {novel.genres?.map((g: string) => (
+            <Badge key={g} variant="default">
+              {g}
+            </Badge>
+          ))}
+          {novel.tags?.map((t: string) => (
+            <Badge key={t} variant="secondary">
+              {t}
+            </Badge>
+          ))}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -237,7 +252,7 @@ export default function NovelDetailPage() {
         value={activeTab}
         onValueChange={(value) => {
           const params = new URLSearchParams(searchParams.toString());
-          if (value === "overview") {
+          if (value === "chapters") {
             params.delete("tab");
           } else {
             params.set("tab", value);
@@ -249,16 +264,6 @@ export default function NovelDetailPage() {
         }}
       >
         <TabsList className="w-full justify-center">
-          <TabsTrigger value="overview">Tổng quan</TabsTrigger>
-          <TabsTrigger value="world-building">Thế giới quan</TabsTrigger>
-          <TabsTrigger value="characters">
-            Nhân vật
-            {characters && characters.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                ({characters.length})
-              </span>
-            )}
-          </TabsTrigger>
           <TabsTrigger value="chapters">
             Chương
             {chapters && chapters.length > 0 && (
@@ -270,16 +275,16 @@ export default function NovelDetailPage() {
               <span className="inline-flex size-2 rounded-full bg-amber-500" />
             )}
           </TabsTrigger>
+          <TabsTrigger value="world-building">Thế giới quan</TabsTrigger>
+          <TabsTrigger value="characters">
+            Nhân vật
+            {characters && characters.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                ({characters.length})
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="mt-4">
-          <OverviewTab
-            novel={novel}
-            chapterCount={chapters?.length ?? 0}
-            wordCount={totalWords}
-            characterCount={characters?.length ?? 0}
-          />
-        </TabsContent>
 
         <TabsContent value="world-building" className="mt-4">
           <WorldBuildingTab novel={novel} />
