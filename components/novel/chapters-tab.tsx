@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { Chapter } from "@/lib/db";
 import { deleteChapter, type ChapterAnalysisStatus } from "@/lib/hooks";
 import {
@@ -24,10 +29,12 @@ import {
   CircleDashedIcon,
   ClockIcon,
   FileTextIcon,
+  LanguagesIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
   TrashIcon,
+  WrenchIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -87,6 +94,7 @@ export function ChaptersTab({
   analysisStatuses,
   wordCounts,
   onAnalyze,
+  onTranslate,
 }: {
   novelId: string;
   chapters: Chapter[];
@@ -98,6 +106,7 @@ export function ChaptersTab({
     mode: "full" | "incremental" | "selected",
     selectedIds?: string[],
   ) => void;
+  onTranslate: (chapterIds: string[]) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -154,14 +163,33 @@ export function ChaptersTab({
         </Button>
         <div className="ml-auto flex gap-2">
           {selected.size > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onAnalyze("selected", Array.from(selected))}
-            >
-              <SearchIcon className="mr-1.5 size-3.5" />
-              Phân tích đã chọn ({selected.size})
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <WrenchIcon className="mr-1.5 size-3.5" />
+                  Xử lý ({selected.size})
+                  <ChevronDownIcon className="ml-1 size-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-48 p-1">
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  onClick={() =>
+                    onAnalyze("selected", Array.from(selected))
+                  }
+                >
+                  <SearchIcon className="size-3.5" />
+                  Phân tích đã chọn
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  onClick={() => onTranslate(Array.from(selected))}
+                >
+                  <LanguagesIcon className="size-3.5" />
+                  Dịch đã chọn
+                </button>
+              </PopoverContent>
+            </Popover>
           )}
           {needsAnalysisCount > 0 && (
             <Button

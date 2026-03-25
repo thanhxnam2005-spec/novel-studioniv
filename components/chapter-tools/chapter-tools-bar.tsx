@@ -25,12 +25,17 @@ const TOOLS: {
   { mode: "edit", icon: PenLineIcon, label: "Chỉnh sửa chương" },
 ];
 
-export function ChapterToolsBar({ chapterId }: { chapterId: string }) {
+export function ChapterToolsBar({
+  chapterId,
+  onToggleMode,
+}: {
+  chapterId: string;
+  onToggleMode: (mode: ChapterToolMode) => void;
+}) {
   const activeMode = useChapterTools((s) => s.activeMode);
   const isStreaming = useChapterTools((s) => s.isStreaming);
   const reviewResult = useChapterTools((s) => s.reviewResult);
   const reviewChapterId = useChapterTools((s) => s.reviewChapterId);
-  const toggleMode = useChapterTools((s) => s.toggleMode);
 
   return (
     <TooltipProvider>
@@ -44,7 +49,7 @@ export function ChapterToolsBar({ chapterId }: { chapterId: string }) {
             <Tooltip key={tool.mode}>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => toggleMode(tool.mode)}
+                  onClick={() => onToggleMode(tool.mode)}
                   className={cn(
                     "relative flex size-10 items-center justify-center rounded-lg transition-colors",
                     isActive

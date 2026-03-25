@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmInterruptDialog } from "@/components/ui/confirm-interrupt-dialog";
 import {
   Empty,
   EmptyDescription,
@@ -33,6 +34,7 @@ import {
   useAIModels,
   useAIProviders,
   useChatSettings,
+  useConfirmInterrupt,
   useConversationMessages,
   useConversations,
 } from "@/lib/hooks";
@@ -87,6 +89,9 @@ export function ChatPanel() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { showConfirm: showCloseConfirm, guard: guardClose, confirm: confirmClose, dismiss: dismissClose } =
+    useConfirmInterrupt(isStreaming);
 
   // Auto-select first provider when none is set
   useEffect(() => {
@@ -387,11 +392,17 @@ export function ChatPanel() {
           >
             <SettingsIcon />
           </Button>
-          <Button variant="ghost" size="icon-xs" onClick={close}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => guardClose(() => { abortRef.current?.abort(); close(); })}
+          >
             <XIcon />
           </Button>
         </div>
       </div>
+
+      <ConfirmInterruptDialog open={showCloseConfirm} onConfirm={confirmClose} onCancel={dismissClose} />
 
       {historyOpen && (
         <ChatHistoryDialog

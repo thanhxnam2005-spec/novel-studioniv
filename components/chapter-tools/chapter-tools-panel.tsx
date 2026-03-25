@@ -66,6 +66,7 @@ export function ChapterToolsPanel({
   chapterOrder,
   chapterTitle,
   onTranslated,
+  onClose,
 }: {
   content: string;
   novelId: string;
@@ -73,9 +74,9 @@ export function ChapterToolsPanel({
   chapterOrder: number;
   chapterTitle: string;
   onTranslated: (result: TranslateResult) => void;
+  onClose: () => void;
 }) {
   const activeMode = useChapterTools((s) => s.activeMode);
-  const setActiveMode = useChapterTools((s) => s.setActiveMode);
   const panelWidth = useChapterTools((s) => s.panelWidth);
 
   return (
@@ -96,7 +97,7 @@ export function ChapterToolsPanel({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={() => setActiveMode(null)}
+              onClick={onClose}
             >
               <XIcon className="size-4" />
             </Button>

@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { useChapter, updateChapter, useScenes, updateScene } from "@/lib/hooks";
+import { ConfirmInterruptDialog } from "@/components/ui/confirm-interrupt-dialog";
+import { useChapter, updateChapter, useScenes, updateScene, useConfirmInterrupt } from "@/lib/hooks";
 import { ChapterToolsBar } from "@/components/chapter-tools/chapter-tools-bar";
 import { ChapterToolsPanel } from "@/components/chapter-tools/chapter-tools-panel";
 import { SideBySideDiff } from "@/components/chapter-tools/side-by-side-diff";
-import { useChapterTools } from "@/lib/stores/chapter-tools";
+import { useChapterTools, type ChapterToolMode } from "@/lib/stores/chapter-tools";
 
 export default function ChapterEditorPage() {
   const { id: novelId, chapterId } = useParams<{
@@ -101,6 +102,28 @@ export default function ChapterEditorPage() {
     toast.success("Đã áp dụng chỉnh sửa");
   };
 
+  // Guard for chapter tools interruption
+  const { showConfirm, guard, confirm, dismiss } = useConfirmInterrupt(isStreaming);
+
+  const handleToggleMode = useCallback(
+    (mode: ChapterToolMode) => {
+      const current = useChapterTools.getState().activeMode;
+      const target = current === mode ? null : mode;
+      guard(() => {
+        useChapterTools.getState().cancelStreaming();
+        useChapterTools.getState().setActiveMode(target);
+      });
+    },
+    [guard],
+  );
+
+  const handleClosePanel = useCallback(() => {
+    guard(() => {
+      useChapterTools.getState().cancelStreaming();
+      useChapterTools.getState().setActiveMode(null);
+    });
+  }, [guard]);
+
   const handleTranslated = useCallback((result: { content: string; title?: string }) => {
     setContent(result.content);
     if (result.title) {
@@ -182,7 +205,7 @@ export default function ChapterEditorPage() {
         )}
       </main>
 
-      <ChapterToolsBar chapterId={chapterId} />
+      <ChapterToolsBar chapterId={chapterId} onToggleMode={handleToggleMode} />
       <ChapterToolsPanel
         content={content}
         novelId={novelId}
@@ -190,7 +213,9 @@ export default function ChapterEditorPage() {
         chapterOrder={chapter.order}
         chapterTitle={chapter.title}
         onTranslated={handleTranslated}
+        onClose={handleClosePanel}
       />
+      <ConfirmInterruptDialog open={showConfirm} onConfirm={confirm} onCancel={dismiss} />
     </div>
   );
 }

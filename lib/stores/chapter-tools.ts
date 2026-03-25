@@ -25,7 +25,6 @@ interface ChapterToolsState {
 
   // Actions
   setActiveMode: (mode: ChapterToolMode | null) => void;
-  toggleMode: (mode: ChapterToolMode) => void;
   setPanelWidth: (width: number) => void;
   startStreaming: () => void;
   setStreamingContent: (text: string) => void;
@@ -53,20 +52,7 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
   },
 
   setActiveMode: (mode) => {
-    const { isStreaming } = get();
-    if (isStreaming) {
-      get().cancelStreaming();
-    }
     set({ activeMode: mode, completedResult: null, completedTitle: null, streamingContent: "" });
-  },
-
-  toggleMode: (mode) => {
-    const { activeMode } = get();
-    if (activeMode === mode) {
-      get().setActiveMode(null);
-    } else {
-      get().setActiveMode(mode);
-    }
   },
 
   startStreaming: () => {

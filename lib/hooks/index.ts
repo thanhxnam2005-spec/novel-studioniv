@@ -8,3 +8,4 @@ export * from "./use-ai-providers";
 export * from "./use-conversations";
 export * from "./use-chat-settings";
 export * from "./use-analysis-settings";
+export * from "./use-confirm-interrupt";

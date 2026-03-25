@@ -18,6 +18,7 @@ import { useAnalysisSettings, useChatSettings, useAIProvider } from "@/lib/hooks
 import { resolveChapterToolPrompts, DEFAULT_TRANSLATE_SYSTEM } from "@/lib/chapter-tools/prompts";
 import { buildTranslateContext, type ContextDepth } from "@/lib/chapter-tools/context";
 import { resolveChapterToolModel, runChapterToolStream } from "@/lib/chapter-tools/stream-runner";
+import { TITLE_SEPARATOR, parseTranslateResult } from "@/lib/chapter-tools/bulk-translate";
 import { ToolConfig } from "./tool-config";
 import { StreamingDisplay } from "./streaming-display";
 
@@ -46,19 +47,6 @@ const DEPTH_OPTIONS: {
     icon: TelescopeIcon,
   },
 ];
-
-const TITLE_SEPARATOR = "---";
-
-function parseTranslateResult(raw: string, includeTitle: boolean): { title: string | null; content: string } {
-  if (!includeTitle) return { title: null, content: raw };
-
-  const sepIndex = raw.indexOf(`\n${TITLE_SEPARATOR}\n`);
-  if (sepIndex === -1) return { title: null, content: raw };
-
-  const title = raw.slice(0, sepIndex).trim();
-  const content = raw.slice(sepIndex + TITLE_SEPARATOR.length + 2).trim();
-  return { title: title || null, content };
-}
 
 interface TranslateSummary {
   originalLines: number;

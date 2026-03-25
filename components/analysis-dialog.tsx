@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmInterruptDialog } from "@/components/ui/confirm-interrupt-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getModel } from "@/lib/ai/provider";
 import {
@@ -22,11 +23,12 @@ import { db } from "@/lib/db";
 import {
   useAIProvider,
   useAnalysisSettings,
+  useConfirmInterrupt,
   useChatSettings,
 } from "@/lib/hooks";
 import { useAnalysisStore } from "@/lib/stores/analysis";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { GaugeIcon, InfoIcon, TelescopeIcon, ZapIcon } from "lucide-react";
+import { CheckCircle2Icon, GaugeIcon, InfoIcon, TelescopeIcon, ZapIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -75,6 +77,7 @@ export function AnalysisDialog({
   const isDone =
     phase === "complete" || phase === "completed_with_errors" || phase === "error";
 
+  const { showConfirm, guard, confirm, dismiss } = useConfirmInterrupt(isAnalyzing && !isDone);
   const [depth, setDepth] = useState<AnalysisDepth>("standard");
 
   const modeLabel =
@@ -150,12 +153,8 @@ export function AnalysisDialog({
       const storeErrors = useAnalysisStore.getState().errors;
       if (storeErrors.length > 0) {
         setPhase("completed_with_errors" as never);
-        toast.warning(
-          `Hoàn tất với ${storeErrors.length} lỗi. Bạn có thể chạy lại để thử các chương thất bại.`,
-        );
       } else {
-        toast.success("Phân tích hoàn tất!");
-        reset();
+        setPhase("complete" as never);
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
@@ -189,12 +188,20 @@ export function AnalysisDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={isAnalyzing && !isDone ? undefined : (v) => {
-        if (!v) reset();
-        onOpenChange(v);
+      onOpenChange={(v) => {
+        if (!v) {
+          guard(() => {
+            useAnalysisStore.getState().cancel();
+            reset();
+            onOpenChange(false);
+          });
+        } else {
+          onOpenChange(v);
+        }
       }}
     >
       <DialogContent className="sm:max-w-2xl">
+        <ConfirmInterruptDialog open={showConfirm} onConfirm={confirm} onCancel={dismiss} />
         <DialogHeader>
           <DialogTitle>{modeLabel}</DialogTitle>
           <DialogDescription>
@@ -208,8 +215,28 @@ export function AnalysisDialog({
 
         <ScrollArea className="max-h-[60vh]">
           <div className="space-y-4 p-1 pr-4">
-            {/* Progress (when running or done with errors) */}
-            {(isAnalyzing || isDone) && <AnalysisProgress />}
+            {/* Progress (when running) */}
+            {isAnalyzing && !isDone && <AnalysisProgress />}
+
+            {/* Results (when done) */}
+            {isDone && (
+              <div className="space-y-3">
+                {errors.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                    <CheckCircle2Icon className="size-4 shrink-0" />
+                    <span className="text-xs font-medium">Phân tích hoàn tất!</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
+                    <CheckCircle2Icon className="size-4 shrink-0" />
+                    <span className="text-xs font-medium">
+                      Hoàn tất với {errors.length} lỗi
+                    </span>
+                  </div>
+                )}
+                <AnalysisProgress />
+              </div>
+            )}
 
             {/* Config (when not running and not done) */}
             {!isAnalyzing && !isDone && (
@@ -273,34 +300,21 @@ export function AnalysisDialog({
           </div>
         )}
 
-        {/* Done with errors: retry + close */}
-        {isDone && errors.length > 0 && (
+        {/* Done: close + optional retry */}
+        {isDone && (
           <div className="flex justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                reset();
-                onOpenChange(false);
-              }}
-            >
-              Đóng
-            </Button>
-            <Button
-              onClick={() => {
-                reset();
-                // Small delay so store resets before handleRun reads it
-                setTimeout(handleRun, 0);
-              }}
-              disabled={!provider}
-            >
-              Chạy lại phần thất bại
-            </Button>
-          </div>
-        )}
-
-        {/* Done cleanly: auto-closed, but just in case show close */}
-        {isDone && errors.length === 0 && (
-          <div className="flex justify-end gap-2 pt-2">
+            {errors.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  reset();
+                  setTimeout(handleRun, 0);
+                }}
+                disabled={!provider}
+              >
+                Chạy lại phần thất bại
+              </Button>
+            )}
             <Button
               onClick={() => {
                 reset();
