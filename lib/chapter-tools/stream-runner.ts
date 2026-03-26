@@ -41,7 +41,10 @@ export async function runChapterToolStream(opts: {
   let accumulated = "";
   let rafId = 0;
   const flush = () => {
-    useChapterTools.getState().setStreamingContent(accumulated);
+    // Guard: only flush if still streaming (prevents stale RAF after cancel)
+    if (useChapterTools.getState().isStreaming) {
+      useChapterTools.getState().setStreamingContent(accumulated);
+    }
     rafId = 0;
   };
 
@@ -61,6 +64,12 @@ export async function runChapterToolStream(opts: {
     }
     cancelAnimationFrame(rafId);
 
+    // If user cancelled while buffered chunks were still being consumed,
+    // the loop may exit normally without throwing AbortError. Bail out.
+    if (controller?.signal.aborted) {
+      return null;
+    }
+
     // Empty response = content likely filtered/prohibited by provider
     if (!accumulated.trim()) {
       const msg = "Nhà cung cấp AI trả về nội dung trống — có thể nội dung đã bị chặn bởi bộ lọc an toàn. Hãy thử chỉnh sửa prompt tùy chỉnh, Chỉ thị chung, hoặc đổi mô hình AI khác.";
@@ -74,6 +83,7 @@ export async function runChapterToolStream(opts: {
     opts.onComplete?.(accumulated);
     return accumulated;
   } catch (err) {
+    // Cancel any pending RAF to prevent stale content flush after abort
     cancelAnimationFrame(rafId);
     if (err instanceof Error && err.name === "AbortError") {
       toast.info(opts.cancelMessage);

@@ -1,7 +1,7 @@
 "use client";
 
-import { XIcon } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { StopCircleIcon, XIcon } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StickToBottom } from "use-stick-to-bottom";
@@ -66,6 +66,7 @@ export function ChapterToolsPanel({
   chapterOrder,
   chapterTitle,
   onTranslated,
+  onRevertTranslation,
   onClose,
 }: {
   content: string;
@@ -74,10 +75,22 @@ export function ChapterToolsPanel({
   chapterOrder: number;
   chapterTitle: string;
   onTranslated: (result: TranslateResult) => void;
+  onRevertTranslation: () => void;
   onClose: () => void;
 }) {
   const activeMode = useChapterTools((s) => s.activeMode);
   const panelWidth = useChapterTools((s) => s.panelWidth);
+  const isStreaming = useChapterTools((s) => s.isStreaming);
+  const cancelStreaming = useChapterTools((s) => s.cancelStreaming);
+
+  // Footer content provided by mode components via renderFooter callback
+  const [footerContent, setFooterContent] = useState<React.ReactNode>(null);
+
+  const renderFooter = useCallback((node: React.ReactNode) => {
+    setFooterContent(node);
+  }, []);
+
+  const hasFooter = isStreaming || footerContent;
 
   return (
     <div
@@ -115,17 +128,48 @@ export function ChapterToolsPanel({
                   chapterOrder={chapterOrder}
                   chapterTitle={chapterTitle}
                   onTranslated={onTranslated}
+                  onRevert={onRevertTranslation}
+                  renderFooter={renderFooter}
                 />
               )}
               {activeMode === "review" && (
-                <ReviewMode content={content} novelId={novelId} chapterId={chapterId} />
+                <ReviewMode
+                  content={content}
+                  novelId={novelId}
+                  chapterId={chapterId}
+                  renderFooter={renderFooter}
+                />
               )}
               {activeMode === "edit" && (
-                <EditMode content={content} novelId={novelId} chapterId={chapterId} />
+                <EditMode
+                  content={content}
+                  novelId={novelId}
+                  chapterId={chapterId}
+                  renderFooter={renderFooter}
+                />
               )}
             </StickToBottom.Content>
             <ScrollToBottom />
           </StickToBottom>
+
+          {/* Fixed footer: stop button during streaming, mode actions otherwise */}
+          {hasFooter && (
+            <div className="shrink-0 border-t bg-background px-4 py-3">
+              {isStreaming ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={cancelStreaming}
+                  className="w-full"
+                >
+                  <StopCircleIcon className="mr-1.5 size-3.5" />
+                  Dừng
+                </Button>
+              ) : (
+                footerContent
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

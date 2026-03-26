@@ -1,10 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { createChapter } from "@/lib/hooks";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/db";
+import { createChapter } from "@/lib/hooks";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export function AddChapterDialog({
   open,
@@ -56,6 +56,9 @@ export function AddChapterDialog({
           content: content.trim(),
           order: 0,
           wordCount,
+          version: 0,
+          versionType: "manual",
+          isActive: 1,
           createdAt: now,
           updatedAt: now,
         });
@@ -101,7 +104,7 @@ export function AddChapterDialog({
                 placeholder="Nội dung chương..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="mt-1.5 min-h-[200px] font-mono text-sm"
+                className="mt-1.5 min-h-[200px] max-h-[50vh] overscroll-auto font-mono text-sm"
               />
             </div>
           </div>

@@ -65,6 +65,44 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.6.0",
+    date: "2026-03-26",
+    title: "Lịch sử phiên bản & Soạn thảo nâng cao",
+    summary:
+      "Lưu nhiều phiên bản nội dung chương, hoàn tác/làm lại, cảnh báo thay đổi chưa lưu.",
+    changes: [
+      {
+        category: "feature",
+        description: "Lịch sử phiên bản nội dung",
+        details:
+          "Lưu tối đa 10 phiên bản mỗi cảnh. So sánh, khôi phục phiên bản cũ từ thanh công cụ. Dịch hàng loạt tự động tạo phiên bản.",
+        tags: ["phiên bản"],
+      },
+      {
+        category: "feature",
+        description: "Hoàn tác / Làm lại (Ctrl+Z / Ctrl+Shift+Z)",
+        details:
+          "Hoàn tác mọi thay đổi trong phiên soạn thảo, kể cả kết quả AI dịch/sửa.",
+        tags: ["soạn thảo", "phím tắt"],
+      },
+      {
+        category: "feature",
+        description: "Cảnh báo rời trang khi chưa lưu",
+        tags: ["soạn thảo"],
+      },
+      {
+        category: "improvement",
+        description: "Nút hành động AI cố định ở cuối bảng công cụ",
+        tags: ["giao diện"],
+      },
+      {
+        category: "breaking",
+        description: "Cần xóa dữ liệu cũ và nhập lại từ bản sao lưu",
+        tags: ["cơ sở dữ liệu"],
+      },
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-03-26",
     title: "Nhật ký thay đổi & Cải thiện phân tích",

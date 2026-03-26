@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
@@ -66,16 +66,19 @@ export function TranslateMode({
   chapterOrder,
   chapterTitle,
   onTranslated,
+  onRevert,
+  renderFooter,
 }: {
   content: string;
   novelId: string;
   chapterOrder: number;
   chapterTitle: string;
   onTranslated: (result: TranslateResult) => void;
+  onRevert: () => void;
+  renderFooter: (node: React.ReactNode) => void;
 }) {
   const isStreaming = useChapterTools((s) => s.isStreaming);
   const streamingContent = useChapterTools((s) => s.streamingContent);
-  const cancelStreaming = useChapterTools((s) => s.cancelStreaming);
   const clearResult = useChapterTools((s) => s.clearResult);
 
   const settings = useAnalysisSettings();
@@ -150,6 +153,35 @@ export function TranslateMode({
 
   const showConfig = !isStreaming && !summary;
 
+  // Push footer actions to the panel's fixed footer via effect
+  const handleReTranslate = useCallback(() => {
+    onRevert();
+    setSummary(null);
+  }, [onRevert]);
+
+  useEffect(() => {
+    if (isStreaming) {
+      renderFooter(null);
+      return;
+    }
+    if (summary) {
+      renderFooter(
+        <Button onClick={handleReTranslate} variant="outline" className="w-full">
+          <LanguagesIcon className="mr-1.5 size-3.5" />
+          Dịch lại
+        </Button>,
+      );
+      return;
+    }
+    renderFooter(
+      <Button onClick={handleTranslate} className="w-full">
+        <LanguagesIcon className="mr-1.5 size-3.5" />
+        Dịch chương
+      </Button>,
+    );
+    return () => renderFooter(null);
+  }, [isStreaming, summary, handleTranslate, handleReTranslate, renderFooter]);
+
   return (
     <div className="space-y-4">
       <ToolConfig
@@ -214,7 +246,6 @@ export function TranslateMode({
         <StreamingDisplay
           content={streamingContent}
           isStreaming
-          onCancel={cancelStreaming}
         />
       )}
 
@@ -244,23 +275,7 @@ export function TranslateMode({
               )}
             </div>
           </div>
-
-          <Button
-            onClick={() => setSummary(null)}
-            variant="outline"
-            className="w-full"
-          >
-            <LanguagesIcon className="mr-1.5 size-3.5" />
-            Dịch lại
-          </Button>
         </div>
-      )}
-
-      {showConfig && (
-        <Button onClick={handleTranslate} className="w-full">
-          <LanguagesIcon className="mr-1.5 size-3.5" />
-          Dịch chương
-        </Button>
       )}
     </div>
   );

@@ -26,8 +26,8 @@ export async function getChaptersNeedingAnalysis(novelId: string): Promise<{
     }
 
     const scenes = await db.scenes
-      .where("chapterId")
-      .equals(ch.id)
+      .where("[chapterId+isActive]")
+      .equals([ch.id, 1])
       .toArray();
     const latestEdit = Math.max(
       ...scenes.map((s) => s.updatedAt.getTime()),

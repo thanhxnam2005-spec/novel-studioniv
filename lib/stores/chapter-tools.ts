@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SceneVersionType } from "@/lib/db";
 
 export type ChapterToolMode = "translate" | "review" | "edit";
 
@@ -23,6 +24,10 @@ interface ChapterToolsState {
   completedResult: string | null;
   completedTitle: string | null;
 
+  // Version tracking
+  pendingVersionType: SceneVersionType | null;
+  setPendingVersionType: (type: SceneVersionType | null) => void;
+
   // Actions
   setActiveMode: (mode: ChapterToolMode | null) => void;
   setPanelWidth: (width: number) => void;
@@ -45,6 +50,9 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
   reviewChapterId: null,
   completedResult: null,
   completedTitle: null,
+  pendingVersionType: null,
+
+  setPendingVersionType: (type) => set({ pendingVersionType: type }),
 
   setPanelWidth: (width) => {
     const clamped = Math.max(PANEL_MIN_WIDTH, Math.min(width, PANEL_MAX_WIDTH));
@@ -102,5 +110,6 @@ export const useChapterTools = create<ChapterToolsState>((set, get) => ({
       reviewChapterId: null,
       completedResult: null,
       completedTitle: null,
+      pendingVersionType: null,
     }),
 }));

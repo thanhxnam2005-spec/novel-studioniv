@@ -129,8 +129,8 @@ export async function analyzeNovel({
   const chapterContents: BatchItem[] = [];
   for (const { item: chapter, originalIndex } of sampled) {
     const scenes = await db.scenes
-      .where("chapterId")
-      .equals(chapter.id)
+      .where("[chapterId+isActive]")
+      .equals([chapter.id, 1])
       .sortBy("order");
     const content = scenes.map((s) => s.content).join("\n\n");
     chapterContents.push({

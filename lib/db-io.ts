@@ -22,7 +22,7 @@ import {
 // ─── Constants ──────────────────────────────────────────────
 
 const CURRENT_EXPORT_VERSION = 1;
-export const CURRENT_DB_VERSION = 10;
+export const CURRENT_DB_VERSION = 1;
 
 const NOVEL_SCOPED_TABLES = [
   "novels",
@@ -90,7 +90,7 @@ const DATE_FIELDS: Record<string, string[]> = {
 // FK fields that need remapping in "keep-both" mode
 const FK_FIELDS: Record<string, Record<string, string>> = {
   chapters: { novelId: "novels" },
-  scenes: { novelId: "novels", chapterId: "chapters" },
+  scenes: { novelId: "novels", chapterId: "chapters", activeSceneId: "scenes" },
   characters: { novelId: "novels" },
   notes: { novelId: "novels" },
   aiModels: { providerId: "aiProviders" },

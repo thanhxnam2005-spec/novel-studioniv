@@ -5,6 +5,7 @@ import {
   type Scene,
   type Character,
   type Note,
+  type SceneVersionType,
 } from "@/lib/db";
 
 // ─── Export Format ──────────────────────────────────────────
@@ -23,13 +24,20 @@ export interface NovelExportData {
 
 // ─── Export ─────────────────────────────────────────────────
 
-export async function exportNovel(novelId: string): Promise<NovelExportData> {
+export async function exportNovel(
+  novelId: string,
+  options?: { includeVersions?: boolean },
+): Promise<NovelExportData> {
   const novel = await db.novels.get(novelId);
   if (!novel) throw new Error("Novel not found");
 
+  const includeVersions = options?.includeVersions ?? false;
+
   const [chapters, scenes, characters, notes] = await Promise.all([
     db.chapters.where("novelId").equals(novelId).toArray(),
-    db.scenes.where("novelId").equals(novelId).toArray(),
+    includeVersions
+      ? db.scenes.where("novelId").equals(novelId).toArray()
+      : db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray(),
     db.characters.where("novelId").equals(novelId).toArray(),
     db.notes.where("novelId").equals(novelId).toArray(),
   ]);
@@ -79,6 +87,7 @@ export async function importNovel(file: File): Promise<string> {
   // Map old IDs → new IDs
   const chapterIdMap = new Map<string, string>();
   const characterIdMap = new Map<string, string>();
+  const sceneIdMap = new Map<string, string>();
 
   // Novel — merge v1 analysis data if present
   const novelData = { ...data.novel };
@@ -126,17 +135,38 @@ export async function importNovel(file: File): Promise<string> {
     }
   }
 
-  // Scenes
+  // Scenes (active + inactive versions)
   if (data.scenes?.length) {
     for (const sc of data.scenes) {
+      const newId = crypto.randomUUID();
+      sceneIdMap.set(sc.id, newId);
       await db.scenes.add({
         ...sc,
-        id: crypto.randomUUID(),
+        id: newId,
         novelId,
         chapterId: chapterIdMap.get(sc.chapterId) ?? sc.chapterId,
+        // Remap activeSceneId for inactive versions
+        activeSceneId: sc.activeSceneId
+          ? (sceneIdMap.get(sc.activeSceneId) ?? sc.activeSceneId)
+          : undefined,
+        // Ensure version fields have defaults for old exports without them
+        version: sc.version ?? 0,
+        versionType: (sc.versionType ?? "manual") as SceneVersionType,
+        isActive: sc.isActive ?? 1,
         createdAt: new Date(sc.createdAt),
         updatedAt: new Date(sc.updatedAt),
       });
+    }
+  }
+
+  // Second pass: fix activeSceneId for scenes imported before their parent
+  if (data.scenes?.length) {
+    for (const sc of data.scenes) {
+      if (sc.activeSceneId && sceneIdMap.has(sc.activeSceneId)) {
+        const newId = sceneIdMap.get(sc.id)!;
+        const newActiveId = sceneIdMap.get(sc.activeSceneId)!;
+        await db.scenes.update(newId, { activeSceneId: newActiveId });
+      }
     }
   }
 

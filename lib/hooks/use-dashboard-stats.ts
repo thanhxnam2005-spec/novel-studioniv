@@ -11,9 +11,9 @@ export function useDashboardStats() {
       db.characters.count(),
     ]);
 
-    // Sum wordCount via cursor to avoid loading all scene content into memory
+    // Sum wordCount via cursor — only active scenes (not version history)
     let wordCount = 0;
-    await db.scenes.each((s) => {
+    await db.scenes.where("isActive").equals(1).each((s) => {
       wordCount += s.wordCount;
     });
 
@@ -35,7 +35,11 @@ export function useRecentChapters(limit = 8) {
     // Fetch novels and scenes in parallel
     const [novels, scenes] = await Promise.all([
       db.novels.bulkGet(novelIds),
-      db.scenes.where("chapterId").anyOf(chapterIds).toArray(),
+      db.scenes
+        .where("chapterId")
+        .anyOf(chapterIds)
+        .and((s) => s.isActive === 1)
+        .toArray(),
     ]);
 
     const novelMap = new Map(

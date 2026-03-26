@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
-import { PenLineIcon, CheckIcon } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { CheckIcon, PenLineIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useChapterTools } from "@/lib/stores/chapter-tools";
@@ -16,10 +16,12 @@ export function EditMode({
   content,
   novelId,
   chapterId,
+  renderFooter,
 }: {
   content: string;
   novelId: string;
   chapterId: string;
+  renderFooter: (node: React.ReactNode) => void;
 }) {
   const isStreaming = useChapterTools((s) => s.isStreaming);
   const streamingContent = useChapterTools((s) => s.streamingContent);
@@ -27,8 +29,6 @@ export function EditMode({
   const rawReviewResult = useChapterTools((s) => s.reviewResult);
   const reviewChapterId = useChapterTools((s) => s.reviewChapterId);
   const reviewResult = reviewChapterId === chapterId ? rawReviewResult : null;
-  const cancelStreaming = useChapterTools((s) => s.cancelStreaming);
-
   const settings = useAnalysisSettings();
   const chatSettings = useChatSettings();
   const provider = useAIProvider(chatSettings?.providerId);
@@ -68,6 +68,29 @@ export function EditMode({
     });
   }, [content, novelId, settings, provider, chatSettings, reviewResult]);
 
+  // Push footer actions to the panel's fixed footer via effect
+  useEffect(() => {
+    if (isStreaming) {
+      renderFooter(null);
+      return;
+    }
+    if (completedResult) {
+      renderFooter(
+        <p className="text-xs text-muted-foreground">
+          Kết quả hiển thị bên trái. Chỉnh sửa và nhấn &ldquo;Áp dụng&rdquo; để thay thế nội dung.
+        </p>,
+      );
+      return;
+    }
+    renderFooter(
+      <Button onClick={handleEdit} className="w-full">
+        <PenLineIcon className="mr-1.5 size-3.5" />
+        Chỉnh sửa chương
+      </Button>,
+    );
+    return () => renderFooter(null);
+  }, [isStreaming, completedResult, handleEdit, renderFooter]);
+
   return (
     <div className="space-y-4">
       <ToolConfig
@@ -89,21 +112,7 @@ export function EditMode({
         <StreamingDisplay
           content={streamingContent}
           isStreaming
-          onCancel={cancelStreaming}
         />
-      )}
-
-      {completedResult && !isStreaming && (
-        <p className="text-xs text-muted-foreground">
-          Kết quả hiển thị bên trái. Chỉnh sửa và nhấn &ldquo;Áp dụng&rdquo; để thay thế nội dung.
-        </p>
-      )}
-
-      {!isStreaming && !completedResult && (
-        <Button onClick={handleEdit} className="w-full">
-          <PenLineIcon className="mr-1.5 size-3.5" />
-          Chỉnh sửa chương
-        </Button>
       )}
     </div>
   );

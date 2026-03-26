@@ -2,6 +2,7 @@ import { streamText } from "ai";
 import type { LanguageModel } from "ai";
 import { db } from "@/lib/db";
 import type { AnalysisSettings, Scene } from "@/lib/db";
+import { createSceneVersion, ensureInitialVersion } from "@/lib/hooks/use-scene-versions";
 import type { ContextDepth } from "./context";
 import { buildTranslateContext } from "./context";
 import { resolveChapterToolPrompts } from "./prompts";
@@ -33,22 +34,35 @@ function countWords(content: string): number {
   return content.split(/\s+/).filter(Boolean).length;
 }
 
+/** Save a single chapter result with version snapshots. */
+async function saveChapterScenes(
+  result: TranslateChapterResult,
+  timestamp: Date,
+) {
+  if (result.newTitle) {
+    await db.chapters.update(result.chapterId, {
+      title: result.newTitle,
+      updatedAt: timestamp,
+    });
+  }
+  for (const scene of result.scenes) {
+    // Bootstrap v1 (manual) with original content if no versions exist
+    const existing = await db.scenes.get(scene.sceneId);
+    if (existing) {
+      await ensureInitialVersion(scene.sceneId, existing.novelId, existing.content);
+      // Save the NEW translated content as a version
+      await createSceneVersion(scene.sceneId, existing.novelId, "ai-translate", scene.content);
+    }
+    await db.scenes.update(scene.sceneId, {
+      content: scene.content,
+      wordCount: countWords(scene.content),
+      updatedAt: timestamp,
+    });
+  }
+}
+
 export async function saveChapterResult(result: TranslateChapterResult) {
-  await db.transaction("rw", [db.chapters, db.scenes], async () => {
-    if (result.newTitle) {
-      await db.chapters.update(result.chapterId, {
-        title: result.newTitle,
-        updatedAt: new Date(),
-      });
-    }
-    for (const scene of result.scenes) {
-      await db.scenes.update(scene.sceneId, {
-        content: scene.content,
-        wordCount: countWords(scene.content),
-        updatedAt: new Date(),
-      });
-    }
-  });
+  await saveChapterScenes(result, new Date());
 }
 
 /** Save multiple chapter results in a single transaction. */
@@ -56,19 +70,7 @@ export async function saveBulkResults(results: TranslateChapterResult[]) {
   await db.transaction("rw", [db.chapters, db.scenes], async () => {
     const now = new Date();
     for (const result of results) {
-      if (result.newTitle) {
-        await db.chapters.update(result.chapterId, {
-          title: result.newTitle,
-          updatedAt: now,
-        });
-      }
-      for (const scene of result.scenes) {
-        await db.scenes.update(scene.sceneId, {
-          content: scene.content,
-          wordCount: countWords(scene.content),
-          updatedAt: now,
-        });
-      }
+      await saveChapterScenes(result, now);
     }
   });
 }
@@ -115,7 +117,7 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
   // Prefetch chapters + all scenes in 2 queries (not N+1)
   const [allChapters, allScenes] = await Promise.all([
     db.chapters.where("novelId").equals(novelId).sortBy("order"),
-    db.scenes.where("novelId").equals(novelId).toArray(),
+    db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray(),
   ]);
 
   const chapters = allChapters.filter((c) => chapterIdSet.has(c.id));

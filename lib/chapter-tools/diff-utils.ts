@@ -1,4 +1,4 @@
-import { diffWords, type Change } from "diff";
+import { diffWords, diffLines, type Change } from "diff";
 
 export type { Change };
 
@@ -16,29 +16,37 @@ export interface DiffResult {
   stats: DiffStats;
 }
 
-/**
- * Compute word-level diff between original and edited text.
- * Uses jsdiff's diffWords for prose-optimized comparison.
- */
-export function computeDiff(original: string, edited: string): DiffResult {
-  const changes = diffWords(original, edited);
-
+/** Compute text statistics for a pair of original/edited strings. */
+function computeStats(original: string, edited: string): DiffStats {
   const origWords = original.trim().split(/\s+/).filter(Boolean).length;
   const editWords = edited.trim().split(/\s+/).filter(Boolean).length;
   const origLines = original.split("\n").length;
   const editLines = edited.split("\n").length;
 
   return {
-    changes,
-    stats: {
-      wordDiff: editWords - origWords,
-      lineDiff: editLines - origLines,
-      origWords,
-      editWords,
-      origLines,
-      editLines,
-    },
+    wordDiff: editWords - origWords,
+    lineDiff: editLines - origLines,
+    origWords,
+    editWords,
+    origLines,
+    editLines,
   };
+}
+
+/**
+ * Compute word-level diff between original and edited text.
+ * Uses jsdiff's diffWords for prose-optimized comparison.
+ */
+export function computeDiff(original: string, edited: string): DiffResult {
+  return { changes: diffWords(original, edited), stats: computeStats(original, edited) };
+}
+
+/**
+ * Compute line-level diff between original and edited text.
+ * Uses jsdiff's diffLines for structural comparison.
+ */
+export function computeLineDiff(original: string, edited: string): DiffResult {
+  return { changes: diffLines(original, edited), stats: computeStats(original, edited) };
 }
 
 /**

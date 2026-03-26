@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { ClipboardCheckIcon, PenLineIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -16,15 +16,16 @@ export function ReviewMode({
   content,
   novelId,
   chapterId,
+  renderFooter,
 }: {
   content: string;
   novelId: string;
   chapterId: string;
+  renderFooter: (node: React.ReactNode) => void;
 }) {
   const isStreaming = useChapterTools((s) => s.isStreaming);
   const streamingContent = useChapterTools((s) => s.streamingContent);
   const completedResult = useChapterTools((s) => s.completedResult);
-  const cancelStreaming = useChapterTools((s) => s.cancelStreaming);
   const clearResult = useChapterTools((s) => s.clearResult);
   const setReviewResult = useChapterTools((s) => s.setReviewResult);
   const setActiveMode = useChapterTools((s) => s.setActiveMode);
@@ -64,11 +65,40 @@ export function ReviewMode({
     });
   }, [content, novelId, chapterId, settings, provider, chatSettings, setReviewResult]);
 
-  const handleRegenerate = () => {
+  const handleRegenerate = useCallback(() => {
     clearResult();
     setReviewResult(null);
     handleReview();
-  };
+  }, [clearResult, setReviewResult, handleReview]);
+
+  // Push footer actions to the panel's fixed footer via effect
+  useEffect(() => {
+    if (isStreaming) {
+      renderFooter(null);
+      return;
+    }
+    if (completedResult) {
+      renderFooter(
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRegenerate} className="flex-1">
+            Đánh giá lại
+          </Button>
+          <Button size="sm" onClick={() => setActiveMode("edit")} className="flex-1">
+            <PenLineIcon className="mr-1.5 size-3.5" />
+            Chỉnh sửa theo đánh giá
+          </Button>
+        </div>,
+      );
+      return;
+    }
+    renderFooter(
+      <Button onClick={handleReview} className="w-full">
+        <ClipboardCheckIcon className="mr-1.5 size-3.5" />
+        Đánh giá chương
+      </Button>,
+    );
+    return () => renderFooter(null);
+  }, [isStreaming, completedResult, handleRegenerate, handleReview, setActiveMode, renderFooter]);
 
   return (
     <div className="space-y-4">
@@ -84,28 +114,8 @@ export function ReviewMode({
         <StreamingDisplay
           content={isStreaming ? streamingContent : (completedResult ?? "")}
           isStreaming={isStreaming}
-          onCancel={cancelStreaming}
           renderAsMarkdown
         />
-      )}
-
-      {completedResult && !isStreaming && (
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRegenerate} className="flex-1">
-            Đánh giá lại
-          </Button>
-          <Button size="sm" onClick={() => setActiveMode("edit")} className="flex-1">
-            <PenLineIcon className="mr-1.5 size-3.5" />
-            Chỉnh sửa dựa trên đánh giá
-          </Button>
-        </div>
-      )}
-
-      {!isStreaming && !completedResult && (
-        <Button onClick={handleReview} className="w-full">
-          <ClipboardCheckIcon className="mr-1.5 size-3.5" />
-          Đánh giá chương
-        </Button>
       )}
     </div>
   );

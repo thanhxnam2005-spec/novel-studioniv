@@ -201,6 +201,9 @@ export function NovelImportWizard() {
               content: ch.content,
               order: 0,
               wordCount: ch.wordCount,
+              version: 0,
+              versionType: "manual",
+              isActive: 1,
               createdAt: now,
               updatedAt: now,
             });

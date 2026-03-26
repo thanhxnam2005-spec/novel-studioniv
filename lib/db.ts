@@ -50,6 +50,8 @@ export interface Chapter {
   updatedAt: Date;
 }
 
+export type SceneVersionType = "ai-translate" | "ai-edit" | "manual";
+
 export interface Scene {
   id: string;
   chapterId: string;
@@ -58,6 +60,12 @@ export interface Scene {
   content: string;
   order: number;
   wordCount: number;
+  // Version fields
+  version: number;
+  versionType: SceneVersionType;
+  /** 1 = current content, 0 = historical version. Number for IndexedDB compound key compat. */
+  isActive: number;
+  activeSceneId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
