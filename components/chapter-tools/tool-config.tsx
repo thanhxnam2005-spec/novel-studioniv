@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -33,8 +34,6 @@ interface ToolConfigProps {
   promptLabel: string;
 }
 
-const DEBOUNCE_MS = 600;
-
 export function ToolConfig({
   modelKey,
   promptKey,
@@ -53,11 +52,8 @@ export function ToolConfig({
   const storedPrompt = (settings[promptKey] as string | undefined) ?? "";
   const effectivePrompt = storedPrompt || defaultPrompt;
 
-  // Local prompt state for responsive typing + debounced save
   const [promptText, setPromptText] = useState(effectivePrompt);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Sync local state when stored value changes externally (e.g. reset)
   useEffect(() => {
     setPromptText(effectivePrompt);
   }, [effectivePrompt]);
@@ -101,16 +97,12 @@ export function ToolConfig({
     saveModel({ providerId: selectedProviderId, modelId });
   };
 
+  const debouncedSavePrompt = useDebouncedCallback(savePrompt, 600);
+
   const handlePromptChange = (text: string) => {
     setPromptText(text);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => savePrompt(text), DEBOUNCE_MS);
+    debouncedSavePrompt.run(text);
   };
-
-  // Flush on unmount
-  useEffect(() => {
-    return () => clearTimeout(debounceRef.current);
-  }, []);
 
   const hasCustomModel = !!currentModel;
   const hasCustomPrompt =
@@ -193,7 +185,7 @@ export function ToolConfig({
                   variant="ghost"
                   size="sm"
                   onClick={async () => {
-                    clearTimeout(debounceRef.current);
+                    debouncedSavePrompt.cancel();
                     await updateAnalysisSettings({
                       [promptKey]: undefined,
                     } as Partial<AnalysisSettings>);

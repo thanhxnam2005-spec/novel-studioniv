@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -66,19 +67,11 @@ function DebouncedTextarea({
   onSave: (key: string, value: string) => void;
   onReset: (field: PromptField) => void;
 }) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isCustomized = value.trim() !== "";
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
-
-  const handleChange = useCallback(
-    (val: string) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        onSave(field.key, val);
-      }, 800);
-    },
-    [field.key, onSave],
+  const debouncedSave = useDebouncedCallback(
+    (val: string) => onSave(field.key, val),
+    800,
   );
 
   return (
@@ -103,7 +96,7 @@ function DebouncedTextarea({
       <Textarea
         key={value} // Reset textarea when value changes externally (e.g. reset)
         defaultValue={value}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={(e) => debouncedSave.run(e.target.value)}
         placeholder={field.defaultValue}
         className="min-h-[120px] font-mono text-xs leading-relaxed"
       />

@@ -7,6 +7,22 @@ import type {
   QTWorkerResponse,
 } from "./qt-engine.types";
 import { DEFAULT_CONVERT_OPTIONS } from "./qt-engine.types";
+import {
+  BRACKET_CLOSE,
+  BRACKET_OPEN,
+  CAP_PASSTHROUGH,
+  CAP_TRIGGERS,
+  DIGIT_LEADING,
+  DIGIT_TRAILING,
+  FULLWIDTH_PUNCT,
+  NAME_SOURCES,
+  NAME_SUFFIXES,
+  NO_SPACE_AFTER,
+  NO_SPACE_BEFORE,
+  PARTICLE_OVERRIDES,
+  SENTENCE_ENDERS,
+  normalizeFullwidthPunct,
+} from "./qt-engine.constants";
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -37,75 +53,6 @@ function capitalizeFirst(str: string): string {
   return str;
 }
 
-const NAME_SOURCES = new Set<ConvertSource>([
-  "qt-name",
-  "novel-name",
-  "global-name",
-]);
-
-const SENTENCE_ENDERS = /[.!?。！？…\n：:；;]/;
-const CAP_TRIGGERS = /[《«]/;
-const CAP_PASSTHROUGH =
-  /^[\s\u3000""''「『（(\[{<》」』）\])}>《》«»，、；：,.:;!?。！？…～·\-–—\u201c\u201d\u2018\u2019]+$/;
-
-const NO_SPACE_BEFORE =
-  /[,.:;!?。，、；：！？…\u201c\u201d\u2018\u2019」』）\])}>》»～·\-–—\s]/;
-const NO_SPACE_AFTER = /[\u201c\u201d\u2018\u2019「『（\[({<《«\s]/;
-const DIGIT_TRAILING = /\d$/;
-const DIGIT_LEADING = /^\d/;
-
-// ─── Full-width → ASCII punctuation ─────────────────────────
-
-const FULLWIDTH_PUNCT: Record<string, string> = {
-  "，": ",",
-  "。": ".",
-  "：": ":",
-  "；": ";",
-  "！": "!",
-  "？": "?",
-  "（": "(",
-  "）": ")",
-  "【": "[",
-  "】": "]",
-  "、": ",",
-  "～": "~",
-  "\u3000": " ",
-  "……": "...",
-};
-
-const FULLWIDTH_RE = new RegExp(
-  Object.keys(FULLWIDTH_PUNCT)
-    .sort((a, b) => b.length - a.length)
-    .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("|"),
-  "g",
-);
-
-function normalizeFullwidthPunct(text: string): string {
-  return text.replace(FULLWIDTH_RE, (m) => FULLWIDTH_PUNCT[m] ?? m);
-}
-
-// ─── Particle overrides ──────────────────────────────────────
-
-const PARTICLE_OVERRIDES: Record<string, string> = {
-  的: "của",
-  了: "",
-  着: "đang",
-  过: "qua",
-  吗: "sao",
-  呢: "đây",
-  吧: "đi",
-  啊: "a",
-  哦: "ồ",
-  嗯: "ừ",
-  哈: "ha",
-  啦: "rồi",
-  嘛: "mà",
-  呀: "a",
-  哩: "lý",
-  喽: "rồi",
-};
-
 // ─── State ───────────────────────────────────────────────────
 
 let namesMap: Map<string, string>;
@@ -135,15 +82,22 @@ function initDicts(dictData: Record<string, DictPair[]>): void {
     namesMap.set(e.chinese, capitalizeWords(pickPrimary(e.vietnamese)));
 
   for (const e of dictData.vietphrase ?? []) {
-    if (e.chinese in PARTICLE_OVERRIDES) {
+    if (e.chinese in FULLWIDTH_PUNCT) {
+      vietPhraseMap.set(e.chinese, FULLWIDTH_PUNCT[e.chinese]);
+    } else if (e.chinese in PARTICLE_OVERRIDES) {
       vietPhraseMap.set(e.chinese, PARTICLE_OVERRIDES[e.chinese]);
     } else {
       vietPhraseMap.set(e.chinese, pickPrimary(e.vietnamese));
     }
   }
 
-  for (const e of dictData.phienam ?? [])
-    phienAmMap.set(e.chinese, pickPrimary(e.vietnamese));
+  for (const e of dictData.phienam ?? []) {
+    if (e.chinese in FULLWIDTH_PUNCT) {
+      phienAmMap.set(e.chinese, FULLWIDTH_PUNCT[e.chinese]);
+    } else {
+      phienAmMap.set(e.chinese, pickPrimary(e.vietnamese));
+    }
+  }
 
   for (const e of dictData.luatnhan ?? []) {
     const idx = e.chinese.indexOf("{0}");
@@ -355,13 +309,6 @@ function convert(
 
 // ─── Post-processing ─────────────────────────────────────────
 
-/** Chinese suffixes that capitalize when following a name (geographic, titles, orgs) */
-const NAME_SUFFIXES = new Set(
-  "省市县区镇村山河湖海岛峰谷关城宫殿阁楼塔寺庙庄府院堂门派宗帝王皇后妃侯公伯子爵将帅族氏家國国".split(
-    "",
-  ),
-);
-
 function capitalizeNameAdjacent(segments: ConvertSegment[]): void {
   for (let i = 1; i < segments.length; i++) {
     const prev = segments[i - 1];
@@ -379,9 +326,6 @@ function capitalizeNameAdjacent(segments: ConvertSegment[]): void {
     }
   }
 }
-
-const BRACKET_OPEN = /[《«]/;
-const BRACKET_CLOSE = /[》»]/;
 
 function capitalizeBracketContent(segments: ConvertSegment[]): void {
   let inside = false;
@@ -438,18 +382,16 @@ function segmentsToPlainText(segments: ConvertSegment[]): string {
   const parts: string[] = [];
 
   for (const seg of segments) {
-    if (seg.source === "unknown") {
-      parts.push(normalizeFullwidthPunct(seg.original));
-      continue;
-    }
-
-    const translated = seg.translated;
-    if (!translated) continue;
+    const text =
+      seg.source === "unknown"
+        ? normalizeFullwidthPunct(seg.original)
+        : normalizeFullwidthPunct(seg.translated);
+    if (!text) continue;
 
     if (parts.length > 0) {
       const prev = parts[parts.length - 1];
       const lastChar = prev.slice(-1);
-      const firstChar = translated[0];
+      const firstChar = text[0];
 
       const shouldAddSpace =
         lastChar !== undefined &&
@@ -464,7 +406,7 @@ function segmentsToPlainText(segments: ConvertSegment[]): string {
       if (shouldAddSpace) parts.push(" ");
     }
 
-    parts.push(translated);
+    parts.push(text);
   }
 
   return parts.join("").replace(/ {2,}/g, " ");

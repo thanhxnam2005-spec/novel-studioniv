@@ -52,7 +52,8 @@ import {
   XIcon,
   ZapIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import { toast } from "sonner";
 
 const DEPTH_OPTIONS: {
@@ -162,12 +163,10 @@ export function BulkTranslateDialog({
     saveModel({ providerId: selectedProviderId, modelId });
   };
 
-  // Prompt — synced with AnalysisSettings.translatePrompt, debounced save
   const storedPrompt = (settings.translatePrompt as string | undefined) ?? "";
   const effectivePrompt = storedPrompt || DEFAULT_TRANSLATE_SYSTEM;
   const [promptText, setPromptText] = useState(effectivePrompt);
   const [promptOpen, setPromptOpen] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     setPromptText(effectivePrompt);
@@ -188,13 +187,12 @@ export function BulkTranslateDialog({
     }
   }, []);
 
+  const debouncedSavePrompt = useDebouncedCallback(savePrompt, 600);
+
   const handlePromptChange = (text: string) => {
     setPromptText(text);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => savePrompt(text), 600);
+    debouncedSavePrompt.run(text);
   };
-
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const isCustomPrompt = promptText.trim() !== DEFAULT_TRANSLATE_SYSTEM.trim();
 
@@ -441,7 +439,7 @@ export function BulkTranslateDialog({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              clearTimeout(debounceRef.current);
+                              debouncedSavePrompt.cancel();
                               handlePromptChange(DEFAULT_TRANSLATE_SYSTEM);
                             }}
                             className="h-6 text-xs"

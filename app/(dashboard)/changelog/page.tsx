@@ -53,8 +53,8 @@ function CategoryBadge({ category }: { category: ChangeCategory }) {
 
 function ChangeItem({ entry }: { entry: ChangeEntry }) {
   return (
-    <li className="flex gap-3 py-2 first:pt-0 last:pb-0">
-      <div className="w-[120px] shrink-0 pt-px">
+    <li className="flex flex-col sm:flex-row gap-3 py-2 first:pt-0 last:pb-0">
+      <div className="sm:w-[120px] shrink-0 pt-px">
         <CategoryBadge category={entry.category} />
         {entry.tags && entry.tags.length > 0 && (
           <div className="mt-0.5 flex flex-wrap gap-1">
@@ -99,52 +99,49 @@ function ReleaseCard({
   return (
     <div
       id={release.version}
-      className="group/release relative pb-10 pl-8 last:pb-0"
+      className="group/release relative pb-5 pl-8 last:pb-0"
     >
       {/* Timeline connector */}
       <div className="absolute left-0 top-0 bottom-0 w-px bg-border group-last/release:bottom-auto group-last/release:h-3" />
 
       {/* Timeline dot */}
       <div
-        className={`absolute left-0 top-1.5 size-2.5 -translate-x-1/2 rounded-full border-2 border-background ${
-          isLatest ? "bg-primary" : "bg-muted-foreground/40"
+        className={`absolute left-0 top-3 -translate-x-1/2 rounded-full border-2 border-background ${
+          isLatest
+            ? "bg-primary size-3"
+            : "bg-background border-border size-2.5"
         }`}
       />
 
       <Collapsible defaultOpen={isLatest}>
         {/* Release header — acts as trigger */}
-        <CollapsibleTrigger className="group/trigger flex w-full cursor-pointer items-center gap-2 text-left">
-          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]/trigger:rotate-90" />
-          <span className="font-mono text-sm font-semibold text-foreground">
-            v{release.version}
-          </span>
-          <span className="text-xs text-muted-foreground">{formattedDate}</span>
-          {isLatest && (
-            <Badge variant="default" className="h-4 text-[10px]">
-              Mới nhất
-            </Badge>
-          )}
-          {release.title && (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              — {release.title}
-            </span>
-          )}
-        </CollapsibleTrigger>
-
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down p-0.5">
-          {/* Release title & summary */}
-          <div className="mt-3">
-            {release.title && (
-              <h3 className="mb-1 font-heading text-lg font-semibold tracking-tight text-foreground">
-                {release.title}
-              </h3>
-            )}
+        <CollapsibleTrigger className="group/trigger flex w-full cursor-pointer items-start gap-2">
+          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]/trigger:rotate-90 mt-2" />
+          <div className="flex-1">
+            <div className="w-full flex items-center gap-2 text-left">
+              <Badge
+                variant={isLatest ? "default" : "outline"}
+                className="h-5 px-2"
+              >
+                v{release.version}
+              </Badge>
+              {release.title && (
+                <h4 className="mb-1 font-heading text-lg font-semibold tracking-tight text-foreground">
+                  {release.title}
+                </h4>
+              )}
+              <Badge variant="ghost">{formattedDate}</Badge>
+            </div>
             {release.summary && (
-              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground text-left">
                 {release.summary}
               </p>
             )}
+          </div>
+        </CollapsibleTrigger>
 
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down p-0.5">
+          <div className="mt-3">
             {/* Changes list */}
             <div className="rounded-xl bg-card ring-1 ring-foreground/10">
               <ul className="divide-y divide-border px-4 py-3">

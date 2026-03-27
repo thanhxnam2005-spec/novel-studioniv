@@ -65,6 +65,50 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.8.1",
+    date: "2026-03-27",
+    title: "Nâng cao chất lượng convert & Live mode",
+    summary:
+      "Chế độ Live tự động dịch khi gõ. Kết quả convert chính xác hơn nhờ viết hoa thông minh, xử lý dấu câu chuẩn, và sửa lỗi khoảng cách giữa các số.",
+    changes: [
+      {
+        category: "feature",
+        description: "Chế độ Live — convert tự động khi gõ",
+        details:
+          "Bật công tắc Live trên trang Convert nhanh để kết quả dịch tự động cập nhật sau 1 giây ngừng gõ. Mặc định bật sẵn.",
+        tags: ["convert", "trải nghiệm"],
+      },
+      {
+        category: "feature",
+        description: "Tùy chọn viết hoa nội dung trong ngoặc sách",
+        details:
+          "Thêm cài đặt tự động viết hoa chữ cái đầu mỗi từ bên trong 《》 và «» — hữu ích cho tên sách, tên kỹ năng, hoặc tên địa danh.",
+        tags: ["convert", "cài đặt"],
+      },
+      {
+        category: "improvement",
+        description: "Viết hoa thông minh hơn sau dấu câu và tên riêng",
+        details:
+          "Tự động viết hoa đầu câu sau dấu chấm, chấm hỏi, chấm than, xuống dòng. Viết hoa hậu tố địa danh/chức danh khi đứng sau tên riêng (ví dụ: Lục Trúc Tỉnh thay vì Lục Trúc tỉnh).",
+        tags: ["convert", "chất lượng"],
+      },
+      {
+        category: "fix",
+        description: "Sửa lỗi dấu câu và khoảng cách",
+        details:
+          "Dấu câu tiếng Trung toàn chiều (，。：「」『』（）…) giờ tự động chuyển thành dấu câu thông thường. Sửa lỗi số bị tách rời (18 → 1 8). Sửa lỗi thêm khoảng trắng thừa sau dấu ngoặc kép.",
+        tags: ["convert", "sửa lỗi"],
+      },
+      {
+        category: "improvement",
+        description: "Cải thiện bản dịch các từ thường gặp",
+        details:
+          "Các hư từ phổ biến (的, 了, 着, 吗, 呢...) giờ được dịch đúng nghĩa thông dụng nhất thay vì chọn nghĩa hiếm từ từ điển.",
+        tags: ["convert", "chất lượng"],
+      },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-03-27",
     title: "Quick Translator — Convert truyện Trung-Việt",

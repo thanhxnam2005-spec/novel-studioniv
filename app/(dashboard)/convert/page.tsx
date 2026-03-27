@@ -1,23 +1,27 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { ConvertConfig } from "@/components/convert-config";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
+import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
 import {
   ArrowRightLeftIcon,
   CheckIcon,
   ClipboardCopyIcon,
+  LoaderIcon,
   SettingsIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export default function ConvertPage() {
@@ -25,23 +29,51 @@ export default function ConvertPage() {
   const [output, setOutput] = useState("");
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [liveMode, setLiveMode] = useState(true);
   const engineReady = useQTEngineReady();
   const convertOptions = useConvertSettings();
+  const debouncedInput = useDebouncedValue(input, 500);
+  const seqRef = useRef(0);
 
   const handleConvert = useCallback(async () => {
     if (!input.trim()) return;
+    const seq = ++seqRef.current;
     setIsConverting(true);
     try {
       const result = await convertText(input, { options: convertOptions });
-      setOutput(result.plainText);
+      if (seqRef.current === seq) setOutput(result.plainText);
     } catch (err) {
       toast.error(
         "Lỗi convert: " + (err instanceof Error ? err.message : String(err)),
       );
     } finally {
-      setIsConverting(false);
+      if (seqRef.current === seq) setIsConverting(false);
     }
   }, [input, convertOptions]);
+
+  useEffect(() => {
+    if (!liveMode || !engineReady) return;
+    if (!debouncedInput.trim()) {
+      setOutput("");
+      return;
+    }
+    const seq = ++seqRef.current;
+    setIsConverting(true);
+    convertText(debouncedInput, { options: convertOptions })
+      .then((result) => {
+        if (seqRef.current === seq) setOutput(result.plainText);
+      })
+      .catch((err) => {
+        if (seqRef.current === seq)
+          toast.error(
+            "Lỗi convert: " +
+              (err instanceof Error ? err.message : String(err)),
+          );
+      })
+      .finally(() => {
+        if (seqRef.current === seq) setIsConverting(false);
+      });
+  }, [liveMode, debouncedInput, convertOptions, engineReady]);
 
   const handleCopy = useCallback(async () => {
     if (!output) return;
@@ -66,17 +98,30 @@ export default function ConvertPage() {
             Không cần API key.
           </p>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm">
-              <SettingsIcon className="mr-1.5 size-3.5" />
-              Cài đặt
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-72">
-            <ConvertConfig />
-          </PopoverContent>
-        </Popover>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="live-mode"
+              checked={liveMode}
+              onCheckedChange={setLiveMode}
+              disabled={!engineReady}
+            />
+            <Label htmlFor="live-mode" className="text-sm">
+              Live
+            </Label>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <SettingsIcon className="mr-1.5 size-3.5" />
+                Cài đặt
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72">
+              <ConvertConfig />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -106,7 +151,12 @@ export default function ConvertPage() {
         {/* Output */}
         <div className="space-y-2">
           <div className="flex h-8 items-center justify-between">
-            <label className="text-sm font-medium">Kết quả (Việt)</label>
+            <label className="text-sm font-medium">
+              Kết quả (Việt)
+              {liveMode && isConverting && (
+                <LoaderIcon className="text-muted-foreground ml-2 inline size-3.5 animate-spin" />
+              )}
+            </label>
             {output && (
               <Button variant="ghost" size="sm" onClick={handleCopy}>
                 {copied ? (
@@ -127,21 +177,23 @@ export default function ConvertPage() {
         </div>
       </div>
 
-      {/* Convert button */}
-      <div className="mt-4 flex justify-center">
-        <Button
-          size="lg"
-          onClick={handleConvert}
-          disabled={isConverting || !input.trim() || !engineReady}
-        >
-          <ArrowRightLeftIcon className="mr-2 size-4" />
-          {isConverting
-            ? "Đang convert..."
-            : !engineReady
-              ? "Đang tải từ điển..."
-              : "Convert"}
-        </Button>
-      </div>
+      {/* Convert button — hidden in live mode */}
+      {!liveMode && (
+        <div className="mt-4 flex justify-center">
+          <Button
+            size="lg"
+            onClick={handleConvert}
+            disabled={isConverting || !input.trim() || !engineReady}
+          >
+            <ArrowRightLeftIcon className="mr-2 size-4" />
+            {isConverting
+              ? "Đang convert..."
+              : !engineReady
+                ? "Đang tải từ điển..."
+                : "Convert"}
+          </Button>
+        </div>
+      )}
     </main>
   );
 }

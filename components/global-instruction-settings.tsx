@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -9,23 +8,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import { useChatSettings, updateChatSettings } from "@/lib/hooks";
 
 export function GlobalInstructionSettings() {
   const settings = useChatSettings();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clean up timer on unmount
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
-
-  const save = useCallback((value: string) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(async () => {
-      await updateChatSettings({
-        globalSystemInstruction: value.trim() || undefined,
-      });
-    }, 600);
-  }, []);
+  const save = useDebouncedCallback((value: string) => {
+    updateChatSettings({
+      globalSystemInstruction: value.trim() || undefined,
+    });
+  }, 600);
 
   return (
     <Card>
@@ -41,7 +34,7 @@ export function GlobalInstructionSettings() {
         <Textarea
           placeholder="VD: Luôn trả lời bằng Tiếng Việt. Sử dụng giọng văn trang trọng."
           defaultValue={settings.globalSystemInstruction ?? ""}
-          onChange={(e) => save(e.target.value)}
+          onChange={(e) => save.run(e.target.value)}
           className="min-h-[100px] font-mono text-sm"
         />
       </CardContent>
