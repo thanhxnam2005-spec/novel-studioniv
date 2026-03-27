@@ -2,7 +2,6 @@
 
 import { ChapterToolsBar } from "@/components/chapter-tools/chapter-tools-bar";
 import { ChapterToolsPanel } from "@/components/chapter-tools/chapter-tools-panel";
-import { SideBySideDiff } from "@/components/chapter-tools/side-by-side-diff";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
+import { LineEditor } from "@/components/ui/line-editor";
+import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -52,6 +53,7 @@ import {
   ChevronDownIcon,
   HistoryIcon,
   Redo2Icon,
+  RotateCcwIcon,
   SaveIcon,
   Undo2Icon,
 } from "lucide-react";
@@ -391,24 +393,46 @@ export default function ChapterEditorPage() {
 
         {/* Main content area */}
         {showDiffInMain ? (
-          <SideBySideDiff
-            original={content}
-            result={editedResult}
-            onResultChange={setEditedResult}
-            onAccept={handleAcceptDiff}
-            onReject={clearResult}
-            onRegenerate={() => {
-              clearResult();
-            }}
-          />
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <TextCompareEditor
+              leftValue={content}
+              rightValue={editedResult}
+              onChange={setEditedResult}
+              editableSide="right"
+              showDiff
+              storageKey="chapter-diff"
+              leftLabel="Bản gốc"
+              rightLabel="Kết quả (chỉnh sửa)"
+              className="min-h-0 flex-1 rounded-none border-x-0 border-t-0"
+              panelWrapperClassName="min-h-0 flex-1"
+            />
+            <div className="flex shrink-0 items-center justify-between border-t px-4 py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => clearResult()}
+              >
+                <RotateCcwIcon className="mr-1.5 size-3" />
+                Tạo lại
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={clearResult}>
+                  Hủy
+                </Button>
+                <Button size="sm" onClick={handleAcceptDiff}>
+                  Áp dụng
+                </Button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="flex-1 overflow-auto">
             <div className="mx-auto h-full max-w-4xl px-6 py-4">
-              <textarea
+              <LineEditor
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="h-full w-full resize-none rounded-lg border bg-transparent p-4 font-mono text-sm leading-relaxed outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring/50"
+                onChange={setContent}
                 placeholder="Bắt đầu viết..."
+                className="h-full"
               />
             </div>
           </div>

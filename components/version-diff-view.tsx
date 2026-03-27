@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { DiffHighlight } from "@/components/chapter-tools/diff-highlight";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { computeDiff, formatStats, type DiffResult } from "@/lib/chapter-tools/diff-utils";
-import { DiffHighlight } from "@/components/chapter-tools/diff-highlight";
+import { TextCompareEditor } from "@/components/ui/text-compare-editor";
+import {
+  computeDiff,
+  formatStats,
+  type DiffResult,
+} from "@/lib/chapter-tools/diff-utils";
 import { ColumnsIcon, RowsIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface VersionDiffViewProps {
   versionContent: string;
@@ -47,22 +52,15 @@ export function VersionDiffView({
   const [mode, setMode] = useState<"inline" | "side-by-side">("inline");
   const diff = useAsyncDiff(versionContent, currentContent);
 
-  if (!diff) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="h-64 w-full rounded-md" />
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {/* Stats bar + mode toggle */}
       <div className="flex shrink-0 items-center gap-2">
-        <span className="text-xs text-muted-foreground">
-          {formatStats(diff.stats)}
-        </span>
+        {mode === "inline" && (
+          <span className="text-xs text-muted-foreground">
+            {diff ? formatStats(diff.stats) : "Đang so sánh..."}
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-1 rounded-md border p-0.5">
           <Button
             variant={mode === "inline" ? "secondary" : "ghost"}
@@ -86,58 +84,28 @@ export function VersionDiffView({
       </div>
 
       {mode === "inline" ? (
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
-          <DiffHighlight changes={diff.changes} />
-        </div>
+        diff ? (
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
+            <DiffHighlight changes={diff.changes} />
+          </div>
+        ) : (
+          <div className="space-y-3 p-3">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        )
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
-          <div className="flex min-h-0 flex-col">
-            <span className="mb-1 shrink-0 text-xs font-medium text-muted-foreground">
-              Phiên bản cũ
-            </span>
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                {diff.changes.map((change, i) => {
-                  if (change.added) return null;
-                  if (change.removed) {
-                    return (
-                      <span
-                        key={i}
-                        className="rounded-sm bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300"
-                      >
-                        {change.value}
-                      </span>
-                    );
-                  }
-                  return <span key={i}>{change.value}</span>;
-                })}
-              </div>
-            </div>
-          </div>
-          <div className="flex min-h-0 flex-col">
-            <span className="mb-1 shrink-0 text-xs font-medium text-muted-foreground">
-              Hiện tại
-            </span>
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border p-3">
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                {diff.changes.map((change, i) => {
-                  if (change.removed) return null;
-                  if (change.added) {
-                    return (
-                      <span
-                        key={i}
-                        className="rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                      >
-                        {change.value}
-                      </span>
-                    );
-                  }
-                  return <span key={i}>{change.value}</span>;
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TextCompareEditor
+          leftValue={versionContent}
+          rightValue={currentContent}
+          showDiff
+          storageKey="version-diff"
+          leftLabel="Phiên bản cũ | Hiện tại"
+          className="min-h-0 flex-1"
+          panelWrapperClassName="min-h-0 h-[50vh]"
+        />
       )}
     </div>
   );

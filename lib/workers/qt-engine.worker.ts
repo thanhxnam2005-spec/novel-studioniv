@@ -14,6 +14,8 @@ import {
   CAP_TRIGGERS,
   DIGIT_LEADING,
   DIGIT_TRAILING,
+  WORD_CHAR_LEADING,
+  WORD_CHAR_TRAILING,
   FULLWIDTH_PUNCT,
   NAME_SOURCES,
   NAME_SUFFIXES,
@@ -380,6 +382,7 @@ function capitalizeSentences(segments: ConvertSegment[]): void {
 
 function segmentsToPlainText(segments: ConvertSegment[]): string {
   const parts: string[] = [];
+  let prevSource: ConvertSource | undefined;
 
   for (const seg of segments) {
     const text =
@@ -401,11 +404,20 @@ function segmentsToPlainText(segments: ConvertSegment[]): string {
         lastChar !== "\u3000" &&
         !NO_SPACE_AFTER.test(lastChar) &&
         !NO_SPACE_BEFORE.test(firstChar) &&
-        !(DIGIT_TRAILING.test(lastChar) && DIGIT_LEADING.test(firstChar));
+        !(DIGIT_TRAILING.test(lastChar) && DIGIT_LEADING.test(firstChar)) &&
+        // Keep passthrough word-chars together: "ABC123" stays intact,
+        // but translated segments still get spaces: "vị đại"
+        !(
+          prevSource === "unknown" &&
+          seg.source === "unknown" &&
+          WORD_CHAR_TRAILING.test(lastChar) &&
+          WORD_CHAR_LEADING.test(firstChar)
+        );
 
       if (shouldAddSpace) parts.push(" ");
     }
 
+    prevSource = seg.source;
     parts.push(text);
   }
 

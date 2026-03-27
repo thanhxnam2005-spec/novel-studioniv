@@ -65,51 +65,67 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
-    version: "0.8.1",
+    version: "0.4.2",
+    date: "2026-03-27",
+    title: "Trình soạn thảo & So sánh văn bản",
+    summary:
+      "Trình soạn thảo mới với đánh số dòng, bộ so sánh song song với word-level diff, và sửa lỗi convert tách rời chữ Latin/Việt.",
+    changes: [
+      {
+        category: "feature",
+        description: "Trình soạn thảo văn bản với đánh số dòng",
+        details:
+          "Editor mới hiển thị số dòng bên trái giống. Đã tích hợp vào trang soạn thảo chương và trang convert.",
+        tags: ["soạn thảo", "tính năng"],
+      },
+      {
+        category: "feature",
+        description: "Bộ so sánh văn bản song song",
+        details:
+          "So sánh hai văn bản song song với word-level diff highlight, đồng bộ cuộn, cài đặt cỡ chữ, và bật/tắt diff. Cài đặt được lưu theo từng ngữ cảnh sử dụng.",
+        tags: ["soạn thảo", "tính năng"],
+      },
+      {
+        category: "fix",
+        description: "Sửa lỗi convert tách rời chữ Latin và tiếng Việt",
+        details:
+          "Văn bản Latin trong đoạn Trung không còn bị tách từng ký tự. Giữ nguyên khoảng cách giữa các từ đã dịch.",
+        tags: ["convert", "sửa lỗi"],
+      },
+    ],
+  },
+  {
+    version: "0.4.1",
     date: "2026-03-27",
     title: "Nâng cao chất lượng convert & Live mode",
     summary:
-      "Chế độ Live tự động dịch khi gõ. Kết quả convert chính xác hơn nhờ viết hoa thông minh, xử lý dấu câu chuẩn, và sửa lỗi khoảng cách giữa các số.",
+      "Kết quả convert chính xác hơn với viết hoa thông minh, xử lý dấu câu chuẩn, và chế độ Live tự động dịch khi gõ.",
     changes: [
       {
         category: "feature",
         description: "Chế độ Live — convert tự động khi gõ",
         details:
-          "Bật công tắc Live trên trang Convert nhanh để kết quả dịch tự động cập nhật sau 1 giây ngừng gõ. Mặc định bật sẵn.",
+          "Bật công tắc Live trên trang Convert nhanh để kết quả dịch tự động cập nhật liên tục.",
         tags: ["convert", "trải nghiệm"],
       },
       {
-        category: "feature",
-        description: "Tùy chọn viết hoa nội dung trong ngoặc sách",
-        details:
-          "Thêm cài đặt tự động viết hoa chữ cái đầu mỗi từ bên trong 《》 và «» — hữu ích cho tên sách, tên kỹ năng, hoặc tên địa danh.",
-        tags: ["convert", "cài đặt"],
-      },
-      {
         category: "improvement",
-        description: "Viết hoa thông minh hơn sau dấu câu và tên riêng",
+        description: "Cải thiện viết hoa tự động và tùy chọn viết hoa chủ động",
         details:
-          "Tự động viết hoa đầu câu sau dấu chấm, chấm hỏi, chấm than, xuống dòng. Viết hoa hậu tố địa danh/chức danh khi đứng sau tên riêng (ví dụ: Lục Trúc Tỉnh thay vì Lục Trúc tỉnh).",
+          "Cải thiện xử lý tự động viết hoa trong câu. Thêm tùy chọn viết hoa tự động trong ngoặc sách.",
         tags: ["convert", "chất lượng"],
       },
       {
-        category: "fix",
-        description: "Sửa lỗi dấu câu và khoảng cách",
-        details:
-          "Dấu câu tiếng Trung toàn chiều (，。：「」『』（）…) giờ tự động chuyển thành dấu câu thông thường. Sửa lỗi số bị tách rời (18 → 1 8). Sửa lỗi thêm khoảng trắng thừa sau dấu ngoặc kép.",
-        tags: ["convert", "sửa lỗi"],
-      },
-      {
         category: "improvement",
-        description: "Cải thiện bản dịch các từ thường gặp",
+        description: "Xử lý các dấu câu và cải thiện các từ thường gặp",
         details:
-          "Các hư từ phổ biến (的, 了, 着, 吗, 呢...) giờ được dịch đúng nghĩa thông dụng nhất thay vì chọn nghĩa hiếm từ từ điển.",
+          "Các dấu câu toàn chiều như giờ tự động chuyển thành dấu câu thông thường. Các từ hay gặp giờ được dịch đúng nghĩa phổ biến nhất thay vì chọn nghĩa hiếm từ từ điển.",
         tags: ["convert", "chất lượng"],
       },
     ],
   },
   {
-    version: "0.8.0",
+    version: "0.4.0",
     date: "2026-03-27",
     title: "Quick Translator — Convert truyện Trung-Việt",
     summary:
@@ -139,7 +155,7 @@ export const changelog: ChangelogRelease[] = [
     ],
   },
   {
-    version: "0.7.0",
+    version: "0.3.4",
     date: "2026-03-26",
     title: "Cải thiện xử lý lỗi AI & Trải nghiệm chat",
     summary:
@@ -163,7 +179,7 @@ export const changelog: ChangelogRelease[] = [
     ],
   },
   {
-    version: "0.6.0",
+    version: "0.3.3",
     date: "2026-03-26",
     title: "Lịch sử phiên bản & Soạn thảo nâng cao",
     summary:
@@ -201,7 +217,7 @@ export const changelog: ChangelogRelease[] = [
     ],
   },
   {
-    version: "0.5.0",
+    version: "0.3.2",
     date: "2026-03-26",
     title: "Nhật ký thay đổi & Cải thiện phân tích",
     summary:
@@ -231,7 +247,7 @@ export const changelog: ChangelogRelease[] = [
     ],
   },
   {
-    version: "0.4.0",
+    version: "0.3.1",
     date: "2026-03-26",
     title: "Dịch thuật hàng loạt",
     summary:

@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
@@ -89,16 +89,41 @@ export default function ConvertPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-8">
-      <div className="mb-6 flex items-start justify-between">
+    <main className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden px-6 py-4">
+      {/* ── Header ── */}
+      <div className="mb-4 flex shrink-0 items-start justify-between">
         <div>
           <h1 className="font-serif text-2xl font-bold">Convert nhanh</h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Dán văn bản tiếng Trung và convert sang tiếng Việt bằng từ điển QT.
             Không cần API key.
           </p>
         </div>
+
         <div className="flex items-center gap-3">
+          {input && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleClear}
+              title="Xóa"
+            >
+              <Trash2Icon className="size-3.5" />
+            </Button>
+          )}
+          {output && (
+            <Button variant="ghost" size="sm" onClick={handleCopy}>
+              {copied ? (
+                <CheckIcon className="mr-1.5 size-3.5" />
+              ) : (
+                <ClipboardCopyIcon className="mr-1.5 size-3.5" />
+              )}
+              {copied ? "Đã chép" : "Sao chép"}
+            </Button>
+          )}
+
+          {(input || output) && <div className="h-5 w-px bg-border" />}
+
           <div className="flex items-center gap-2">
             <Switch
               id="live-mode"
@@ -110,6 +135,11 @@ export default function ConvertPage() {
               Live
             </Label>
           </div>
+
+          {isConverting && (
+            <LoaderIcon className="size-4 animate-spin text-muted-foreground" />
+          )}
+
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
@@ -124,62 +154,21 @@ export default function ConvertPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Input */}
-        <div className="space-y-2">
-          <div className="flex h-8 items-center justify-between">
-            <label className="text-sm font-medium">Văn bản gốc (Trung)</label>
-            {input && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleClear}
-                title="Xóa"
-              >
-                <Trash2Icon className="size-3.5" />
-              </Button>
-            )}
-          </div>
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Dán văn bản tiếng Trung vào đây..."
-            className="h-[calc(100vh-280px)] resize-none font-mono text-sm"
-          />
-        </div>
+      {/* ── Side-by-side editor ── */}
+      <TextCompareEditor
+        panelWrapperClassName="h-[calc(100dvh-260px)]"
+        leftValue={input}
+        rightValue={output}
+        onChange={setInput}
+        editableSide="left"
+        storageKey="convert"
+        leftLabel="Văn bản gốc (Trung)"
+        rightLabel="Kết quả (Việt)"
+      />
 
-        {/* Output */}
-        <div className="space-y-2">
-          <div className="flex h-8 items-center justify-between">
-            <label className="text-sm font-medium">
-              Kết quả (Việt)
-              {liveMode && isConverting && (
-                <LoaderIcon className="text-muted-foreground ml-2 inline size-3.5 animate-spin" />
-              )}
-            </label>
-            {output && (
-              <Button variant="ghost" size="sm" onClick={handleCopy}>
-                {copied ? (
-                  <CheckIcon className="mr-1.5 size-3.5" />
-                ) : (
-                  <ClipboardCopyIcon className="mr-1.5 size-3.5" />
-                )}
-                {copied ? "Đã sao chép" : "Sao chép"}
-              </Button>
-            )}
-          </div>
-          <Textarea
-            value={output}
-            readOnly
-            placeholder="Kết quả convert sẽ hiển thị ở đây..."
-            className="bg-muted/30 h-[calc(100vh-280px)] resize-none font-mono text-sm"
-          />
-        </div>
-      </div>
-
-      {/* Convert button — hidden in live mode */}
+      {/* ── Manual convert button ── */}
       {!liveMode && (
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex shrink-0 justify-center">
           <Button
             size="lg"
             onClick={handleConvert}

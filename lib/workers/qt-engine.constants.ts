@@ -16,6 +16,10 @@ export const NO_SPACE_BEFORE =
 export const NO_SPACE_AFTER = /[\u201c\u2018「『（\[({<《«\s]/;
 export const DIGIT_TRAILING = /\d$/;
 export const DIGIT_LEADING = /^\d/;
+/** Matches a trailing word character (letter or digit) — used to keep
+ *  passthrough (source:"unknown") tokens like "ABC123" together. */
+export const WORD_CHAR_TRAILING = /[\d\p{Script=Latin}]$/u;
+export const WORD_CHAR_LEADING = /^[\d\p{Script=Latin}]/u;
 
 export const BRACKET_OPEN = /[《«]/;
 export const BRACKET_CLOSE = /[》»]/;
