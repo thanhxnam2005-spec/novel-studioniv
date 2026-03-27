@@ -5,8 +5,9 @@ import {
   formatStats,
   type DiffResult,
 } from "@/lib/chapter-tools/diff-utils";
+import { useDebouncedValue } from "@/lib/hooks/use-debounce";
+import { useLocalStorage } from "@/lib/hooks/use-local-storage";
 import { cn } from "@/lib/utils";
-import { useLocalStorage } from "@uidotdev/usehooks";
 import { Settings2Icon } from "lucide-react";
 import {
   memo,
@@ -92,29 +93,28 @@ function useAsyncWordDiff(
   b: string,
   enabled: boolean,
 ): DiffResult | null {
+  const debouncedA = useDebouncedValue(a, 200);
+  const debouncedB = useDebouncedValue(b, 200);
   const [result, setResult] = useState<DiffResult | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
-      setResult(null);
-      return;
-    }
+    if (!enabled) return;
 
     let cancelled = false;
     const id = requestIdleCallback(
       () => {
-        if (!cancelled) setResult(computeDiff(a, b));
+        if (!cancelled) setResult(computeDiff(debouncedA, debouncedB));
       },
-      { timeout: 200 },
+      { timeout: 1000 },
     );
 
     return () => {
       cancelled = true;
       cancelIdleCallback(id);
     };
-  }, [a, b, enabled]);
+  }, [debouncedA, debouncedB, enabled]);
 
-  return result;
+  return enabled ? result : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -429,8 +429,11 @@ export function TextCompareEditor({
     const scrollRef = side === "left" ? leftScrollRef : rightScrollRef;
     const onScroll = handleScroll(side);
     const showDiffHighlight = config.showDiff && !!diff;
+    // Diff forces readonly so both panels show highlights
+    // without the cost of re-rendering mirror + diff on every keystroke.
+    const effectiveEditable = editable && !showDiffHighlight;
     // Editable panel mirror uses deferred value to avoid blocking on keystrokes
-    const mirrorValue = editable ? deferredEditableValue : value;
+    const mirrorValue = effectiveEditable ? deferredEditableValue : value;
 
     // Choose mirror content: diff-highlighted or plain lines
     const linesContent = showDiffHighlight ? (
@@ -444,7 +447,7 @@ export function TextCompareEditor({
       <PlainLines value={mirrorValue} gutterCls={gutterCls} contentCls={contentCls} />
     );
 
-    if (editable) {
+    if (effectiveEditable) {
       return (
         <div className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
           {/* Mirror — visible rendered lines (plain or diff-highlighted) */}

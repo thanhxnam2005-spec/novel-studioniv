@@ -12,3 +12,4 @@ export * from "./use-analysis-settings";
 export * from "./use-confirm-interrupt";
 export * from "./use-history-state";
 export * from "./use-navigation-guard";
+export * from "./use-local-storage";
