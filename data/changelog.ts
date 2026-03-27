@@ -65,6 +65,29 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.4.3",
+    date: "2026-03-28",
+    title: "Nhận diện tên tự động & Mở rộng từ điển",
+    summary:
+      "Engine convert tự nhận diện tên nhân vật/địa danh dựa trên họ và tần suất xuất hiện. Loại trừ tên sai để revert bản dịch. Bổ sung hơn 400 tên nổi tiếng và 116 luật nhân mới.",
+    changes: [
+      {
+        category: "feature",
+        description: "Tự nhận diện tên riêng khi convert",
+        details:
+          "Engine tự phát hiện tên nhân vật và địa danh chưa có trong từ điển dựa trên cấu trúc họ-tên và tần suất xuất hiện. Tên được nhận diện sẽ tự động viết hoa trong kết quả. Có thể thêm vào từ điển hoặc loại trừ nếu nhận diện sai — kết quả convert sẽ tự cập nhật. Danh sách loại trừ được lưu vĩnh viễn và hiển thị trong tab riêng của từ điển tên.",
+        tags: ["convert", "tên riêng"],
+      },
+      {
+        category: "improvement",
+        description: "Bổ sung hơn 400 tên mới",
+        details:
+          "Từ điển tên mặc định thêm nhân vật Tam Quốc, Kim Dung, Tây Du Ký, Hồng Lâu Mộng, Thủy Hử, nhân vật lịch sử, thần thoại, và địa danh phổ biến.",
+        tags: ["convert", "từ điển"],
+      },
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-03-27",
     title: "Trình soạn thảo & So sánh văn bản",

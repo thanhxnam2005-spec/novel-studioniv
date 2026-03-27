@@ -80,6 +80,7 @@ export function NameDictPanel() {
   const novelEntries = useNovelNameEntries(activeNovelId ?? undefined);
   const globalEntries = useGlobalNameEntries();
 
+  const [activeTab, setActiveTab] = useState<"dict" | "rejected">("dict");
   const [page, setPage] = useState(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<NameEntry | null>(null);
@@ -90,9 +91,20 @@ export function NameDictPanel() {
 
   // When on a novel page: merged (global + novel). Otherwise: global only.
   const isNovelContext = !!activeNovelId;
-  const allEntries = isNovelContext
-    ? (mergedEntries ?? [])
-    : (globalEntries ?? []);
+  const rawEntries = useMemo(
+    () => (isNovelContext ? (mergedEntries ?? []) : (globalEntries ?? [])),
+    [isNovelContext, mergedEntries, globalEntries],
+  );
+
+  // Split into dict entries and rejected entries
+  const allEntries = useMemo(
+    () => rawEntries.filter((e) => e.category !== "loại trừ"),
+    [rawEntries],
+  );
+  const rejectedEntries = useMemo(
+    () => rawEntries.filter((e) => e.category === "loại trừ"),
+    [rawEntries],
+  );
 
   // Pre-compute global chinese keys for O(1) override check
   const globalChineseSet = useMemo(
@@ -202,357 +214,465 @@ export function NameDictPanel() {
         </Button>
       </header>
 
-      {/* Search + filter + add */}
-      <div className="flex gap-1.5 border-b p-3">
-        <div className="relative flex-1">
-          <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 size-3.5" />
-          <Input
-            placeholder="Tìm kiếm..."
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="h-8 pl-8 text-sm"
-          />
-        </div>
-
-        {/* Filter popover */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="relative size-8"
-              title="Bộ lọc"
-            >
-              <FilterIcon className="size-3.5" />
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-56">
-            <div className="space-y-3">
-              {/* Scope filter — only in novel context */}
-              {isNovelContext && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Phạm vi</Label>
-                  <div className="flex gap-1">
-                    {(
-                      [
-                        ["all", "Tất cả"],
-                        ["novel", "Riêng"],
-                        ["global", "Chung"],
-                      ] as const
-                    ).map(([value, label]) => (
-                      <Button
-                        key={value}
-                        variant={scopeFilter === value ? "default" : "outline"}
-                        size="sm"
-                        className="h-7 flex-1 text-xs"
-                        onClick={() => handleScopeChange(value)}
-                      >
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Category filter */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Loại</Label>
-                <div className="flex flex-wrap gap-1">
-                  <Button
-                    variant={!categoryFilter ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => handleCategoryChange("all")}
-                  >
-                    Tất cả
-                  </Button>
-                  {NAME_ENTRY_CATEGORIES.map((cat) => (
-                    <Button
-                      key={cat}
-                      variant={categoryFilter === cat ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs capitalize"
-                      onClick={() => handleCategoryChange(cat)}
-                    >
-                      {cat}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Clear */}
-              {activeFilterCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-full text-xs"
-                  onClick={clearFilters}
-                >
-                  Xóa bộ lọc
-                </Button>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <Button
-          size="icon-sm"
-          className="size-8"
+      {/* Tab bar */}
+      <div className="flex shrink-0 border-b">
+        <button
+          type="button"
           onClick={() => {
-            setNewChinese("");
-            setNewVietnamese("");
-            setNewCategory("nhân vật");
-            setNewScope(isNovelContext ? "novel" : "global");
-            setAddDialogOpen(true);
+            setActiveTab("dict");
+            setPage(0);
           }}
-          title="Thêm mục"
+          className={cn(
+            "flex-1 py-2 text-xs font-medium transition-colors",
+            activeTab === "dict"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
-          <PlusIcon className="size-3.5" />
-        </Button>
+          Từ điển ({allEntries.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("rejected");
+            setPage(0);
+          }}
+          className={cn(
+            "flex-1 py-2 text-xs font-medium transition-colors",
+            activeTab === "rejected"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Loại trừ ({rejectedEntries.length})
+        </button>
       </div>
 
-      {/* Active filter badges */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap gap-1 border-b px-3 py-2">
-          {scopeFilter !== "all" && (
-            <Badge variant="secondary" className="h-5 gap-1 pr-1 text-[10px]">
-              {scopeFilter === "novel" ? "Riêng" : "Chung"}
-              <button
-                onClick={() => handleScopeChange("all")}
-                className="hover:text-foreground ml-0.5 rounded-full"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </Badge>
-          )}
-          {categoryFilter && (
-            <Badge
-              variant="secondary"
-              className="h-5 gap-1 pr-1 text-[10px] capitalize"
-            >
-              {categoryFilter}
-              <button
-                onClick={() => handleCategoryChange("all")}
-                className="hover:text-foreground ml-0.5 rounded-full"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Entries list — paginated */}
-      <ScrollArea className="h-[calc(100dvh-152px)]">
-        <div className="divide-y">
-          {pagedEntries.length === 0 && (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              {searchQuery || categoryFilter || scopeFilter !== "all"
-                ? "Không tìm thấy kết quả"
-                : "Chưa có mục nào"}
-            </p>
-          )}
-          {pagedEntries.map((entry) => {
-            const isNovelEntry = entry.scope !== "global";
-            const isOverriding =
-              isNovelEntry && globalChineseSet.has(entry.chinese);
-            return (
-              <div
-                key={entry.id}
-                className="group flex items-center gap-2 px-4 py-2 text-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "font-mono",
-                        isNovelEntry
-                          ? "font-semibold"
-                          : "text-muted-foreground",
-                      )}
-                    >
+      {/* ── Rejected tab ── */}
+      {activeTab === "rejected" && (
+        <>
+          <ScrollArea className="h-[calc(100dvh-112px)]">
+            <div className="divide-y">
+              {rejectedEntries.length === 0 && (
+                <p className="text-muted-foreground py-8 text-center text-sm">
+                  Chưa có tên nào bị loại trừ
+                </p>
+              )}
+              {rejectedEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="group flex items-center justify-between px-4 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-medium">
                       {entry.chinese}
                     </span>
-                    <span className="text-muted-foreground">→</span>
-                    <span
-                      className={cn(
-                        isNovelEntry ? "" : "text-muted-foreground text-xs",
-                      )}
-                    >
-                      {entry.vietnamese}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-1">
-                    <Badge
-                      variant="outline"
-                      className="h-4 px-1 text-[10px] capitalize"
-                    >
-                      {entry.category}
-                    </Badge>
-                    {!isNovelEntry && (
+                    {entry.scope !== "global" && (
                       <Badge
                         variant="secondary"
                         className="h-4 px-1 text-[10px]"
                       >
-                        Chung
-                      </Badge>
-                    )}
-                    {isOverriding && (
-                      <Badge variant="default" className="h-4 px-1 text-[10px]">
-                        Ghi đè
+                        Riêng
                       </Badge>
                     )}
                   </div>
-                </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => openEditDialog(entry)}
-                    className="size-6"
-                  >
-                    <Edit3Icon className="size-3" />
-                  </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => handleDelete(entry.id)}
-                    className="size-6"
+                    className="size-6 opacity-0 group-hover:opacity-100"
+                    title="Bỏ loại trừ"
                   >
                     <Trash2Icon className="size-3" />
                   </Button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </ScrollArea>
-
-      {/* Pagination footer */}
-      <div className="flex shrink-0 items-center justify-between border-t px-4 py-2">
-        <span className="text-muted-foreground text-xs">
-          {filtered.length} mục
-          {isNovelContext
-            ? ` (${(novelEntries ?? []).length} riêng, ${(globalEntries ?? []).length} chung)`
-            : ""}
-        </span>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-6"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeftIcon className="size-3.5" />
-            </Button>
-            <span className="text-muted-foreground text-xs tabular-nums">
-              {page + 1}/{totalPages}
+              ))}
+            </div>
+          </ScrollArea>
+          <div className="flex shrink-0 items-center border-t px-4 py-2">
+            <span className="text-muted-foreground text-xs">
+              {rejectedEntries.length} mục loại trừ
             </span>
+          </div>
+        </>
+      )}
+
+      {/* ── Dict tab ── */}
+      {activeTab === "dict" && (
+        <>
+          {/* Search + filter + add */}
+          <div className="flex gap-1.5 border-b p-3">
+            <div className="relative flex-1">
+              <SearchIcon className="text-muted-foreground absolute top-2.5 left-2.5 size-3.5" />
+              <Input
+                placeholder="Tìm kiếm..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="h-8 pl-8 text-sm"
+              />
+            </div>
+
+            {/* Filter popover */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="relative size-8"
+                  title="Bộ lọc"
+                >
+                  <FilterIcon className="size-3.5" />
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56">
+                <div className="space-y-3">
+                  {/* Scope filter — only in novel context */}
+                  {isNovelContext && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Phạm vi</Label>
+                      <div className="flex gap-1">
+                        {(
+                          [
+                            ["all", "Tất cả"],
+                            ["novel", "Riêng"],
+                            ["global", "Chung"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <Button
+                            key={value}
+                            variant={
+                              scopeFilter === value ? "default" : "outline"
+                            }
+                            size="sm"
+                            className="h-7 flex-1 text-xs"
+                            onClick={() => handleScopeChange(value)}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category filter */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Loại</Label>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        variant={!categoryFilter ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleCategoryChange("all")}
+                      >
+                        Tất cả
+                      </Button>
+                      {NAME_ENTRY_CATEGORIES.filter(
+                        (c) => c !== "loại trừ",
+                      ).map((cat) => (
+                        <Button
+                          key={cat}
+                          variant={
+                            categoryFilter === cat ? "default" : "outline"
+                          }
+                          size="sm"
+                          className="h-7 text-xs capitalize"
+                          onClick={() => handleCategoryChange(cat)}
+                        >
+                          {cat}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Clear */}
+                  {activeFilterCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-full text-xs"
+                      onClick={clearFilters}
+                    >
+                      Xóa bộ lọc
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
             <Button
-              variant="ghost"
               size="icon-sm"
-              className="size-6"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
+              className="size-8"
+              onClick={() => {
+                setNewChinese("");
+                setNewVietnamese("");
+                setNewCategory("nhân vật");
+                setNewScope(isNovelContext ? "novel" : "global");
+                setAddDialogOpen(true);
+              }}
+              title="Thêm mục"
             >
-              <ChevronRightIcon className="size-3.5" />
+              <PlusIcon className="size-3.5" />
             </Button>
           </div>
-        )}
-      </div>
 
-      {/* Add/Edit dialog */}
-      <Dialog
-        open={addDialogOpen || !!editingEntry}
-        onOpenChange={(open) => {
-          if (!open) {
-            setAddDialogOpen(false);
-            setEditingEntry(null);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingEntry ? "Chỉnh sửa mục" : "Thêm mục mới"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Trung văn</Label>
-              <Input
-                value={newChinese}
-                onChange={(e) => setNewChinese(e.target.value)}
-                placeholder="林枫"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Tiếng Việt</Label>
-              <Input
-                value={newVietnamese}
-                onChange={(e) => setNewVietnamese(e.target.value)}
-                placeholder="Lâm Phong"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Loại</Label>
-              <Select value={newCategory} onValueChange={setNewCategory}>
-                <SelectTrigger className="w-full capitalize">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {NAME_ENTRY_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat} className="capitalize">
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {!editingEntry && activeNovelId && (
-              <div className="space-y-1">
-                <Label>Phạm vi</Label>
-                <Select
-                  value={newScope}
-                  onValueChange={(v) => setNewScope(v as "novel" | "global")}
+          {/* Active filter badges */}
+          {activeFilterCount > 0 && (
+            <div className="flex flex-wrap gap-1 border-b px-3 py-2">
+              {scopeFilter !== "all" && (
+                <Badge
+                  variant="secondary"
+                  className="h-5 gap-1 pr-1 text-[10px]"
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="novel">Riêng tiểu thuyết</SelectItem>
-                    <SelectItem value="global">Chung (toàn cục)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  {scopeFilter === "novel" ? "Riêng" : "Chung"}
+                  <button
+                    onClick={() => handleScopeChange("all")}
+                    className="hover:text-foreground ml-0.5 rounded-full"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                </Badge>
+              )}
+              {categoryFilter && (
+                <Badge
+                  variant="secondary"
+                  className="h-5 gap-1 pr-1 text-[10px] capitalize"
+                >
+                  {categoryFilter}
+                  <button
+                    onClick={() => handleCategoryChange("all")}
+                    className="hover:text-foreground ml-0.5 rounded-full"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Entries list — paginated */}
+          <ScrollArea className="h-[calc(100dvh-152px)]">
+            <div className="divide-y">
+              {pagedEntries.length === 0 && (
+                <p className="text-muted-foreground py-8 text-center text-sm">
+                  {searchQuery || categoryFilter || scopeFilter !== "all"
+                    ? "Không tìm thấy kết quả"
+                    : "Chưa có mục nào"}
+                </p>
+              )}
+              {pagedEntries.map((entry) => {
+                const isNovelEntry = entry.scope !== "global";
+                const isOverriding =
+                  isNovelEntry && globalChineseSet.has(entry.chinese);
+                return (
+                  <div
+                    key={entry.id}
+                    className="group flex items-center gap-2 px-4 py-2 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={cn(
+                            "font-mono",
+                            isNovelEntry
+                              ? "font-semibold"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {entry.chinese}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <span
+                          className={cn(
+                            isNovelEntry ? "" : "text-muted-foreground text-xs",
+                          )}
+                        >
+                          {entry.vietnamese}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Badge
+                          variant="outline"
+                          className="h-4 px-1 text-[10px] capitalize"
+                        >
+                          {entry.category}
+                        </Badge>
+                        {!isNovelEntry && (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 px-1 text-[10px]"
+                          >
+                            Chung
+                          </Badge>
+                        )}
+                        {isOverriding && (
+                          <Badge
+                            variant="default"
+                            className="h-4 px-1 text-[10px]"
+                          >
+                            Ghi đè
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => openEditDialog(entry)}
+                        className="size-6"
+                      >
+                        <Edit3Icon className="size-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => handleDelete(entry.id)}
+                        className="size-6"
+                      >
+                        <Trash2Icon className="size-3" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+
+          {/* Pagination footer */}
+          <div className="flex shrink-0 items-center justify-between border-t px-4 py-2">
+            <span className="text-muted-foreground text-xs">
+              {filtered.length} mục
+              {isNovelContext
+                ? ` (${(novelEntries ?? []).length} riêng, ${(globalEntries ?? []).length} chung)`
+                : ""}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-6"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeftIcon className="size-3.5" />
+                </Button>
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {page + 1}/{totalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-6"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRightIcon className="size-3.5" />
+                </Button>
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
+
+          {/* Add/Edit dialog */}
+          <Dialog
+            open={addDialogOpen || !!editingEntry}
+            onOpenChange={(open) => {
+              if (!open) {
                 setAddDialogOpen(false);
                 setEditingEntry(null);
-              }}
-            >
-              Hủy
-            </Button>
-            <Button
-              onClick={editingEntry ? handleUpdate : handleAdd}
-              disabled={!newChinese.trim() || !newVietnamese.trim()}
-            >
-              {editingEntry ? "Lưu" : "Thêm"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingEntry ? "Chỉnh sửa mục" : "Thêm mục mới"}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Trung văn</Label>
+                  <Input
+                    value={newChinese}
+                    onChange={(e) => setNewChinese(e.target.value)}
+                    placeholder="林枫"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Tiếng Việt</Label>
+                  <Input
+                    value={newVietnamese}
+                    onChange={(e) => setNewVietnamese(e.target.value)}
+                    placeholder="Lâm Phong"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Loại</Label>
+                  <Select value={newCategory} onValueChange={setNewCategory}>
+                    <SelectTrigger className="w-full capitalize">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NAME_ENTRY_CATEGORIES.filter(
+                        (c) => c !== "loại trừ",
+                      ).map((cat) => (
+                        <SelectItem
+                          key={cat}
+                          value={cat}
+                          className="capitalize"
+                        >
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!editingEntry && activeNovelId && (
+                  <div className="space-y-1">
+                    <Label>Phạm vi</Label>
+                    <Select
+                      value={newScope}
+                      onValueChange={(v) =>
+                        setNewScope(v as "novel" | "global")
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="novel">Riêng tiểu thuyết</SelectItem>
+                        <SelectItem value="global">Chung (toàn cục)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAddDialogOpen(false);
+                    setEditingEntry(null);
+                  }}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={editingEntry ? handleUpdate : handleAdd}
+                  disabled={!newChinese.trim() || !newVietnamese.trim()}
+                >
+                  {editingEntry ? "Lưu" : "Thêm"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </>
   );
 

@@ -12,17 +12,20 @@ import {
   BRACKET_OPEN,
   CAP_PASSTHROUGH,
   CAP_TRIGGERS,
+  COMPOUND_SURNAMES,
   DIGIT_LEADING,
   DIGIT_TRAILING,
   WORD_CHAR_LEADING,
   WORD_CHAR_TRAILING,
   FULLWIDTH_PUNCT,
+  isCJK,
   NAME_SOURCES,
   NAME_SUFFIXES,
   NO_SPACE_AFTER,
   NO_SPACE_BEFORE,
-  PARTICLE_OVERRIDES,
+  NON_NAME_CHARS,
   SENTENCE_ENDERS,
+  SINGLE_SURNAMES,
   normalizeFullwidthPunct,
 } from "./qt-engine.constants";
 
@@ -86,8 +89,6 @@ function initDicts(dictData: Record<string, DictPair[]>): void {
   for (const e of dictData.vietphrase ?? []) {
     if (e.chinese in FULLWIDTH_PUNCT) {
       vietPhraseMap.set(e.chinese, FULLWIDTH_PUNCT[e.chinese]);
-    } else if (e.chinese in PARTICLE_OVERRIDES) {
-      vietPhraseMap.set(e.chinese, PARTICLE_OVERRIDES[e.chinese]);
     } else {
       vietPhraseMap.set(e.chinese, pickPrimary(e.vietnamese));
     }
@@ -135,14 +136,108 @@ function initDicts(dictData: Record<string, DictPair[]>): void {
     if (k.length > maxNameLength) maxNameLength = k.length;
 }
 
+// ─── Name auto-detection ─────────────────────────────────────
+
+function detectNames(
+  text: string,
+  existingNames: Map<string, string>,
+  vpMap: Map<string, string>,
+  paMap: Map<string, string>,
+  minFrequency: number,
+  rejected: Set<string>,
+): Map<string, string> {
+  const candidates = new Map<string, number>();
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (!isCJK(ch)) continue;
+
+    // Check compound surname (2-char) first, then single (1-char)
+    const ch2 = i + 1 < text.length ? text.slice(i, i + 2) : "";
+    const isCompound = COMPOUND_SURNAMES.has(ch2);
+    const isSingle = !isCompound && SINGLE_SURNAMES.has(ch);
+    if (!isCompound && !isSingle) continue;
+
+    const surnameLen = isCompound ? 2 : 1;
+
+    // Left-boundary check: if the surname char is the tail of a prior VP word,
+    // it's likely continuation of another word, not the start of a name.
+    if (i > 0 && isCJK(text[i - 1])) {
+      let partOfPriorWord = false;
+      for (let pLen = 2; pLen <= Math.min(4, i + 1); pLen++) {
+        const prior = text.slice(i - pLen + 1, i + 1);
+        if (vpMap.has(prior) || existingNames.has(prior)) {
+          partOfPriorWord = true;
+          break;
+        }
+      }
+      if (partOfPriorWord) continue;
+    }
+
+    // Try given-name lengths: 1 and 2 chars after the surname
+    for (let givenLen = 2; givenLen >= 1; givenLen--) {
+      const totalLen = surnameLen + givenLen;
+      if (i + totalLen > text.length) continue;
+
+      const candidate = text.slice(i, i + totalLen);
+      // All chars must be CJK
+      if (![...candidate].every(isCJK)) continue;
+      // Already a known name — skip (handled by existing pipeline)
+      if (existingNames.has(candidate)) continue;
+      // Skip if user has rejected this name
+      if (rejected.has(candidate)) continue;
+      // Skip if in VP dictionary (likely a common word/phrase)
+      if (vpMap.has(candidate)) continue;
+      // Skip if given-name contains non-name chars (particles, pronouns, etc.)
+      const givenName = candidate.slice(surnameLen);
+      if ([...givenName].some((c) => NON_NAME_CHARS.has(c))) continue;
+
+      candidates.set(candidate, (candidates.get(candidate) ?? 0) + 1);
+    }
+  }
+
+  // Filter by frequency, dedup substrings, generate readings
+  const result = new Map<string, string>();
+  // Sort by length descending so longer names take priority
+  const sorted = [...candidates.entries()].sort(
+    (a, b) => b[0].length - a[0].length || b[1] - a[1],
+  );
+
+  for (const [name, count] of sorted) {
+    if (count < minFrequency) continue;
+    // Skip if this name is a substring of an already-accepted longer name
+    let isSubstring = false;
+    for (const accepted of result.keys()) {
+      if (accepted.includes(name)) {
+        isSubstring = true;
+        break;
+      }
+    }
+    if (isSubstring) continue;
+
+    // Generate Hán-Việt reading from phienAm map
+    const reading = [...name]
+      .map((c) => paMap.get(c) ?? c)
+      .join(" ");
+    result.set(name, capitalizeWords(reading));
+  }
+
+  return result;
+}
+
 // ─── Convert ─────────────────────────────────────────────────
+
+interface ConvertResult {
+  segments: ConvertSegment[];
+  detectedNames?: DictPair[];
+}
 
 function convert(
   text: string,
   novelNames?: DictPair[],
   globalNames?: DictPair[],
   opts?: ConvertOptions,
-): ConvertSegment[] {
+): ConvertResult {
   const o = { ...DEFAULT_CONVERT_OPTIONS, ...opts };
 
   const novelNamesMap = novelNames?.length
@@ -206,6 +301,37 @@ function convert(
   if (globalNamesMap) for (const [k, v] of globalNamesMap) allNames.set(k, v);
   if (novelNamesMap) for (const [k, v] of novelNamesMap) allNames.set(k, v);
 
+  // Auto-detect names based on surname + frequency heuristic
+  let autoDetected: Map<string, string> | null = null;
+  if (o.autoDetectNames) {
+    const rejectedSet = new Set(o.rejectedAutoNames);
+    autoDetected = detectNames(
+      text,
+      allNames,
+      filteredVP,
+      phienAmMap,
+      o.nameDetectMinFrequency,
+      rejectedSet,
+    );
+    if (autoDetected.size === 0) autoDetected = null;
+  }
+
+  // Insert auto-detected names into priority chain
+  if (autoDetected) {
+    if (o.nameVsPriority === "name-first") {
+      // [novel, global, qt, AUTO, vp] — insert before last (VP)
+      priorityMaps.splice(priorityMaps.length - 1, 0, [
+        "auto-name",
+        autoDetected,
+      ]);
+    } else {
+      // [vp, novel, global, qt] → append auto after all
+      priorityMaps.push(["auto-name", autoDetected]);
+    }
+    // Also add to allNames for LuatNhan matching
+    for (const [k, v] of autoDetected) allNames.set(k, v);
+  }
+
   let effectiveMaxKey = Math.min(maxKeyLength, o.maxPhraseLength);
   let effectiveMaxName = maxNameLength;
   if (novelNamesMap)
@@ -216,6 +342,12 @@ function convert(
     }
   if (globalNamesMap)
     for (const k of globalNamesMap.keys()) {
+      if (k.length > effectiveMaxKey)
+        effectiveMaxKey = Math.min(k.length, o.maxPhraseLength);
+      if (k.length > effectiveMaxName) effectiveMaxName = k.length;
+    }
+  if (autoDetected)
+    for (const k of autoDetected.keys()) {
       if (k.length > effectiveMaxKey)
         effectiveMaxKey = Math.min(k.length, o.maxPhraseLength);
       if (k.length > effectiveMaxName) effectiveMaxName = k.length;
@@ -302,11 +434,19 @@ function convert(
     }
   }
 
+  if (autoDetected?.size) capitalizeDetectedNames(segments, autoDetected);
   capitalizeNameAdjacent(segments);
   capitalizeSentences(segments);
   if (o.capitalizeBrackets) capitalizeBracketContent(segments);
 
-  return segments;
+  const result: ConvertResult = { segments };
+  if (autoDetected?.size) {
+    result.detectedNames = [...autoDetected.entries()].map(([c, v]) => ({
+      chinese: c,
+      vietnamese: v,
+    }));
+  }
+  return result;
 }
 
 // ─── Post-processing ─────────────────────────────────────────
@@ -325,6 +465,42 @@ function capitalizeNameAdjacent(segments: ConvertSegment[]): void {
       const capped = capitalizeWords(seg.translated);
       if (capped !== seg.translated)
         segments[i] = { ...seg, translated: capped };
+    }
+  }
+}
+
+function capitalizeDetectedNames(
+  segments: ConvertSegment[],
+  detectedNames: Map<string, string>,
+): void {
+  for (const [nameChars] of detectedNames) {
+    const nameLen = nameChars.length;
+    for (let i = 0; i <= segments.length - nameLen; i++) {
+      // Build combined original from consecutive segments
+      let combined = "";
+      let j = i;
+      while (j < segments.length && combined.length < nameLen) {
+        combined += segments[j].original;
+        j++;
+      }
+      if (combined !== nameChars) continue;
+      // Check if any segment is already a name source — skip if so
+      let alreadyName = false;
+      for (let k = i; k < j; k++) {
+        if (NAME_SOURCES.has(segments[k].source)) {
+          alreadyName = true;
+          break;
+        }
+      }
+      if (alreadyName) continue;
+      // Capitalize each segment and mark as auto-name
+      for (let k = i; k < j; k++) {
+        segments[k] = {
+          ...segments[k],
+          translated: capitalizeFirst(segments[k].translated),
+          source: "auto-name",
+        };
+      }
     }
   }
 }
@@ -450,14 +626,20 @@ self.onmessage = (event: MessageEvent<QTWorkerRequest>) => {
 
     case "convert": {
       try {
-        const segments = convert(
+        const { segments, detectedNames } = convert(
           msg.text,
           msg.novelNames,
           msg.globalNames,
           msg.options,
         );
         const plainText = segmentsToPlainText(segments);
-        post({ type: "result", id: msg.id, segments, plainText });
+        post({
+          type: "result",
+          id: msg.id,
+          segments,
+          plainText,
+          detectedNames,
+        });
       } catch (err) {
         post({
           type: "error",
@@ -471,7 +653,7 @@ self.onmessage = (event: MessageEvent<QTWorkerRequest>) => {
     case "convert-batch": {
       try {
         for (const item of msg.items) {
-          const segments = convert(
+          const { segments, detectedNames } = convert(
             item.text,
             msg.novelNames,
             msg.globalNames,
@@ -484,6 +666,7 @@ self.onmessage = (event: MessageEvent<QTWorkerRequest>) => {
             itemId: item.itemId,
             segments,
             plainText,
+            detectedNames,
           });
         }
         post({ type: "batch-complete", id: msg.id });

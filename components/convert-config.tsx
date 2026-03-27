@@ -140,6 +140,33 @@ export function ConvertConfig() {
           onCheckedChange={(v) => update({ capitalizeBrackets: v })}
         />
       </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="auto-detect-names" className="text-xs font-medium">
+          Tự nhận diện tên
+        </Label>
+        <Switch
+          id="auto-detect-names"
+          checked={settings.autoDetectNames}
+          onCheckedChange={(v) => update({ autoDetectNames: v })}
+        />
+      </div>
+
+      {settings.autoDetectNames && (
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">
+            Tần suất tối thiểu: {settings.nameDetectMinFrequency}
+          </Label>
+          <Slider
+            value={[settings.nameDetectMinFrequency]}
+            onValueChange={([v]) => update({ nameDetectMinFrequency: v })}
+            min={1}
+            max={5}
+            step={1}
+            className="w-full"
+          />
+        </div>
+      )}
     </div>
   );
 }

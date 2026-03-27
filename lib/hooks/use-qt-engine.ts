@@ -79,6 +79,7 @@ const pendingCallbacks = new Map<
       itemId: string,
       segments: ConvertSegment[],
       plainText: string,
+      detectedNames?: DictPair[],
     ) => void;
   }
 >();
@@ -100,14 +101,23 @@ function handleMessage(event: MessageEvent<QTWorkerResponse>) {
       const cb = pendingCallbacks.get(msg.id);
       if (cb) {
         pendingCallbacks.delete(msg.id);
-        cb.resolve({ segments: msg.segments, plainText: msg.plainText });
+        cb.resolve({
+          segments: msg.segments,
+          plainText: msg.plainText,
+          detectedNames: msg.detectedNames,
+        });
       }
       break;
     }
 
     case "batch-progress": {
       const cb = pendingCallbacks.get(msg.id);
-      cb?.onProgress?.(msg.itemId, msg.segments, msg.plainText);
+      cb?.onProgress?.(
+        msg.itemId,
+        msg.segments,
+        msg.plainText,
+        msg.detectedNames,
+      );
       break;
     }
 
@@ -198,7 +208,11 @@ export function isQTEngineReady(): boolean {
 export async function convertText(
   text: string,
   opts?: { novelNames?: DictPair[]; globalNames?: DictPair[]; options?: ConvertOptions },
-): Promise<{ segments: ConvertSegment[]; plainText: string }> {
+): Promise<{
+  segments: ConvertSegment[];
+  plainText: string;
+  detectedNames?: DictPair[];
+}> {
   if (!isReady) await initQTEngine();
 
   const id = crypto.randomUUID();
@@ -228,6 +242,7 @@ export async function convertBatch(
       itemId: string,
       segments: ConvertSegment[],
       plainText: string,
+      detectedNames?: DictPair[],
     ) => void;
   },
 ): Promise<void> {

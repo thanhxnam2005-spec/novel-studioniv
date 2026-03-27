@@ -201,7 +201,8 @@ export type NameEntryCategory =
   | "thuật ngữ"
   | "vật phẩm"
   | "kỹ năng"
-  | "khác";
+  | "khác"
+  | "loại trừ";
 
 export const NAME_ENTRY_CATEGORIES: NameEntryCategory[] = [
   "nhân vật",
@@ -211,6 +212,7 @@ export const NAME_ENTRY_CATEGORIES: NameEntryCategory[] = [
   "vật phẩm",
   "kỹ năng",
   "khác",
+  "loại trừ",
 ];
 
 export interface NameEntry {

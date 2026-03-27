@@ -1,6 +1,7 @@
 "use client";
 
 import { ConvertConfig } from "@/components/convert-config";
+import { ConvertDetectedNames } from "@/components/convert-detected-names";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,7 +13,9 @@ import { Switch } from "@/components/ui/switch";
 import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
+import { useRejectedAutoNames } from "@/lib/hooks/use-name-entries";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
+import type { ConvertOptions, DictPair } from "@/lib/workers/qt-engine.types";
 import {
   ArrowRightLeftIcon,
   CheckIcon,
@@ -21,7 +24,7 @@ import {
   SettingsIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export default function ConvertPage() {
@@ -30,18 +33,29 @@ export default function ConvertPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [liveMode, setLiveMode] = useState(true);
+  const [detectedNames, setDetectedNames] = useState<DictPair[]>([]);
   const engineReady = useQTEngineReady();
   const convertOptions = useConvertSettings();
+  const rejectedAutoNames = useRejectedAutoNames();
   const debouncedInput = useDebouncedValue(input, 500);
   const seqRef = useRef(0);
+
+  // Merge persistent settings with ephemeral rejected names
+  const mergedOptions = useMemo<ConvertOptions>(
+    () => ({ ...convertOptions, rejectedAutoNames }),
+    [convertOptions, rejectedAutoNames],
+  );
 
   const handleConvert = useCallback(async () => {
     if (!input.trim()) return;
     const seq = ++seqRef.current;
     setIsConverting(true);
     try {
-      const result = await convertText(input, { options: convertOptions });
-      if (seqRef.current === seq) setOutput(result.plainText);
+      const result = await convertText(input, { options: mergedOptions });
+      if (seqRef.current === seq) {
+        setOutput(result.plainText);
+        setDetectedNames(result.detectedNames ?? []);
+      }
     } catch (err) {
       toast.error(
         "Lỗi convert: " + (err instanceof Error ? err.message : String(err)),
@@ -49,7 +63,7 @@ export default function ConvertPage() {
     } finally {
       if (seqRef.current === seq) setIsConverting(false);
     }
-  }, [input, convertOptions]);
+  }, [input, mergedOptions]);
 
   useEffect(() => {
     if (!liveMode || !engineReady) return;
@@ -59,9 +73,12 @@ export default function ConvertPage() {
     }
     const seq = ++seqRef.current;
     setIsConverting(true);
-    convertText(debouncedInput, { options: convertOptions })
+    convertText(debouncedInput, { options: mergedOptions })
       .then((result) => {
-        if (seqRef.current === seq) setOutput(result.plainText);
+        if (seqRef.current === seq) {
+          setOutput(result.plainText);
+          setDetectedNames(result.detectedNames ?? []);
+        }
       })
       .catch((err) => {
         if (seqRef.current === seq)
@@ -73,7 +90,7 @@ export default function ConvertPage() {
       .finally(() => {
         if (seqRef.current === seq) setIsConverting(false);
       });
-  }, [liveMode, debouncedInput, convertOptions, engineReady]);
+  }, [liveMode, debouncedInput, mergedOptions, engineReady]);
 
   const handleCopy = useCallback(async () => {
     if (!output) return;
@@ -86,6 +103,7 @@ export default function ConvertPage() {
   const handleClear = useCallback(() => {
     setInput("");
     setOutput("");
+    setDetectedNames([]);
   }, []);
 
   return (
@@ -165,6 +183,13 @@ export default function ConvertPage() {
         leftLabel="Văn bản gốc (Trung)"
         rightLabel="Kết quả (Việt)"
       />
+
+      {/* ── Detected names ── */}
+      {detectedNames.length > 0 && (
+        <div className="mt-3 shrink-0">
+          <ConvertDetectedNames detectedNames={detectedNames} />
+        </div>
+      )}
 
       {/* ── Manual convert button ── */}
       {!liveMode && (

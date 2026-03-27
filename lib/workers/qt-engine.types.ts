@@ -2,6 +2,7 @@ export type ConvertSource =
   | "novel-name"
   | "global-name"
   | "qt-name"
+  | "auto-name"
   | "vietphrase"
   | "phienam"
   | "luatnhan"
@@ -50,6 +51,12 @@ export interface ConvertOptions {
   splitMode?: SplitMode;
   /** Capitalize all words inside 《》 and «» brackets (default: false) */
   capitalizeBrackets?: boolean;
+  /** Auto-detect names based on surname + frequency heuristic (default: true) */
+  autoDetectNames?: boolean;
+  /** Minimum occurrences for auto-detected names (default: 3) */
+  nameDetectMinFrequency?: number;
+  /** Auto-detected names to exclude (not persisted in settings) */
+  rejectedAutoNames?: string[];
 }
 
 export const DEFAULT_CONVERT_OPTIONS: Required<ConvertOptions> = {
@@ -60,6 +67,9 @@ export const DEFAULT_CONVERT_OPTIONS: Required<ConvertOptions> = {
   luatNhanMode: "name-only",
   splitMode: "paragraph",
   capitalizeBrackets: false,
+  autoDetectNames: true,
+  nameDetectMinFrequency: 3,
+  rejectedAutoNames: [],
 };
 
 // Main → Worker
@@ -93,6 +103,7 @@ export type QTWorkerResponse =
       id: string;
       segments: ConvertSegment[];
       plainText: string;
+      detectedNames?: DictPair[];
     }
   | {
       type: "batch-progress";
@@ -100,6 +111,7 @@ export type QTWorkerResponse =
       itemId: string;
       segments: ConvertSegment[];
       plainText: string;
+      detectedNames?: DictPair[];
     }
   | { type: "batch-complete"; id: string }
   | { type: "error"; id: string; message: string };

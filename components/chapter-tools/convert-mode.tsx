@@ -1,6 +1,7 @@
 "use client";
 
 import { ConvertConfig } from "@/components/convert-config";
+import { ConvertDetectedNames } from "@/components/convert-detected-names";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -8,8 +9,10 @@ import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
 import {
   getMergedNameDict,
   useMergedNameEntries,
+  useRejectedAutoNames,
 } from "@/lib/hooks/use-name-entries";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
+import type { DictPair } from "@/lib/workers/qt-engine.types";
 import {
   createSceneVersion,
   ensureInitialVersion,
@@ -53,8 +56,10 @@ export function ConvertMode({
   const [summary, setSummary] = useState<ConvertSummary | null>(null);
   const [useNameDict, setUseNameDict] = useState(true);
   const [convertTitle, setConvertTitle] = useState(true);
+  const [detectedNames, setDetectedNames] = useState<DictPair[]>([]);
   const scenes = useScenes(chapterId);
   const mergedEntries = useMergedNameEntries(novelId);
+  const rejectedAutoNames = useRejectedAutoNames(novelId);
   const engineReady = useQTEngineReady();
   const convertOptions = useConvertSettings();
 
@@ -71,8 +76,9 @@ export function ConvertMode({
         : undefined;
       const result = await convertText(content, {
         novelNames: nameDict,
-        options: convertOptions,
+        options: { ...convertOptions, rejectedAutoNames },
       });
+      setDetectedNames(result.detectedNames ?? []);
 
       // Convert chapter title if enabled
       let newTitle: string | undefined;
@@ -124,6 +130,7 @@ export function ConvertMode({
     scenes,
     onTranslated,
     convertOptions,
+    rejectedAutoNames,
   ]);
 
   const handleReConvert = useCallback(() => {
@@ -253,6 +260,13 @@ export function ConvertMode({
               </div>
             )}
           </div>
+
+          {detectedNames.length > 0 && (
+            <ConvertDetectedNames
+              detectedNames={detectedNames}
+              novelId={novelId}
+            />
+          )}
         </div>
       )}
     </div>
