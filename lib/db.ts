@@ -54,7 +54,8 @@ export type SceneVersionType =
   | "ai-translate"
   | "ai-edit"
   | "manual"
-  | "qt-convert";
+  | "qt-convert"
+  | "find-replace";
 
 export interface Scene {
   id: string;
@@ -201,8 +202,7 @@ export type NameEntryCategory =
   | "thuật ngữ"
   | "vật phẩm"
   | "kỹ năng"
-  | "khác"
-  | "loại trừ";
+  | "khác";
 
 export const NAME_ENTRY_CATEGORIES: NameEntryCategory[] = [
   "nhân vật",
@@ -212,7 +212,6 @@ export const NAME_ENTRY_CATEGORIES: NameEntryCategory[] = [
   "vật phẩm",
   "kỹ năng",
   "khác",
-  "loại trừ",
 ];
 
 export interface NameEntry {
@@ -221,6 +220,31 @@ export interface NameEntry {
   chinese: string;
   vietnamese: string;
   category: string; // NameEntryCategory or custom string
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Replace Rules ──────────────────────────────────────────
+
+export interface ReplaceRule {
+  id: string;
+  scope: string; // "global" | novelId
+  pattern: string;
+  replacement: string;
+  isRegex: boolean;
+  caseSensitive: boolean;
+  enabled: boolean;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Excluded Names ─────────────────────────────────────────
+
+export interface ExcludedName {
+  id: string;
+  scope: string; // "global" | novelId
+  chinese: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -284,6 +308,8 @@ export class NovelStudioDB extends Dexie {
   chatSettings!: EntityTable<ChatSettings, "id">;
   analysisSettings!: EntityTable<AnalysisSettings, "id">;
   nameEntries!: EntityTable<NameEntry, "id">;
+  replaceRules!: EntityTable<ReplaceRule, "id">;
+  excludedNames!: EntityTable<ExcludedName, "id">;
   dictEntries!: EntityTable<DictEntry, "id">;
   dictMeta!: EntityTable<DictMeta, "id">;
   dictCache!: EntityTable<DictCache, "source">;

@@ -32,7 +32,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useChapterTools } from "@/lib/stores/chapter-tools";
 import { NAME_ENTRY_CATEGORIES, type NameEntry } from "@/lib/db";
+import {
+  deleteExcludedName,
+  useExcludedNames,
+} from "@/lib/hooks/use-excluded-names";
 import {
   createNameEntry,
   deleteNameEntry,
@@ -42,6 +47,7 @@ import {
   useNovelNameEntries,
 } from "@/lib/hooks/use-name-entries";
 import { useNovel } from "@/lib/hooks/use-novels";
+import { useAllReplaceRules } from "@/lib/hooks/use-replace-rules";
 import {
   useNameDictPanel,
   type ScopeFilter,
@@ -59,6 +65,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ReplaceRulesTab } from "./replace-rules-tab";
 
 const PAGE_SIZE = 50;
 
@@ -66,21 +73,23 @@ export function NameDictPanel() {
   const {
     isOpen,
     activeNovelId,
+    activeTab,
     searchQuery,
     categoryFilter,
     scopeFilter,
     close,
+    setActiveTab,
     setSearchQuery,
     setCategoryFilter,
     setScopeFilter,
   } = useNameDictPanel();
+  const toolActive = useChapterTools((s) => s.activeMode !== null);
   const isMobile = useIsMobile();
   const novel = useNovel(activeNovelId ?? undefined);
   const mergedEntries = useMergedNameEntries(activeNovelId ?? undefined);
   const novelEntries = useNovelNameEntries(activeNovelId ?? undefined);
   const globalEntries = useGlobalNameEntries();
 
-  const [activeTab, setActiveTab] = useState<"dict" | "rejected">("dict");
   const [page, setPage] = useState(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<NameEntry | null>(null);
@@ -89,22 +98,25 @@ export function NameDictPanel() {
   const [newCategory, setNewCategory] = useState<string>("nhân vật");
   const [newScope, setNewScope] = useState<"novel" | "global">("novel");
 
+  const excludedNames = useExcludedNames(activeNovelId ?? undefined);
+  const globalReplaceRules = useAllReplaceRules("global");
+  const novelReplaceRules = useAllReplaceRules(activeNovelId ?? "");
+
+  // Merged replace rule count for tab badge (deduped by pattern)
+  const replaceRuleCount = useMemo(() => {
+    const keys = new Set<string>();
+    for (const r of globalReplaceRules ?? []) keys.add(r.pattern);
+    for (const r of novelReplaceRules ?? []) keys.add(r.pattern);
+    return keys.size;
+  }, [globalReplaceRules, novelReplaceRules]);
+
   // When on a novel page: merged (global + novel). Otherwise: global only.
   const isNovelContext = !!activeNovelId;
-  const rawEntries = useMemo(
+  const allEntries = useMemo(
     () => (isNovelContext ? (mergedEntries ?? []) : (globalEntries ?? [])),
     [isNovelContext, mergedEntries, globalEntries],
   );
-
-  // Split into dict entries and rejected entries
-  const allEntries = useMemo(
-    () => rawEntries.filter((e) => e.category !== "loại trừ"),
-    [rawEntries],
-  );
-  const rejectedEntries = useMemo(
-    () => rawEntries.filter((e) => e.category === "loại trừ"),
-    [rawEntries],
-  );
+  const rejectedEntries = excludedNames ?? [];
 
   // Pre-compute global chinese keys for O(1) override check
   const globalChineseSet = useMemo(
@@ -234,6 +246,21 @@ export function NameDictPanel() {
         <button
           type="button"
           onClick={() => {
+            setActiveTab("replace");
+            setPage(0);
+          }}
+          className={cn(
+            "flex-1 py-2 text-xs font-medium transition-colors",
+            activeTab === "replace"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Thay thế ({replaceRuleCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             setActiveTab("rejected");
             setPage(0);
           }}
@@ -247,6 +274,16 @@ export function NameDictPanel() {
           Loại trừ ({rejectedEntries.length})
         </button>
       </div>
+
+      {/* ── Replace rules tab ── */}
+      {activeTab === "replace" && (
+        <ReplaceRulesTab
+          activeNovelId={activeNovelId}
+          isNovelContext={isNovelContext}
+          globalRules={globalReplaceRules}
+          novelRules={novelReplaceRules}
+        />
+      )}
 
       {/* ── Rejected tab ── */}
       {activeTab === "rejected" && (
@@ -279,7 +316,7 @@ export function NameDictPanel() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => handleDelete(entry.id)}
+                    onClick={() => deleteExcludedName(entry.id)}
                     className="size-6 opacity-0 group-hover:opacity-100"
                     title="Bỏ loại trừ"
                   >
@@ -371,9 +408,7 @@ export function NameDictPanel() {
                       >
                         Tất cả
                       </Button>
-                      {NAME_ENTRY_CATEGORIES.filter(
-                        (c) => c !== "loại trừ",
-                      ).map((cat) => (
+                      {NAME_ENTRY_CATEGORIES.map((cat) => (
                         <Button
                           key={cat}
                           variant={
@@ -618,9 +653,7 @@ export function NameDictPanel() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {NAME_ENTRY_CATEGORIES.filter(
-                        (c) => c !== "loại trừ",
-                      ).map((cat) => (
+                      {NAME_ENTRY_CATEGORIES.map((cat) => (
                         <SelectItem
                           key={cat}
                           value={cat}
@@ -700,7 +733,21 @@ export function NameDictPanel() {
     );
   }
 
-  // Desktop: gap spacer + fixed container
+  // Desktop: floating overlay when tool active, normal layout panel otherwise
+  if (toolActive) {
+    return (
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-30 hidden h-svh w-[400px] border-l bg-card shadow-lg transition-[right] duration-200 ease-linear md:flex",
+          !isOpen && "right-[calc(400px*-1)]",
+        )}
+      >
+        <div className="flex size-full flex-col">{panelContent}</div>
+      </div>
+    );
+  }
+
+  // No tool active — normal layout panel with gap spacer
   return (
     <div className="hidden md:block">
       <div

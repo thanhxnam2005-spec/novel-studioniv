@@ -50,4 +50,55 @@ export function registerMigrations(db: NovelStudioDB) {
   db.version(4).stores({
     convertSettings: "id",
   });
+
+  // v5: Extract replace rules and excluded names into dedicated tables
+  db.version(5)
+    .stores({
+      nameEntries:
+        "id, scope, chinese, category, [scope+chinese], createdAt",
+      replaceRules: "id, scope, [scope+order], createdAt",
+      excludedNames: "id, scope, chinese, [scope+chinese], createdAt",
+    })
+    .upgrade(async (tx) => {
+      const nameEntries = tx.table("nameEntries");
+      const replaceRulesTable = tx.table("replaceRules");
+      const excludedNamesTable = tx.table("excludedNames");
+
+      const allEntries = await nameEntries.toArray();
+      const now = new Date();
+      const toDelete: string[] = [];
+      const newRules: Record<string, unknown>[] = [];
+      const newExcludes: Record<string, unknown>[] = [];
+
+      for (const entry of allEntries) {
+        if (entry.category === "thay thế") {
+          newRules.push({
+            id: entry.id,
+            scope: entry.scope,
+            pattern: entry.chinese,
+            replacement: entry.vietnamese,
+            isRegex: entry.isRegex ?? false,
+            caseSensitive: entry.caseSensitive ?? false,
+            enabled: entry.enabled ?? true,
+            order: entry.order ?? 0,
+            createdAt: entry.createdAt ?? now,
+            updatedAt: entry.updatedAt ?? now,
+          });
+          toDelete.push(entry.id);
+        } else if (entry.category === "loại trừ") {
+          newExcludes.push({
+            id: entry.id,
+            scope: entry.scope,
+            chinese: entry.chinese,
+            createdAt: entry.createdAt ?? now,
+            updatedAt: entry.updatedAt ?? now,
+          });
+          toDelete.push(entry.id);
+        }
+      }
+
+      if (newRules.length > 0) await replaceRulesTable.bulkAdd(newRules);
+      if (newExcludes.length > 0) await excludedNamesTable.bulkAdd(newExcludes);
+      if (toDelete.length > 0) await nameEntries.bulkDelete(toDelete);
+    });
 }

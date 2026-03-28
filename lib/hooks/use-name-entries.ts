@@ -44,22 +44,6 @@ export function useMergedNameEntries(novelId: string | undefined) {
   }, [novelId]);
 }
 
-/** Load rejected auto-names (category "loại trừ") for global + optional novelId scope */
-export function useRejectedAutoNames(novelId?: string): string[] {
-  return (
-    useLiveQuery(async () => {
-      const entries = await db.nameEntries
-        .where("category")
-        .equals("loại trừ")
-        .toArray();
-      // Filter to global + novelId scopes
-      return entries
-        .filter((e) => e.scope === "global" || e.scope === novelId)
-        .map((e) => e.chinese);
-    }, [novelId]) ?? []
-  );
-}
-
 export function useNameEntryCount(scope: string | undefined) {
   return useLiveQuery(
     () =>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -57,6 +58,19 @@ function OptionGroup<T extends string>({
 export function ConvertConfig() {
   const settings = useConvertSettings();
 
+  // Memoize slider value arrays to prevent Radix Slider infinite re-render loop
+  // (new array reference on every render triggers onValueChange → Dexie write → re-render)
+  // Memoize slider value arrays to prevent Radix Slider infinite re-render loop
+  // (new array reference on every render triggers onValueChange → Dexie write → re-render)
+  const maxPhraseLengthValue = useMemo(
+    () => [settings.maxPhraseLength],
+    [settings.maxPhraseLength],
+  );
+  const nameDetectMinFreqValue = useMemo(
+    () => [settings.nameDetectMinFrequency],
+    [settings.nameDetectMinFrequency],
+  );
+
   const update = (patch: Partial<ConvertOptions>) => {
     void updateConvertSettings(patch);
   };
@@ -88,7 +102,7 @@ export function ConvertConfig() {
           Cụm từ dài nhất: {settings.maxPhraseLength}
         </Label>
         <Slider
-          value={[settings.maxPhraseLength]}
+          value={maxPhraseLengthValue}
           onValueChange={([v]) => update({ maxPhraseLength: v })}
           min={4}
           max={20}
@@ -158,7 +172,7 @@ export function ConvertConfig() {
             Tần suất tối thiểu: {settings.nameDetectMinFrequency}
           </Label>
           <Slider
-            value={[settings.nameDetectMinFrequency]}
+            value={nameDetectMinFreqValue}
             onValueChange={([v]) => update({ nameDetectMinFrequency: v })}
             min={1}
             max={5}

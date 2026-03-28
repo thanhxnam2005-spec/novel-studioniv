@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { createExcludedName } from "@/lib/hooks/use-excluded-names";
 import { createNameEntry } from "@/lib/hooks/use-name-entries";
 import type { DictPair } from "@/lib/workers/qt-engine.types";
 import { BookmarkPlusIcon, SparklesIcon, XIcon } from "lucide-react";
@@ -50,11 +51,9 @@ export function ConvertDetectedNames({
 
   const handleDismiss = async (chinese: string) => {
     try {
-      await createNameEntry({
+      await createExcludedName({
         scope: novelId ?? "global",
         chinese,
-        vietnamese: "",
-        category: "loại trừ",
       });
       onDismiss?.(chinese);
     } catch {

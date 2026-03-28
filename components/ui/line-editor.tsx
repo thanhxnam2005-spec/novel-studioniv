@@ -10,10 +10,16 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { ScrollbarMarks } from "./scrollbar-marks";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
+
+export interface FindHighlight {
+  index: number;
+  length: number;
+}
 
 interface LineEditorProps {
   /** Current text value */
@@ -30,6 +36,8 @@ interface LineEditorProps {
   contentFont?: string;
   /** Font-size Tailwind classes for gutter (default: "text-xs leading-5") */
   gutterFont?: string;
+  /** Highlight ranges (char index + length) rendered as marks in the mirror */
+  highlights?: FindHighlight[] | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -46,23 +54,80 @@ const CONTENT_BASE =
 /*  Rendered lines                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Build highlighted content fragments for a single line. */
+function renderHighlightedLine(
+  line: string,
+  lineStart: number,
+  highlights: FindHighlight[],
+): React.ReactNode {
+  // Filter highlights that overlap this line
+  const lineEnd = lineStart + line.length;
+  const relevant = highlights.filter(
+    (h) => h.index < lineEnd && h.index + h.length > lineStart,
+  );
+  if (relevant.length === 0) return line || "\u00A0";
+
+  const fragments: React.ReactNode[] = [];
+  let cursor = 0;
+
+  for (const h of relevant) {
+    const start = Math.max(0, h.index - lineStart);
+    const end = Math.min(line.length, h.index + h.length - lineStart);
+    if (start > cursor) {
+      fragments.push(line.slice(cursor, start));
+    }
+    fragments.push(
+      <mark
+        key={`${h.index}-${h.length}`}
+        className="rounded-sm bg-yellow-200/80 text-inherit dark:bg-yellow-500/40"
+        data-mark
+      >
+        {line.slice(start, end)}
+      </mark>,
+    );
+    cursor = end;
+  }
+  if (cursor < line.length) {
+    fragments.push(line.slice(cursor));
+  }
+  return fragments.length > 0 ? fragments : "\u00A0";
+}
+
 const RenderedLines = memo(function RenderedLines({
   value,
   gutterCls,
   contentCls,
+  highlights,
 }: {
   value: string;
   gutterCls: string;
   contentCls: string;
+  highlights?: FindHighlight[] | null;
 }) {
   const lines = useMemo(() => value.split("\n"), [value]);
+
+  // Pre-compute line start offsets if highlights are present
+  const lineOffsets = useMemo(() => {
+    if (!highlights || highlights.length === 0) return null;
+    const offsets: number[] = [];
+    let offset = 0;
+    for (const line of lines) {
+      offsets.push(offset);
+      offset += line.length + 1; // +1 for \n
+    }
+    return offsets;
+  }, [lines, highlights]);
 
   return (
     <>
       {lines.map((line, i) => (
         <div key={i} className={LINE_CLS}>
           <span className={gutterCls}>{i + 1}</span>
-          <span className={contentCls}>{line || "\u00A0"}</span>
+          <span className={contentCls}>
+            {highlights && highlights.length > 0 && lineOffsets
+              ? renderHighlightedLine(line, lineOffsets[i], highlights)
+              : line || "\u00A0"}
+          </span>
         </div>
       ))}
     </>
@@ -81,6 +146,7 @@ export function LineEditor({
   className,
   contentFont = "text-sm leading-5",
   gutterFont = "text-xs leading-5",
+  highlights,
 }: LineEditorProps) {
   const mirrorRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -141,6 +207,7 @@ export function LineEditor({
             value={deferredValue}
             gutterCls={gutterCls}
             contentCls={contentCls}
+            highlights={highlights}
           />
         </div>
       </div>
@@ -159,6 +226,14 @@ export function LineEditor({
         spellCheck={false}
         readOnly={readOnly}
       />
+
+      {highlights && highlights.length > 0 && (
+        <ScrollbarMarks
+          scrollRef={textareaRef}
+          contentRef={mirrorRef}
+          selector="[data-mark]"
+        />
+      )}
     </div>
   );
 }

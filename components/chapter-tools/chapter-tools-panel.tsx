@@ -12,6 +12,7 @@ import { useCallback, useRef, useState } from "react";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ConvertMode } from "./convert-mode";
 import { EditMode } from "./edit-mode";
+import { ReplaceMode } from "./replace-mode";
 import { ReviewMode } from "./review-mode";
 import { TranslateMode, type TranslateResult } from "./translate-mode";
 
@@ -20,6 +21,7 @@ const MODE_TITLES: Record<ChapterToolMode, string> = {
   review: "Đánh giá chương",
   edit: "Chỉnh sửa chương",
   convert: "Convert chương",
+  replace: "Thay thế",
 };
 
 function PanelResizeHandle() {
@@ -97,16 +99,18 @@ export function ChapterToolsPanel({
 
   const hasFooter = isStreaming || footerContent;
 
+  const showPanel = !!activeMode;
+
   return (
     <div
       className={cn(
         "relative flex shrink-0 flex-col overflow-hidden border-l bg-background transition-[width] duration-200",
-        !activeMode && "w-0",
+        !showPanel && "w-0",
       )}
-      style={activeMode ? { width: panelWidth } : undefined}
+      style={showPanel ? { width: panelWidth } : undefined}
     >
       {activeMode && (
-        <>
+        <div className={cn("flex size-full flex-col", !showPanel && "invisible")}>
           <PanelResizeHandle />
           <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
             <h3 className="text-sm font-medium">{MODE_TITLES[activeMode]}</h3>
@@ -158,6 +162,13 @@ export function ChapterToolsPanel({
                   renderFooter={renderFooter}
                 />
               )}
+              {activeMode === "replace" && (
+                <ReplaceMode
+                  content={content}
+                  novelId={novelId}
+                  renderFooter={renderFooter}
+                />
+              )}
             </StickToBottom.Content>
             <ScrollToBottom />
           </StickToBottom>
@@ -180,7 +191,7 @@ export function ChapterToolsPanel({
               )}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
+import { useExcludedNamesList } from "@/lib/hooks/use-excluded-names";
 import {
   getMergedNameDict,
   useMergedNameEntries,
-  useRejectedAutoNames,
 } from "@/lib/hooks/use-name-entries";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
 import type { DictPair } from "@/lib/workers/qt-engine.types";
@@ -59,7 +59,7 @@ export function ConvertMode({
   const [detectedNames, setDetectedNames] = useState<DictPair[]>([]);
   const scenes = useScenes(chapterId);
   const mergedEntries = useMergedNameEntries(novelId);
-  const rejectedAutoNames = useRejectedAutoNames(novelId);
+  const rejectedAutoNames = useExcludedNamesList(novelId);
   const engineReady = useQTEngineReady();
   const convertOptions = useConvertSettings();
 

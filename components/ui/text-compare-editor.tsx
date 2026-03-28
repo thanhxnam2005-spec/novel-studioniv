@@ -5,6 +5,7 @@ import {
   formatStats,
   type DiffResult,
 } from "@/lib/chapter-tools/diff-utils";
+import { ScrollbarMarks } from "./scrollbar-marks";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import { useLocalStorage } from "@/lib/hooks/use-local-storage";
 import { cn } from "@/lib/utils";
@@ -203,13 +204,27 @@ const WordDiffLines = memo(function WordDiffLines({
 
   const hlCls =
     side === "left"
-      ? "rounded-sm bg-red-100 text-red-800 line-through dark:bg-red-900/40 dark:text-red-300"
-      : "rounded-sm bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300";
+      ? "rounded-sm bg-red-200 text-red-800 line-through dark:bg-red-800/50 dark:text-red-300"
+      : "rounded-sm bg-green-200 text-green-800 dark:bg-green-800/50 dark:text-green-300";
+  const lineBgCls =
+    side === "left"
+      ? "bg-red-50 dark:bg-red-950/30"
+      : "bg-green-50 dark:bg-green-950/30";
+  const markColor =
+    side === "left"
+      ? "bg-red-400 dark:bg-red-500"
+      : "bg-green-400 dark:bg-green-500";
 
   return (
     <>
-      {lines.map((spans, i) => (
-        <div key={i} className={LINE_CLS}>
+      {lines.map((spans, i) => {
+        const hasHighlight = spans.some((s) => s.highlighted);
+        return (
+        <div
+          key={i}
+          className={cn(LINE_CLS, hasHighlight && lineBgCls)}
+          {...(hasHighlight ? { "data-mark": true, "data-mark-color": markColor } : {})}
+        >
           <span className={gutterCls}>{i + 1}</span>
           <span className={contentCls}>
             {spans.length === 0
@@ -224,7 +239,8 @@ const WordDiffLines = memo(function WordDiffLines({
                 ))}
           </span>
         </div>
-      ))}
+        );
+      })}
     </>
   );
 });
@@ -469,20 +485,36 @@ export function TextCompareEditor({
             onScroll={onScroll}
             spellCheck={false}
           />
+          {showDiffHighlight && (
+            <ScrollbarMarks
+              scrollRef={{ current: scrollRef.current } as React.RefObject<HTMLElement>}
+              contentRef={editableMirrorRef}
+              selector="[data-mark]"
+            />
+          )}
         </div>
       );
     }
 
     // Readonly panel — div-based with inline gutter
+    const readonlyRef = scrollRef;
     return (
-      <div
-        ref={(el) => {
-          scrollRef.current = el;
-        }}
-        className="h-full min-h-0 min-w-0 flex-1 cursor-default overflow-y-auto"
-        onScroll={onScroll}
-      >
-        {linesContent}
+      <div className="relative h-full min-h-0 min-w-0 flex-1">
+        <div
+          ref={(el) => {
+            scrollRef.current = el;
+          }}
+          className="h-full cursor-default overflow-y-auto"
+          onScroll={onScroll}
+        >
+          {linesContent}
+        </div>
+        {showDiffHighlight && (
+          <ScrollbarMarks
+            scrollRef={readonlyRef as React.RefObject<HTMLElement>}
+            selector="[data-mark]"
+          />
+        )}
       </div>
     );
   }

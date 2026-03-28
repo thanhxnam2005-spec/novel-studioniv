@@ -16,6 +16,7 @@ import {
   GitCompareArrowsIcon,
   LanguagesIcon,
   LoaderIcon,
+  ReplaceAllIcon,
   SparklesIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const TOOLS: {
   { mode: "translate", icon: LanguagesIcon, label: "Dịch chương" },
   { mode: "review", icon: ClipboardCheckIcon, label: "Đánh giá chương" },
   { mode: "edit", icon: SparklesIcon, label: "Chỉnh sửa chương" },
+  { mode: "replace", icon: ReplaceAllIcon, label: "Thay thế" },
 ];
 
 export function ChapterToolsBar({

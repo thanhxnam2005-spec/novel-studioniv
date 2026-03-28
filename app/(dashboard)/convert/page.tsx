@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
-import { useRejectedAutoNames } from "@/lib/hooks/use-name-entries";
+import { useExcludedNamesList } from "@/lib/hooks/use-excluded-names";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
 import type { ConvertOptions, DictPair } from "@/lib/workers/qt-engine.types";
 import {
@@ -36,7 +36,7 @@ export default function ConvertPage() {
   const [detectedNames, setDetectedNames] = useState<DictPair[]>([]);
   const engineReady = useQTEngineReady();
   const convertOptions = useConvertSettings();
-  const rejectedAutoNames = useRejectedAutoNames();
+  const rejectedAutoNames = useExcludedNamesList();
   const debouncedInput = useDebouncedValue(input, 500);
   const seqRef = useRef(0);
 

@@ -65,6 +65,43 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.5.0",
+    date: "2026-03-28",
+    title: "Tìm & Thay thế nâng cao",
+    summary:
+      "Công cụ tìm kiếm và thay thế văn bản với regex, từ điển quy tắc, thay thế hàng loạt. Diff nội tuyến mới với đánh dấu vị trí trên thanh cuộn.",
+    changes: [
+      {
+        category: "feature",
+        description: "Tìm & Thay thế với từ điển quy tắc",
+        details:
+          "Tìm kiếm realtime với highlight, thay thế bằng chuỗi hoặc regex. Lưu mẫu thành quy tắc riêng cho tiểu thuyết hoặc toàn cục — hỗ trợ bật/tắt, sắp xếp, phân biệt hoa/thường. Chạy trên chương hiện tại hoặc thay thế hàng loạt nhiều chương với xem trước và bật/tắt từng rule.",
+        tags: ["thay thế", "soạn thảo"],
+      },
+      {
+        category: "feature",
+        description: "Diff nội tuyến & đánh dấu thanh cuộn",
+        details:
+          "Chế độ xem diff nội tuyến mới hiển thị thêm/xóa/sửa trên cùng một bảng với ký hiệu +/−/~. Chuyển đổi giữa song song và nội tuyến khi thay thế hàng loạt. Các vị trí thay đổi được đánh dấu trên thanh cuộn trong cả trình soạn thảo, diff nội tuyến và diff song song.",
+        tags: ["diff", "giao diện"],
+      },
+      {
+        category: "refactor",
+        description: "Tách quy tắc thay thế và loại trừ ra khỏi từ điển tên",
+        details:
+          "Quy tắc thay thế và danh sách tên loại trừ lưu trong bảng riêng. Giao diện từ điển vẫn giữ 3 tab. Dữ liệu cũ tự động chuyển đổi.",
+        tags: ["cơ sở dữ liệu", "tái cấu trúc"],
+      },
+      {
+        category: "improvement",
+        description: "Bảng chat và từ điển không còn tranh chấp với công cụ",
+        details:
+          "Chat và từ điển hiển thị dạng panel cố định khi không dùng công cụ, hoặc overlay nổi khi công cụ đang mở — không còn tự đóng khi mở bảng khác. Đóng chat không làm mất cuộc trò chuyện đang chạy.",
+        tags: ["giao diện", "trải nghiệm"],
+      },
+    ],
+  },
+  {
     version: "0.4.3",
     date: "2026-03-28",
     title: "Nhận diện tên tự động & Mở rộng từ điển",

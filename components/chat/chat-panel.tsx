@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ConfirmInterruptDialog } from "@/components/ui/confirm-interrupt-dialog";
 import {
   Empty,
   EmptyDescription,
@@ -35,10 +34,10 @@ import {
   useAIModels,
   useAIProviders,
   useChatSettings,
-  useConfirmInterrupt,
   useConversationMessages,
   useConversations,
 } from "@/lib/hooks";
+import { useChapterTools } from "@/lib/stores/chapter-tools";
 import { useChatPanel } from "@/lib/stores/chat-panel";
 import { cn } from "@/lib/utils";
 import { APICallError, streamText } from "ai";
@@ -62,6 +61,7 @@ import { parseThinkingTags } from "./thinking-parser";
 export function ChatPanel() {
   const { isOpen, close, activeConversationId, setActiveConversation } =
     useChatPanel();
+  const toolActive = useChapterTools((s) => s.activeMode !== null);
   const isMobile = useIsMobile();
 
   const providers = useAIProviders();
@@ -90,12 +90,6 @@ export function ChatPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    showConfirm: showCloseConfirm,
-    guard: guardClose,
-    confirm: confirmClose,
-    dismiss: dismissClose,
-  } = useConfirmInterrupt(isStreaming);
 
   // Auto-select first provider when none is set
   useEffect(() => {
@@ -532,26 +526,11 @@ export function ChatPanel() {
           >
             <SettingsIcon />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() =>
-              guardClose(() => {
-                abortRef.current?.abort();
-                close();
-              })
-            }
-          >
+          <Button variant="ghost" size="icon-xs" onClick={close}>
             <XIcon />
           </Button>
         </div>
       </div>
-
-      <ConfirmInterruptDialog
-        open={showCloseConfirm}
-        onConfirm={confirmClose}
-        onCancel={dismissClose}
-      />
 
       {historyOpen && (
         <ChatHistoryDialog
@@ -714,7 +693,7 @@ export function ChatPanel() {
     </>
   );
 
-  // Mobile: Sheet drawer (mirrors Sidebar mobile path)
+  // Mobile: Sheet drawer
   if (isMobile) {
     return (
       <Sheet
@@ -738,17 +717,29 @@ export function ChatPanel() {
     );
   }
 
-  // Desktop: gap spacer + fixed container (mirrors Sidebar desktop path)
+  // Desktop: normal panel when no tool active, floating overlay when tool is open
+  if (toolActive) {
+    return (
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-20 hidden h-svh w-[400px] border-l bg-card shadow-lg transition-[right] duration-200 ease-linear md:flex",
+          !isOpen && "right-[calc(400px*-1)]",
+        )}
+      >
+        <div className="flex size-full flex-col">{panelContent}</div>
+      </div>
+    );
+  }
+
+  // No tool active — normal layout panel with gap spacer
   return (
     <div className="hidden md:block">
-      {/* Gap spacer */}
       <div
         className={cn(
           "relative bg-transparent transition-[width] duration-200 ease-linear",
           isOpen ? "w-[360px]" : "w-0",
         )}
       />
-      {/* Fixed container */}
       <div
         className={cn(
           "fixed inset-y-0 right-0 z-10 hidden h-svh w-[360px] border-l bg-card transition-[right] duration-200 ease-linear md:flex",

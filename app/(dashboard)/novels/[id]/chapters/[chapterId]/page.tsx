@@ -100,10 +100,13 @@ export default function ChapterEditorPage() {
   const isStreaming = useChapterTools((s) => s.isStreaming);
   const completedResult = useChapterTools((s) => s.completedResult);
   const clearResult = useChapterTools((s) => s.clearResult);
+  const findHighlights = useChapterTools((s) => s.findHighlights);
 
-  // Show diff in main area for edit mode only (translate auto-applies)
+  // Show diff in main area for edit and replace modes
   const showDiffInMain =
-    !isStreaming && !!completedResult && activeMode === "edit";
+    !isStreaming &&
+    !!completedResult &&
+    (activeMode === "edit" || activeMode === "replace");
 
   useEffect(() => {
     return () => {
@@ -111,9 +114,9 @@ export default function ChapterEditorPage() {
     };
   }, []);
 
-  // Sync editedResult when AI completes (edit mode only)
+  // Sync editedResult when AI/replace completes
   useEffect(() => {
-    if (completedResult && activeMode === "edit") {
+    if (completedResult && (activeMode === "edit" || activeMode === "replace")) {
       setEditedResult(completedResult);
     }
   }, [completedResult, activeMode]);
@@ -207,9 +210,13 @@ export default function ChapterEditorPage() {
 
   const handleAcceptDiff = () => {
     pushSnapshot({ content: editedResult, title });
-    useChapterTools.getState().setPendingVersionType("ai-edit");
+    const versionType =
+      useChapterTools.getState().pendingVersionType ?? "ai-edit";
+    useChapterTools.getState().setPendingVersionType(versionType);
     clearResult();
-    toast.success("Đã áp dụng chỉnh sửa");
+    toast.success(
+      activeMode === "replace" ? "Đã áp dụng thay thế" : "Đã áp dụng chỉnh sửa",
+    );
   };
 
   // Guard for chapter tools interruption
@@ -407,14 +414,18 @@ export default function ChapterEditorPage() {
               panelWrapperClassName="min-h-0 flex-1"
             />
             <div className="flex shrink-0 items-center justify-between border-t px-4 py-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => clearResult()}
-              >
-                <RotateCcwIcon className="mr-1.5 size-3" />
-                Tạo lại
-              </Button>
+              {activeMode === "edit" ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => clearResult()}
+                >
+                  <RotateCcwIcon className="mr-1.5 size-3" />
+                  Tạo lại
+                </Button>
+              ) : (
+                <div />
+              )}
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={clearResult}>
                   Hủy
@@ -433,6 +444,7 @@ export default function ChapterEditorPage() {
                 onChange={setContent}
                 placeholder="Bắt đầu viết..."
                 className="h-full"
+                highlights={activeMode === "replace" ? findHighlights : null}
               />
             </div>
           </div>

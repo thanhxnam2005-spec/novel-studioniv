@@ -12,6 +12,8 @@ import {
   type Conversation,
   type ConversationMessage,
   type NameEntry,
+  type ReplaceRule,
+  type ExcludedName,
 } from "@/lib/db";
 import {
   encryptData,
@@ -32,6 +34,8 @@ const NOVEL_SCOPED_TABLES = [
   "characters",
   "notes",
   "nameEntries",
+  "replaceRules",
+  "excludedNames",
 ] as const;
 
 const AI_TABLES = [
@@ -55,6 +59,8 @@ const IMPORT_ORDER = [
   "scenes",
   "notes",
   "nameEntries",
+  "replaceRules",
+  "excludedNames",
   "chatSettings",
   "analysisSettings",
   "conversations",
@@ -74,6 +80,8 @@ export const TABLE_LABELS: Record<string, string> = {
   conversations: "Hội thoại",
   conversationMessages: "Tin nhắn",
   nameEntries: "Từ điển tên",
+  replaceRules: "Quy tắc thay thế",
+  excludedNames: "Tên loại trừ",
 };
 
 // Date fields per table for reviving from JSON
@@ -90,6 +98,8 @@ const DATE_FIELDS: Record<string, string[]> = {
   chatSettings: [],
   analysisSettings: [],
   nameEntries: ["createdAt", "updatedAt"],
+  replaceRules: ["createdAt", "updatedAt"],
+  excludedNames: ["createdAt", "updatedAt"],
 };
 
 // FK fields that need remapping in "keep-both" mode
@@ -99,6 +109,8 @@ const FK_FIELDS: Record<string, Record<string, string>> = {
   characters: { novelId: "novels" },
   notes: { novelId: "novels" },
   nameEntries: { scope: "novels" },
+  replaceRules: { scope: "novels" },
+  excludedNames: { scope: "novels" },
   aiModels: { providerId: "aiProviders" },
   conversations: { providerId: "aiProviders", modelId: "aiModels" },
   conversationMessages: { conversationId: "conversations" },
@@ -121,6 +133,8 @@ type TableData = {
   characters?: Character[];
   notes?: Note[];
   nameEntries?: NameEntry[];
+  replaceRules?: ReplaceRule[];
+  excludedNames?: ExcludedName[];
   aiProviders?: AIProvider[];
   aiModels?: AIModel[];
   chatSettings?: ChatSettings[];
@@ -325,14 +339,18 @@ export async function exportDatabase(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let records: any[];
 
+    // Tables that use "scope" instead of "novelId" as the foreign key to novels
+    const SCOPE_KEYED_TABLES = new Set(["nameEntries", "replaceRules", "excludedNames"]);
+
     if (
       isPerNovel &&
       (NOVEL_SCOPED_TABLES as readonly string[]).includes(tableName) &&
       tableName !== "novels"
     ) {
+      const fkField = SCOPE_KEYED_TABLES.has(tableName) ? "scope" : "novelId";
       const allRecords = await Promise.all(
         novelIds.map((id) =>
-          getTable(tableName).where("novelId").equals(id).toArray(),
+          getTable(tableName).where(fkField).equals(id).toArray(),
         ),
       );
       records = allRecords.flat();

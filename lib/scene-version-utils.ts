@@ -5,6 +5,7 @@ export const VERSION_TYPE_LABELS: Record<SceneVersionType, string> = {
   "ai-edit": "Sửa AI",
   manual: "Thủ công",
   "qt-convert": "Convert QT",
+  "find-replace": "Thay thế",
 };
 
 export const VERSION_TYPE_VARIANTS: Record<
@@ -15,6 +16,7 @@ export const VERSION_TYPE_VARIANTS: Record<
   "ai-edit": "secondary",
   manual: "outline",
   "qt-convert": "secondary",
+  "find-replace": "secondary",
 };
 
 export function formatRelativeTime(date: Date): string {

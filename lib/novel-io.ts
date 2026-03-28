@@ -6,6 +6,8 @@ import {
   type Character,
   type Note,
   type NameEntry,
+  type ReplaceRule,
+  type ExcludedName,
   type SceneVersionType,
 } from "@/lib/db";
 
@@ -20,6 +22,8 @@ export interface NovelExportData {
   characters: Character[];
   notes: Note[];
   nameEntries?: NameEntry[];
+  replaceRules?: ReplaceRule[];
+  excludedNames?: ExcludedName[];
   /** @deprecated v1 only — analysis data is now on Novel */
   analyses?: unknown[];
 }
@@ -35,7 +39,7 @@ export async function exportNovel(
 
   const includeVersions = options?.includeVersions ?? false;
 
-  const [chapters, scenes, characters, notes, nameEntries] =
+  const [chapters, scenes, characters, notes, nameEntries, replaceRules, excludedNames] =
     await Promise.all([
       db.chapters.where("novelId").equals(novelId).toArray(),
       includeVersions
@@ -47,6 +51,8 @@ export async function exportNovel(
       db.characters.where("novelId").equals(novelId).toArray(),
       db.notes.where("novelId").equals(novelId).toArray(),
       db.nameEntries.where("scope").equals(novelId).toArray(),
+      db.replaceRules.where("scope").equals(novelId).toArray(),
+      db.excludedNames.where("scope").equals(novelId).toArray(),
     ]);
 
   return {
@@ -58,6 +64,8 @@ export async function exportNovel(
     characters,
     notes,
     ...(nameEntries.length > 0 ? { nameEntries } : {}),
+    ...(replaceRules.length > 0 ? { replaceRules } : {}),
+    ...(excludedNames.length > 0 ? { excludedNames } : {}),
   };
 }
 
@@ -223,9 +231,60 @@ export async function importNovel(file: File): Promise<string> {
   }
 
   // Name Entries (scope remaps from old novelId to new novelId)
+  // Backward compat: old exports may have replace rules / excludes in nameEntries
   if (data.nameEntries?.length) {
     for (const entry of data.nameEntries) {
-      await db.nameEntries.add({
+      const raw = entry as NameEntry & { category?: string; isRegex?: boolean; caseSensitive?: boolean; enabled?: boolean; order?: number };
+      if (raw.category === "thay thế") {
+        await db.replaceRules.add({
+          id: crypto.randomUUID(),
+          scope: novelId,
+          pattern: raw.chinese,
+          replacement: raw.vietnamese,
+          isRegex: raw.isRegex ?? false,
+          caseSensitive: raw.caseSensitive ?? false,
+          enabled: raw.enabled ?? true,
+          order: raw.order ?? 0,
+          createdAt: new Date(raw.createdAt),
+          updatedAt: new Date(raw.updatedAt),
+        });
+      } else if (raw.category === "loại trừ") {
+        await db.excludedNames.add({
+          id: crypto.randomUUID(),
+          scope: novelId,
+          chinese: raw.chinese,
+          createdAt: new Date(raw.createdAt),
+          updatedAt: new Date(raw.updatedAt),
+        });
+      } else {
+        await db.nameEntries.add({
+          ...entry,
+          id: crypto.randomUUID(),
+          scope: novelId,
+          createdAt: new Date(entry.createdAt),
+          updatedAt: new Date(entry.updatedAt),
+        });
+      }
+    }
+  }
+
+  // Replace Rules
+  if (data.replaceRules?.length) {
+    for (const rule of data.replaceRules) {
+      await db.replaceRules.add({
+        ...rule,
+        id: crypto.randomUUID(),
+        scope: novelId,
+        createdAt: new Date(rule.createdAt),
+        updatedAt: new Date(rule.updatedAt),
+      });
+    }
+  }
+
+  // Excluded Names
+  if (data.excludedNames?.length) {
+    for (const entry of data.excludedNames) {
+      await db.excludedNames.add({
         ...entry,
         id: crypto.randomUUID(),
         scope: novelId,
