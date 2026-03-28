@@ -32,7 +32,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useChapterTools } from "@/lib/stores/chapter-tools";
 import { NAME_ENTRY_CATEGORIES, type NameEntry } from "@/lib/db";
 import {
   deleteExcludedName,
@@ -83,7 +82,6 @@ export function NameDictPanel() {
     setCategoryFilter,
     setScopeFilter,
   } = useNameDictPanel();
-  const toolActive = useChapterTools((s) => s.activeMode !== null);
   const isMobile = useIsMobile();
   const novel = useNovel(activeNovelId ?? undefined);
   const mergedEntries = useMergedNameEntries(activeNovelId ?? undefined);
@@ -733,37 +731,15 @@ export function NameDictPanel() {
     );
   }
 
-  // Desktop: floating overlay when tool active, normal layout panel otherwise
-  if (toolActive) {
-    return (
-      <div
-        className={cn(
-          "fixed inset-y-0 right-0 z-30 hidden h-svh w-[400px] border-l bg-card shadow-lg transition-[right] duration-200 ease-linear md:flex",
-          !isOpen && "right-[calc(400px*-1)]",
-        )}
-      >
-        <div className="flex size-full flex-col">{panelContent}</div>
-      </div>
-    );
-  }
-
-  // No tool active — normal layout panel with gap spacer
+  // Desktop: always a floating overlay (dict is a reference tool, never pushes layout)
   return (
-    <div className="hidden md:block">
-      <div
-        className={cn(
-          "relative bg-transparent transition-[width] duration-200 ease-linear",
-          isOpen ? "w-[360px]" : "w-0",
-        )}
-      />
-      <div
-        className={cn(
-          "fixed inset-y-0 right-0 z-10 hidden h-svh w-[360px] border-l bg-card transition-[right] duration-200 ease-linear md:flex",
-          !isOpen && "right-[calc(360px*-1)]",
-        )}
-      >
-        <div className="flex size-full flex-col">{panelContent}</div>
-      </div>
+    <div
+      className={cn(
+        "fixed inset-y-0 right-0 z-30 hidden h-svh w-[400px] border-l bg-card shadow-lg transition-[right] duration-200 ease-linear md:flex",
+        !isOpen && "right-[calc(400px*-1)]",
+      )}
+    >
+      <div className="flex size-full flex-col">{panelContent}</div>
     </div>
   );
 }
