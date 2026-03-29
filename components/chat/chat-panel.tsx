@@ -144,7 +144,6 @@ export function ChatPanel() {
   }, [isOpen]);
 
   // Auto-select latest conversation when panel opens with none selected.
-  // Only triggers on isOpen change (not when user clears via "new conversation").
   const prevIsOpenRef = useRef(false);
   useEffect(() => {
     if (
@@ -214,8 +213,10 @@ export function ChatPanel() {
         );
 
         // Build system prompt with optional novel context
-        const { attachedNovelId: ctxNovelId, attachedChapterId: ctxChapterId } =
-          useChatPanel.getState();
+        const {
+          attachedNovelId: ctxNovelId,
+          attachedChapterId: ctxChapterId,
+        } = useChatPanel.getState();
         let contextEnhancedPrompt = systemPrompt;
         if (ctxNovelId) {
           const { buildNovelContext } = await import("@/lib/ai/novel-context");
@@ -564,28 +565,15 @@ export function ChatPanel() {
 
     setInput("");
 
-    // Create or reuse conversation
-    let convoId = activeConversationId;
-    if (!convoId) {
-      const { pageNovelId, pageChapterId } = useChatPanel.getState();
-      const title = text.length > 50 ? text.slice(0, 47) + "..." : text;
-      convoId = await createConversation({
-        title,
-        providerId: selectedProviderId,
-        modelId: selectedModelId,
-        novelId: pageNovelId ?? undefined,
-        chapterId: pageNovelId ? (pageChapterId ?? undefined) : undefined,
-      });
-      setActiveConversation(convoId);
-      if (pageNovelId) {
-        setAttachedContext(pageNovelId, pageChapterId);
-      }
-    }
+    // Reuse active conversation
+    const convoId = activeConversationId;
+    if (!convoId) return;
 
+    const isFirstMessage = !dbMessages || dbMessages.length === 0;
     const result = await sendAndStream(convoId, text);
 
     // Auto-title from first assistant reply
-    if (!activeConversationId && result?.content) {
+    if (isFirstMessage && result?.content) {
       const shortTitle =
         result.content.length > 60
           ? result.content.slice(0, 57) + "..."
@@ -598,11 +586,9 @@ export function ChatPanel() {
     input,
     isStreaming,
     selectedProvider,
-    selectedProviderId,
     selectedModelId,
     activeConversationId,
-    setActiveConversation,
-    setAttachedContext,
+    dbMessages,
     sendAndStream,
   ]);
 
@@ -632,7 +618,15 @@ export function ChatPanel() {
 
   async function handleNewConversation() {
     if (isStreaming) handleStop();
-    setActiveConversation(null);
+    const { pageNovelId, pageChapterId } = useChatPanel.getState();
+    const convoId = await createConversation({
+      title: "Cuộc trò chuyện mới",
+      providerId: selectedProviderId,
+      modelId: selectedModelId,
+      novelId: pageNovelId ?? undefined,
+      chapterId: pageNovelId ? (pageChapterId ?? undefined) : undefined,
+    });
+    setActiveConversation(convoId);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
