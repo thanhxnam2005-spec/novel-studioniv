@@ -150,9 +150,22 @@ export interface Conversation {
   title: string;
   providerId: string;
   modelId: string;
+  novelId?: string;
+  chapterId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface ChatToolCall {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+}
+
+export type MessagePart =
+  | { type: "text"; content: string }
+  | { type: "tool-calls"; toolCalls: ChatToolCall[] };
 
 export interface ConversationMessage {
   id: string;
@@ -160,6 +173,8 @@ export interface ConversationMessage {
   role: "user" | "assistant" | "system";
   content: string;
   reasoning?: string;
+  /** Ordered parts for interleaved text/tool-call rendering */
+  parts?: MessagePart[];
   createdAt: Date;
 }
 

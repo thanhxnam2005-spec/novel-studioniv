@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { downloadErrorTrace, getErrorTrace } from "@/lib/ai/error-trace";
+import type { ChatToolCall, MessagePart } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangleIcon,
+  BookSearchIcon,
   BugIcon,
   CheckIcon,
   ChevronDown,
@@ -12,6 +14,7 @@ import {
   LoaderIcon,
   PencilIcon,
   RefreshCwIcon,
+  WrenchIcon,
   XIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -20,7 +23,115 @@ import "streamdown/styles.css";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { chatStreamdownComponents } from "./streamdown-components";
 
+const TOOL_LABELS: Record<string, string> = {
+  getNovelOverview: "Tra cứu tổng quan tiểu thuyết",
+  getWorldBuilding: "Tra cứu thế giới quan",
+  getChapterDetails: "Tra cứu chi tiết chương",
+  getChapterContent: "Đọc nội dung chương",
+  getCharacters: "Tra cứu nhân vật",
+  getNovelNotes: "Tra cứu ghi chú",
+  searchNovelContent: "Tìm kiếm nội dung",
+};
+
 const ERROR_MARKER = "<!-- error -->";
+
+function formatResultPreview(result: unknown): string {
+  if (result == null) return "...";
+  if (typeof result === "string") return result;
+  try {
+    return JSON.stringify(result, null, 2);
+  } catch {
+    return String(result);
+  }
+}
+
+function ToolCallItem({ toolCall }: { toolCall: ChatToolCall }) {
+  const [open, setOpen] = useState(false);
+  const label = TOOL_LABELS[toolCall.toolName] ?? toolCall.toolName;
+  const hasArgs = Object.keys(toolCall.args).length > 0;
+
+  return (
+    <div className="rounded-md border border-border/40 bg-background/50 text-[11px] text-muted-foreground">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-muted/50"
+      >
+        <BookSearchIcon className="size-3 shrink-0" />
+        <span className="flex-1 truncate font-medium">{label}</span>
+        {hasArgs && (
+          <span className="max-w-[40%] shrink-0 truncate text-muted-foreground/70">
+            {Object.entries(toolCall.args)
+              .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+              .join(", ")}
+          </span>
+        )}
+        {open ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+      </button>
+      {open && (
+        <div className="border-t border-border/40 px-2 py-1.5 overflow-auto">
+          {hasArgs && (
+            <div className="mb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                Tham số
+              </span>
+              <pre className="mt-0.5 whitespace-pre-wrap break-all text-[10px] leading-relaxed">
+                {JSON.stringify(toolCall.args, null, 2)}
+              </pre>
+            </div>
+          )}
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              Kết quả
+            </span>
+            <pre className="mt-0.5 max-h-48 overflow-y-auto whitespace-pre-wrap break-all text-[10px] leading-relaxed">
+              {formatResultPreview(toolCall.result)}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Collapsible group of tool calls */
+function ToolCallsGroup({
+  toolCalls,
+  isStreaming,
+  hasContentAfter,
+}: {
+  toolCalls: ChatToolCall[];
+  isStreaming: boolean;
+  hasContentAfter: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const isLoading = isStreaming && !hasContentAfter;
+
+  return (
+    <div className="max-w-[85%]">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="mb-0.5 flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted"
+      >
+        <WrenchIcon
+          className={cn("size-3", isLoading && "animate-spin")}
+        />
+        {isLoading
+          ? "Đang tra cứu..."
+          : `Đã sử dụng ${toolCalls.length} công cụ`}
+        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+      </button>
+      {open && (
+        <div className="mb-1 space-y-1">
+          {toolCalls.map((tc, i) => (
+            <ToolCallItem key={i} toolCall={tc} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function MessageBubble({
   message,
@@ -28,7 +139,13 @@ export function MessageBubble({
   onEdit,
   onRerun,
 }: {
-  message: { id: string; role: string; content: string; reasoning?: string };
+  message: {
+    id: string;
+    role: string;
+    content: string;
+    reasoning?: string;
+    parts?: MessagePart[];
+  };
   isStreaming?: boolean;
   onEdit?: (newContent: string) => void;
   onRerun?: () => void;
@@ -44,6 +161,7 @@ export function MessageBubble({
   const { scrollRef: reasoningScrollRef, contentRef: reasoningContentRef } =
     useStickToBottom();
   const hasReasoning = !!message.reasoning;
+  const hasParts = !!message.parts?.length;
   // Auto-open while streaming thinking, otherwise respect manual toggle
   const reasoningOpen =
     (isStreaming && hasReasoning && !message.content) || reasoningOpenManual;
@@ -91,6 +209,83 @@ export function MessageBubble({
       downloadErrorTrace(trace);
     }
   }
+
+  /** Render assistant content as a text bubble */
+  const renderTextBubble = (
+    text: string,
+    streaming: boolean,
+    key?: string,
+  ) => {
+    if (!text) return null;
+    return (
+      <div
+        key={key}
+        className={cn(
+          "max-w-[85%] rounded-xl px-3 py-2 text-[13px] leading-snug",
+          isError
+            ? "border border-destructive/30 bg-destructive/10 text-destructive"
+            : "bg-muted text-foreground",
+        )}
+      >
+        {isError ? (
+          <div className="flex gap-2">
+            <AlertTriangleIcon className="mt-0.75 size-3 shrink-0" />
+            <div className="min-w-0 flex-1 *:break-all">
+              <Streamdown mode="static" components={chatStreamdownComponents}>
+                {text}
+              </Streamdown>
+            </div>
+          </div>
+        ) : (
+          <Streamdown
+            mode={streaming ? "streaming" : "static"}
+            controls={{ code: { copy: true } }}
+            components={chatStreamdownComponents}
+          >
+            {text}
+          </Streamdown>
+        )}
+      </div>
+    );
+  };
+
+  /** Render interleaved parts (text + tool-calls in order) */
+  const renderParts = () => {
+    if (!message.parts?.length) return null;
+
+    return message.parts.map((part, idx) => {
+      if (part.type === "tool-calls") {
+        // Check if there's text content after this tool-calls group
+        const hasContentAfter = message.parts!
+          .slice(idx + 1)
+          .some((p) => p.type === "text" && p.content.trim());
+
+        return (
+          <ToolCallsGroup
+            key={`tc-${idx}`}
+            toolCalls={part.toolCalls}
+            isStreaming={isStreaming}
+            hasContentAfter={hasContentAfter}
+          />
+        );
+      }
+
+      // Text part — render as bubble
+      if (!part.content.trim()) return null;
+
+      // Check if this is the last text part (for streaming mode)
+      const isLastTextPart =
+        !message.parts!.slice(idx + 1).some((p) => p.type === "text");
+
+      return renderTextBubble(
+        isError
+          ? part.content.replace(ERROR_MARKER, "").trimStart()
+          : part.content,
+        isStreaming && isLastTextPart,
+        `text-${idx}`,
+      );
+    });
+  };
 
   return (
     <div
@@ -144,18 +339,15 @@ export function MessageBubble({
         </div>
       )}
 
-      {(isUser || message.content) && (
+      {/* Interleaved content: parts (text + tool-calls) or fallback */}
+      {isUser ? (
         <div
           className={cn(
             "max-w-[85%] rounded-xl px-3 py-2 text-[13px] leading-snug",
-            isUser
-              ? "bg-primary text-primary-foreground"
-              : isError
-                ? "border border-destructive/30 bg-destructive/10 text-destructive"
-                : "bg-muted text-foreground",
+            "bg-primary text-primary-foreground",
           )}
         >
-          {isUser && editing ? (
+          {editing ? (
             <div className="flex flex-col gap-2">
               <textarea
                 value={editText}
@@ -183,27 +375,16 @@ export function MessageBubble({
                 </Button>
               </div>
             </div>
-          ) : isUser ? (
-            <p className="whitespace-pre-wrap">{message.content || "\u00A0"}</p>
-          ) : isError ? (
-            <div className="flex gap-2">
-              <AlertTriangleIcon className="mt-0.75 size-3 shrink-0" />
-              <div className="min-w-0 flex-1 *:break-all">
-                <Streamdown mode="static" components={chatStreamdownComponents}>
-                  {displayContent}
-                </Streamdown>
-              </div>
-            </div>
           ) : (
-            <Streamdown
-              mode={isStreaming ? "streaming" : "static"}
-              controls={{ code: { copy: true } }}
-              components={chatStreamdownComponents}
-            >
-              {message.content}
-            </Streamdown>
+            <p className="whitespace-pre-wrap">{message.content || "\u00A0"}</p>
           )}
         </div>
+      ) : hasParts ? (
+        /* Render ordered parts: text ↔ tool-calls interleaved */
+        renderParts()
+      ) : (
+        /* Fallback: legacy messages without parts */
+        message.content && renderTextBubble(displayContent, isStreaming)
       )}
 
       {/* Message actions */}

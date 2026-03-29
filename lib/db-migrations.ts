@@ -101,4 +101,9 @@ export function registerMigrations(db: NovelStudioDB) {
       if (newExcludes.length > 0) await excludedNamesTable.bulkAdd(newExcludes);
       if (toDelete.length > 0) await nameEntries.bulkDelete(toDelete);
     });
+
+  // v6: Add novelId/chapterId to conversations for chat context awareness
+  db.version(6).stores({
+    conversations: "id, providerId, modelId, novelId, createdAt, updatedAt",
+  });
 }

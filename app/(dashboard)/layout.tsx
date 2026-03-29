@@ -3,6 +3,7 @@
 import { AppSidebar, miscNav, navConfig } from "@/components/app-sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { DictInitializer } from "@/components/dict-initializer";
+import { GlobalSearchDialog } from "@/components/global-search-dialog";
 import { NameDictPanel } from "@/components/name-dict/name-dict-panel";
 import {
   Breadcrumb,
@@ -17,8 +18,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useChatPanel } from "@/lib/stores/chat-panel";
+import { useGlobalSearch } from "@/lib/stores/global-search";
 import { useNameDictPanel } from "@/lib/stores/name-dict-panel";
-import { BookTextIcon, BotIcon, MoonIcon, SunIcon } from "lucide-react";
+import { BookTextIcon, BotIcon, MoonIcon, SearchIcon, SunIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -39,7 +41,11 @@ export default function DashboardLayout({
     pageTitle = "Soạn thảo";
   const novelIdMatch = pathname.match(/^\/novels\/([^/]+)/);
   const currentNovelId = novelIdMatch?.[1] ?? null;
+  const chapterIdMatch = pathname.match(/^\/novels\/[^/]+\/chapters\/([^/]+)/);
+  const currentChapterId = chapterIdMatch?.[1] ?? null;
   const toggleChat = useChatPanel((s) => s.toggle);
+  const setPageContext = useChatPanel((s) => s.setPageContext);
+  const toggleSearch = useGlobalSearch((s) => s.toggle);
   const nameDictToggle = useNameDictPanel((s) => s.toggle);
   const nameDictSetNovelId = useNameDictPanel((s) => s.setNovelId);
   const toggleNameDict = () => nameDictToggle(currentNovelId);
@@ -48,6 +54,23 @@ export default function DashboardLayout({
   useEffect(() => {
     nameDictSetNovelId(currentNovelId);
   }, [currentNovelId, nameDictSetNovelId]);
+
+  // Keep chat panel's page context in sync with URL
+  useEffect(() => {
+    setPageContext(currentNovelId, currentChapterId);
+  }, [currentNovelId, currentChapterId, setPageContext]);
+
+  // Global search shortcut: Cmd+K / Ctrl+K
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        toggleSearch();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleSearch]);
 
   const [dark, setDark] = useState(false);
   useEffect(() => {
@@ -82,6 +105,14 @@ export default function DashboardLayout({
             <Button
               variant="ghost"
               size="icon-sm"
+              onClick={toggleSearch}
+              title="Tìm kiếm (⌘K)"
+            >
+              <SearchIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={toggleDark}
               title="Chế độ sáng/tối"
             >
@@ -110,6 +141,7 @@ export default function DashboardLayout({
       <ChatPanel />
       <NameDictPanel />
       <DictInitializer />
+      <GlobalSearchDialog />
     </SidebarProvider>
   );
 }

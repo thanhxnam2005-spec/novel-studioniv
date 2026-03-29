@@ -65,6 +65,50 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.7.0",
+    date: "2026-03-29",
+    title: "Trợ lý AI hiểu ngữ cảnh tiểu thuyết",
+    summary:
+      "Chat AI tự động nhận biết tiểu thuyết và chương bạn đang xem, tra cứu nội dung bằng công cụ thông minh, và tìm kiếm fuzzy hỗ trợ typo tiếng Việt.",
+    changes: [
+      {
+        category: "feature",
+        description: "Chat AI tự nhận biết ngữ cảnh tiểu thuyết",
+        details:
+          "Khi mở chat trên trang tiểu thuyết hoặc chương, AI tự động đính kèm ngữ cảnh (tiêu đề, tóm tắt, danh sách nhân vật, chương hiện tại). Cuộc trò chuyện mới tự gắn tiểu thuyết đang xem. Có thể gỡ hoặc đính kèm thủ công tiểu thuyết khác.",
+        tags: ["chat", "AI", "ngữ cảnh"],
+      },
+      {
+        category: "feature",
+        description: "7 công cụ tra cứu cho AI",
+        details:
+          "AI tự quyết định khi nào cần tra cứu thêm thông tin: tổng quan tiểu thuyết, thế giới quan (phe phái, địa danh, hệ thống sức mạnh), chi tiết chương, nội dung chương, nhân vật, ghi chú, và tìm kiếm toàn văn. Hỗ trợ gọi chương theo số thứ tự thay vì UUID.",
+        tags: ["chat", "AI", "công cụ"],
+      },
+      {
+        category: "feature",
+        description: "Tìm kiếm fuzzy với MiniSearch",
+        details:
+          "Công cụ tìm kiếm nội dung sử dụng MiniSearch — hỗ trợ tìm gần đúng (fuzzy), tìm tiền tố (prefix), và chuẩn hóa Unicode NFC cho tiếng Việt. Không còn bỏ sót kết quả do khác biệt dấu hoặc typo nhẹ.",
+        tags: ["chat", "tìm kiếm"],
+      },
+      {
+        category: "feature",
+        description: "Hiển thị công cụ AI đã sử dụng trong chat",
+        details:
+          "Tin nhắn trợ lý hiển thị các công cụ đã gọi dạng collapsible xen kẽ đúng thứ tự với nội dung trả lời. Mở rộng để xem tham số và kết quả trả về của từng lần gọi.",
+        tags: ["chat", "giao diện"],
+      },
+      {
+        category: "improvement",
+        description: "Tự động mở cuộc trò chuyện gần nhất",
+        details:
+          "Khi mở bảng chat mà chưa chọn cuộc trò chuyện nào, tự động chọn cuộc trò chuyện gần nhất thay vì hiển thị màn hình trống.",
+        tags: ["chat", "trải nghiệm"],
+      },
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-03-29",
     title: "AI miễn phí trên trình duyệt với WebGPU",

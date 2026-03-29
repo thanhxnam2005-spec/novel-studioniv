@@ -40,7 +40,7 @@ import {
 import { useChapterTools } from "@/lib/stores/chapter-tools";
 import { useChatPanel } from "@/lib/stores/chat-panel";
 import { cn } from "@/lib/utils";
-import { APICallError, streamText } from "ai";
+import { APICallError, stepCountIs, streamText } from "ai";
 import {
   BotIcon,
   HistoryIcon,
@@ -55,12 +55,19 @@ import { StickToBottom } from "use-stick-to-bottom";
 import { ChatHistoryDialog } from "./chat-history-dialog";
 import { ChatSettingsDialog } from "./chat-settings-dialog";
 import { MessageBubble } from "./message-bubble";
+import { NovelAttachButton } from "./novel-attach-dialog";
+import { NovelContextBadge } from "./novel-context-badge";
 import { ScrollToBottom } from "./scroll-to-bottom";
 import { parseThinkingTags } from "./thinking-parser";
 
 export function ChatPanel() {
-  const { isOpen, close, activeConversationId, setActiveConversation } =
-    useChatPanel();
+  const {
+    isOpen,
+    close,
+    activeConversationId,
+    setActiveConversation,
+    setAttachedContext,
+  } = useChatPanel();
   const toolActive = useChapterTools((s) => s.activeMode !== null);
   const isMobile = useIsMobile();
 
@@ -82,6 +89,9 @@ export function ChatPanel() {
 
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [streamingReasoning, setStreamingReasoning] = useState<string>("");
+  const [streamingParts, setStreamingParts] = useState<
+    import("@/lib/db").MessagePart[]
+  >([]);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -89,7 +99,6 @@ export function ChatPanel() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
 
   // Auto-select first provider when none is set
   useEffect(() => {
@@ -105,7 +114,7 @@ export function ChatPanel() {
     }
   }, [models, selectedModelId]);
 
-  // Sync provider/model when user switches to a different conversation
+  // Sync provider/model and attached context when user switches conversation
   const prevConvoIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (
@@ -118,10 +127,13 @@ export function ChatPanel() {
           providerId: convo.providerId,
           modelId: convo.modelId,
         });
+        setAttachedContext(convo.novelId ?? null, convo.chapterId ?? null);
       }
+    } else if (!activeConversationId) {
+      setAttachedContext(null, null);
     }
     prevConvoIdRef.current = activeConversationId;
-  }, [activeConversationId, conversations]);
+  }, [activeConversationId, conversations, setAttachedContext]);
 
   // Focus input when panel opens
   useEffect(() => {
@@ -129,6 +141,13 @@ export function ChatPanel() {
       setTimeout(() => inputRef.current?.focus(), 200);
     }
   }, [isOpen]);
+
+  // Auto-select latest conversation when panel opens with none selected
+  useEffect(() => {
+    if (isOpen && !activeConversationId && conversations?.length) {
+      setActiveConversation(conversations[0].id);
+    }
+  }, [isOpen, activeConversationId, conversations, setActiveConversation]);
 
   // Keyboard shortcut: Cmd+. to toggle
   useEffect(() => {
@@ -152,6 +171,11 @@ export function ChatPanel() {
       abortRef.current = controller;
 
       let assistantMsgId: string | null = null;
+      let history: {
+        role: "system" | "user" | "assistant";
+        content: string;
+      }[] = [];
+      let latestStreamedContent = "";
 
       try {
         // Save user message
@@ -170,6 +194,7 @@ export function ChatPanel() {
         setStreamingMsgId(assistantMsgId);
         setStreamingContent("");
         setStreamingReasoning("");
+        setStreamingParts([]);
 
         // Build conversation history from DB
         const currentMessages = await import("@/lib/db").then((mod) =>
@@ -179,10 +204,27 @@ export function ChatPanel() {
             .sortBy("createdAt"),
         );
 
-        const history = [
+        // Build system prompt with optional novel context
+        const { attachedNovelId: ctxNovelId, attachedChapterId: ctxChapterId } =
+          useChatPanel.getState();
+        let contextEnhancedPrompt = systemPrompt;
+        if (ctxNovelId) {
+          const { buildNovelContext } = await import("@/lib/ai/novel-context");
+          const novelContext = await buildNovelContext(
+            ctxNovelId,
+            ctxChapterId,
+          );
+          if (novelContext) {
+            contextEnhancedPrompt = systemPrompt
+              ? `${systemPrompt}\n\n${novelContext}`
+              : novelContext;
+          }
+        }
+
+        history = [
           {
             role: "system" as const,
-            content: systemPrompt,
+            content: contextEnhancedPrompt,
           },
           ...currentMessages
             .filter((m) => m.id !== assistantMsgId)
@@ -192,11 +234,19 @@ export function ChatPanel() {
             })),
         ];
 
+        // Conditionally include tools when a novel is attached
+        let tools: Parameters<typeof streamText>[0]["tools"] = undefined;
+        if (ctxNovelId) {
+          const { createChatTools } = await import("@/lib/ai/chat-tools");
+          tools = createChatTools(ctxNovelId);
+        }
+
         const result = streamText({
           model: await getModel(selectedProvider, selectedModelId),
           messages: history,
           temperature,
           abortSignal: controller.signal,
+          ...(tools ? { tools, stopWhen: stepCountIs(3) } : {}),
         });
 
         let rawContent = "";
@@ -204,28 +254,122 @@ export function ChatPanel() {
         let finishReason: string | undefined;
         let streamError: unknown = null;
 
+        // Track ordered parts using parsed-content offsets.
+        // We split the parsed (thinking-stripped) content at step boundaries
+        // so parts always contain clean text. Tool calls are buffered until
+        // finish-step to avoid splitting mid-word.
+        type ToolCall = {
+          toolCallId: string;
+          toolName: string;
+          args: Record<string, unknown>;
+          result?: unknown;
+        };
+        type Part =
+          | { type: "text"; content: string }
+          | { type: "tool-calls"; toolCalls: ToolCall[] };
+        const committedParts: Part[] = [];
+        let lastCommittedParsedLen = 0;
+        let pendingToolCalls: ToolCall[] = [];
+        let lastParsedContent = "";
+
+        const buildSnapshot = (): Part[] => {
+          const snapshot: Part[] = committedParts.map((p) =>
+            p.type === "tool-calls"
+              ? { ...p, toolCalls: p.toolCalls.map((tc) => ({ ...tc })) }
+              : { ...p },
+          );
+          // Append pending tool calls (shown during tool execution)
+          if (pendingToolCalls.length > 0) {
+            snapshot.push({
+              type: "tool-calls",
+              toolCalls: pendingToolCalls.map((tc) => ({ ...tc })),
+            });
+          }
+          // Append in-progress text from the current step
+          const trailingText = lastParsedContent.slice(
+            lastCommittedParsedLen,
+          );
+          if (trailingText) {
+            snapshot.push({ type: "text", content: trailingText });
+          }
+          return snapshot;
+        };
+
+        const flushParts = () => setStreamingParts(buildSnapshot());
+
         for await (const part of result.fullStream) {
           if (part.type === "reasoning-delta") {
             apiReasoning += part.text;
-          }
-          if (part.type === "text-delta") {
+          } else if (part.type === "text-delta") {
             rawContent += part.text;
-          }
-          if (part.type === "finish-step") {
+          } else if (part.type === "tool-call") {
+            const input = "input" in part ? part.input : undefined;
+            pendingToolCalls.push({
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              args:
+                input != null && typeof input === "object"
+                  ? (input as Record<string, unknown>)
+                  : {},
+            });
+            flushParts();
+            continue;
+          } else if (part.type === "tool-result") {
+            // Update in pending or already-committed parts
+            const allToolCalls = [
+              ...pendingToolCalls,
+              ...committedParts
+                .filter(
+                  (p): p is { type: "tool-calls"; toolCalls: ToolCall[] } =>
+                    p.type === "tool-calls",
+                )
+                .flatMap((p) => p.toolCalls),
+            ];
+            const tc = allToolCalls.find(
+              (t) => t.toolCallId === part.toolCallId,
+            );
+            if (tc) {
+              tc.result = "output" in part ? part.output : undefined;
+            }
+            flushParts();
+            continue;
+          } else if (part.type === "finish-step") {
             finishReason = part.finishReason;
-          }
-          if (part.type === "error") {
+            // Commit completed step using parsed content boundaries
+            const stepText = lastParsedContent.slice(
+              lastCommittedParsedLen,
+            );
+            if (stepText) {
+              committedParts.push({ type: "text", content: stepText });
+            }
+            if (pendingToolCalls.length > 0) {
+              committedParts.push({
+                type: "tool-calls",
+                toolCalls: pendingToolCalls,
+              });
+              pendingToolCalls = [];
+            }
+            lastCommittedParsedLen = lastParsedContent.length;
+            flushParts();
+            continue;
+          } else if (part.type === "error") {
             streamError = part.error;
+            continue;
+          } else {
+            continue;
           }
 
           // Parse <think>/<thinking> tags from content stream
           const parsed = parseThinkingTags(rawContent);
+          lastParsedContent = parsed.content;
           const combinedReasoning = apiReasoning
             ? apiReasoning + (parsed.reasoning ? "\n\n" + parsed.reasoning : "")
             : parsed.reasoning;
 
           setStreamingReasoning(combinedReasoning);
           setStreamingContent(parsed.content);
+          latestStreamedContent = parsed.content;
+          flushParts();
         }
 
         // If stream emitted an error part (network failures, API errors, etc.),
@@ -284,10 +428,11 @@ export function ChatPanel() {
           }
         }
 
-        // Persist final content + reasoning
+        // Persist final content, reasoning, and ordered parts
         await updateMessage(assistantMsgId, {
           content: finalContent,
           ...(finalReasoning ? { reasoning: finalReasoning } : {}),
+          ...(committedParts.length > 0 ? { parts: committedParts } : {}),
         });
 
         return { content: finalContent, convoId };
@@ -381,7 +526,7 @@ export function ChatPanel() {
           storeErrorTrace(assistantMsgId, trace);
 
           await updateMessage(assistantMsgId, {
-            content: streamingContent || errorContent,
+            content: latestStreamedContent || errorContent,
           });
         }
       } finally {
@@ -389,16 +534,11 @@ export function ChatPanel() {
         setStreamingMsgId(null);
         setStreamingContent("");
         setStreamingReasoning("");
+        setStreamingParts([]);
         abortRef.current = null;
       }
     },
-    [
-      selectedProvider,
-      selectedModelId,
-      streamingContent,
-      systemPrompt,
-      temperature,
-    ],
+    [selectedProvider, selectedModelId, systemPrompt, temperature],
   );
 
   const handleSend = useCallback(async () => {
@@ -410,13 +550,19 @@ export function ChatPanel() {
     // Create or reuse conversation
     let convoId = activeConversationId;
     if (!convoId) {
+      const { pageNovelId, pageChapterId } = useChatPanel.getState();
       const title = text.length > 50 ? text.slice(0, 47) + "..." : text;
       convoId = await createConversation({
         title,
         providerId: selectedProviderId,
         modelId: selectedModelId,
+        novelId: pageNovelId ?? undefined,
+        chapterId: pageNovelId ? (pageChapterId ?? undefined) : undefined,
       });
       setActiveConversation(convoId);
+      if (pageNovelId) {
+        setAttachedContext(pageNovelId, pageChapterId);
+      }
     }
 
     const result = await sendAndStream(convoId, text);
@@ -439,6 +585,7 @@ export function ChatPanel() {
     selectedModelId,
     activeConversationId,
     setActiveConversation,
+    setAttachedContext,
     sendAndStream,
   ]);
 
@@ -489,6 +636,9 @@ export function ChatPanel() {
           ...m,
           ...(streamingContent ? { content: streamingContent } : {}),
           ...(streamingReasoning ? { reasoning: streamingReasoning } : {}),
+          ...(streamingParts.length > 0
+            ? { parts: streamingParts }
+            : {}),
         }
       : m,
   );
@@ -531,6 +681,8 @@ export function ChatPanel() {
           </Button>
         </div>
       </div>
+
+      <NovelContextBadge />
 
       {historyOpen && (
         <ChatHistoryDialog
@@ -621,12 +773,15 @@ export function ChatPanel() {
                 />
               ))
           )}
-          {isStreaming && !streamingContent && !streamingReasoning && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <LoaderIcon className="size-3 animate-spin" />
-              Đang suy nghĩ...
-            </div>
-          )}
+          {isStreaming &&
+            !streamingContent &&
+            !streamingReasoning &&
+            streamingParts.length === 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground px-2">
+                <LoaderIcon className="size-3 animate-spin" />
+                Đang kết nối...
+              </div>
+            )}
         </StickToBottom.Content>
         <ScrollToBottom />
       </StickToBottom>
@@ -669,22 +824,25 @@ export function ChatPanel() {
           )}
         </div>
         <div className="mt-1.5 flex items-center justify-between">
-          <NativeSelect
-            size="sm"
-            className="max-w-[160px] *:text-[11px]!"
-            value={selectedModelId}
-            onChange={(e) => updateChatSettings({ modelId: e.target.value })}
-            disabled={!hasModels || isStreaming}
-          >
-            {!hasModels && (
-              <NativeSelectOption value="">Không có model</NativeSelectOption>
-            )}
-            {models?.map((m) => (
-              <NativeSelectOption key={m.id} value={m.modelId}>
-                {m.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <div className="flex items-center gap-1">
+            <NativeSelect
+              size="sm"
+              className="max-w-[160px] *:text-[11px]!"
+              value={selectedModelId}
+              onChange={(e) => updateChatSettings({ modelId: e.target.value })}
+              disabled={!hasModels || isStreaming}
+            >
+              {!hasModels && (
+                <NativeSelectOption value="">Không có model</NativeSelectOption>
+              )}
+              {models?.map((m) => (
+                <NativeSelectOption key={m.id} value={m.modelId}>
+                  {m.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <NovelAttachButton />
+          </div>
           <span className="text-[10px] text-muted-foreground/60">
             <kbd className="font-mono">Shift+Enter</kbd> dòng mới
           </span>
