@@ -10,6 +10,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -22,12 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { db } from "@/lib/db";
 import { useNovels } from "@/lib/hooks";
 import { getAdapters } from "@/lib/scraper/adapters";
@@ -77,6 +79,20 @@ function countWords(text: string): number {
 function stripHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   return doc.body.textContent ?? "";
+}
+
+const REQUIRED_EXTENSION_VERSION: string =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("@/extension/manifest.json").version;
+
+function isVersionOutdated(current: string | null, required: string): boolean {
+  if (!current) return false; // can't tell → don't warn
+  const parse = (v: string) => v.split(".").map(Number);
+  const [ca, cb, cc] = parse(current);
+  const [ra, rb, rc] = parse(required);
+  if (ca !== ra) return ca < ra;
+  if (cb !== rb) return cb < rb;
+  return cc < rc;
 }
 
 // ─── Steps ─────────────────────────────────────────────────
@@ -141,7 +157,9 @@ export default function ScraperPage() {
                 <s.icon
                   className={`size-3.5 shrink-0 sm:size-3 ${i === stepIndex && s.key === "scraping" ? "animate-spin" : ""}`}
                 />
-                <span className={i === stepIndex ? "sm:inline" : "hidden sm:inline"}>
+                <span
+                  className={i === stepIndex ? "sm:inline" : "hidden sm:inline"}
+                >
                   {s.label}
                 </span>
               </button>
@@ -166,6 +184,7 @@ function UrlStep() {
     setUrl,
     adapter,
     extensionAvailable,
+    extensionVersion,
     isLoading,
     error,
     fetchNovelInfo,
@@ -201,26 +220,58 @@ function UrlStep() {
       <CardContent className="space-y-4">
         {/* Extension config — collapsible when connected */}
         {extensionAvailable ? (
-          <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 dark:bg-green-950/20">
-            <div className="flex items-center gap-2 text-sm">
-              <CircleDotIcon className="size-3.5 text-green-500" />
-              <span className="text-green-700 dark:text-green-400">
-                Connector đã kết nối
-              </span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 text-sm">
+                <CircleDotIcon className="size-3.5 text-green-500" />
+                <span className="text-green-700 dark:text-green-400">
+                  Connector đã kết nối
+                </span>
+                {extensionVersion && (
+                  <Badge
+                    variant="outline"
+                    className="ml-1 text-green-700 dark:text-green-400 border-green-500/30 bg-green-50 dark:bg-green-950/20"
+                  >
+                    v{extensionVersion}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>Timeout:</span>
+                <Input
+                  type="number"
+                  value={timeout}
+                  onChange={(e) => handleTimeoutChange(e.target.value)}
+                  onBlur={handleTimeoutBlur}
+                  className="h-6 w-14 text-center text-xs"
+                  min={5}
+                  max={60}
+                />
+                <span>s</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>Timeout:</span>
-              <Input
-                type="number"
-                value={timeout}
-                onChange={(e) => handleTimeoutChange(e.target.value)}
-                onBlur={handleTimeoutBlur}
-                className="h-6 w-14 text-center text-xs"
-                min={5}
-                max={60}
-              />
-              <span>s</span>
-            </div>
+            {isVersionOutdated(
+              extensionVersion,
+              REQUIRED_EXTENSION_VERSION,
+            ) && (
+              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/20">
+                <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangleIcon className="size-3.5 shrink-0" />
+                  <span>
+                    Phiên bản cũ (v{extensionVersion}). Cần cập nhật lên v
+                    {REQUIRED_EXTENSION_VERSION}.
+                  </span>
+                </div>
+                <a
+                  href="/novel-studio-connector.zip"
+                  download
+                  className="shrink-0 rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+                >
+                  <DownloadIcon className="mr-1 inline size-3" />
+                  Tải bản mới
+                </a>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -244,7 +295,7 @@ function UrlStep() {
                   size="sm"
                   onClick={handleSaveExtId}
                   disabled={!extId.trim()}
-                  className="shrink-0"
+                  className="shrink-0 h-8"
                 >
                   Kết nối
                 </Button>
@@ -562,9 +613,7 @@ function ScrapingStep() {
                 <div
                   key={i}
                   className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs ${
-                    ch.warning
-                      ? "bg-amber-50/50 dark:bg-amber-950/10"
-                      : ""
+                    ch.warning ? "bg-amber-50/50 dark:bg-amber-950/10" : ""
                   }`}
                 >
                   <span className="w-5 shrink-0 text-right tabular-nums text-muted-foreground/40">
@@ -627,7 +676,8 @@ function ScrapingStep() {
 // ─── Step 4: Preview ───────────────────────────────────────
 
 function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
-  const { novelInfo, scrapedChapters, url, reset } = useScraperStore();
+  const { novelInfo, scrapedChapters, retryingIndex, url, reset } =
+    useScraperStore();
   const novels = useNovels();
 
   const [mode, setMode] = useState<"new" | "existing">("new");
@@ -881,15 +931,23 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
                             <AlertTriangleIcon className="size-2.5" />
                             Nội dung ngắn
                           </span>
-                          <button
-                            onClick={() =>
-                              useScraperStore.getState().retryScrapeChapter(i)
-                            }
-                            className="flex items-center gap-0.5 text-[10px] text-primary hover:underline"
-                          >
-                            <RefreshCwIcon className="size-2.5" />
-                            Thử lại
-                          </button>
+                          {retryingIndex === i ? (
+                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                              <LoaderIcon className="size-2.5 animate-spin" />
+                              Đang thử lại...
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                useScraperStore.getState().retryScrapeChapter(i)
+                              }
+                              disabled={retryingIndex !== null}
+                              className="flex items-center gap-0.5 text-[10px] text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+                            >
+                              <RefreshCwIcon className="size-2.5" />
+                              Thử lại
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -928,10 +986,44 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
 
 // ─── Debug Toolbar (compact icon strip) ────────────────────
 
+function LogData({ data }: { data: string }) {
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    // not JSON
+  }
+
+  if (parsed && typeof parsed === "object") {
+    return (
+      <div className="mt-0.5 max-h-[140px] overflow-auto rounded bg-muted/60 px-2 py-1.5 text-[10px] leading-relaxed text-muted-foreground">
+        {Object.entries(parsed as Record<string, unknown>).map(
+          ([key, value]) => (
+            <div key={key} className="flex gap-1.5">
+              <span className="shrink-0 font-medium text-foreground/70">
+                {key}:
+              </span>
+              <span className="min-w-0 whitespace-pre-wrap break-all">
+                {typeof value === "object" && value !== null
+                  ? JSON.stringify(value)
+                  : String(value ?? "—")}
+              </span>
+            </div>
+          ),
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <pre className="mt-0.5 max-h-[140px] overflow-auto rounded bg-muted/60 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
+      {data}
+    </pre>
+  );
+}
+
 function DebugToolbar() {
   const { debugLogs, clearDebugLogs } = useScraperStore();
-  const [open, setOpen] = useState(false);
-
   const logCount = debugLogs.length;
 
   const copyAll = () => {
@@ -942,106 +1034,78 @@ function DebugToolbar() {
     toast.success("Đã copy debug logs");
   };
 
+  if (logCount === 0) return null;
+
   return (
-    <TooltipProvider>
-      <div className="flex items-center gap-0.5">
-        {logCount > 0 && (
-          <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setOpen(!open)}
-                  className={`relative flex size-7 items-center justify-center rounded-md transition-colors ${
-                    open
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <TerminalIcon className="size-3.5" />
-                  <span className="absolute -right-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white">
-                    {logCount > 9 ? "9+" : logCount}
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Debug logs</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={copyAll}
-                  className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <ClipboardCopyIcon className="size-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Copy tất cả logs</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    clearDebugLogs();
-                    setOpen(false);
-                  }}
-                  className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Trash2Icon className="size-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Xóa logs</TooltipContent>
-            </Tooltip>
-          </>
-        )}
-      </div>
-
-      {/* Floating debug panel */}
-      {open && logCount > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 backdrop-blur-sm">
-          <div className="mx-auto max-w-4xl px-6">
-            <div className="flex items-center justify-between py-2">
-              <span className="text-xs font-medium text-muted-foreground">
-                Debug Logs ({logCount})
-              </span>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </div>
-            <ScrollArea className="h-[240px] pb-3">
-              <div className="space-y-2">
-                {debugLogs.map((log, i) => (
-                  <div key={i}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] tabular-nums text-muted-foreground/50">
-                        {log.timestamp}
-                      </span>
-                      <span className="text-[11px] font-medium">
-                        {log.label}
-                      </span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(log.data);
-                          toast.success(`Copied`);
-                        }}
-                        className="ml-auto text-[10px] text-muted-foreground/40 hover:text-foreground"
-                      >
-                        copy
-                      </button>
-                    </div>
-                    <pre className="mt-0.5 max-h-[140px] overflow-auto rounded bg-muted/60 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground">
-                      {log.data}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+    <Drawer>
+      <DrawerTrigger asChild>
+        <button className="relative flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          <TerminalIcon className="size-3.5" />
+          <span className="absolute -right-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white">
+            {logCount > 9 ? "9+" : logCount}
+          </span>
+        </button>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader className="flex flex-row items-center justify-between gap-2 pb-2 pt-0 w-5xl max-w-[95vw] mx-auto">
+          <div className="flex items-center gap-2">
+            <DrawerTitle className="text-sm">Debug Logs</DrawerTitle>
+            <Badge
+              variant="default"
+              className="gap-1 border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+            >
+              {logCount} log{logCount !== 1 ? "s" : ""}
+            </Badge>
           </div>
-        </div>
-      )}
-    </TooltipProvider>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={copyAll}
+              title="Copy tất cả"
+            >
+              <ClipboardCopyIcon className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={clearDebugLogs}
+              title="Xóa logs"
+            >
+              <Trash2Icon className="size-3.5" />
+            </Button>
+            <DrawerClose asChild>
+              <Button variant="ghost" size="icon-sm">
+                <XIcon className="size-3.5" />
+              </Button>
+            </DrawerClose>
+          </div>
+        </DrawerHeader>
+        <ScrollArea className="h-[40vh] px-4 pb-4 w-5xl max-w-[95vw] mx-auto">
+          <div className="space-y-2">
+            {debugLogs.map((log, i) => (
+              <div key={i}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] tabular-nums text-muted-foreground/50">
+                    {log.timestamp}
+                  </span>
+                  <span className="text-[11px] font-medium">{log.label}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(log.data);
+                      toast.success("Copied");
+                    }}
+                    className="ml-auto text-[10px] text-muted-foreground/40 hover:text-foreground"
+                  >
+                    copy
+                  </button>
+                </div>
+                <LogData data={log.data} />
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </DrawerContent>
+    </Drawer>
   );
 }

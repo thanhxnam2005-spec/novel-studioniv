@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { detectAdapter } from "../scraper/adapters";
 import { scrapeChapters } from "../scraper/engine";
-import { extensionFetch, isExtensionAvailable } from "../scraper/extension-bridge";
+import { extensionFetch, checkExtensionStatus } from "../scraper/extension-bridge";
 import type {
   ChapterContent,
   NovelInfo,
@@ -21,6 +21,7 @@ interface ScraperState {
   url: string;
   adapter: SiteAdapter | null;
   extensionAvailable: boolean | null;
+  extensionVersion: string | null;
   novelInfo: NovelInfo | null;
   selectedChapterUrls: Set<string>;
   scrapedChapters: ChapterContent[];
@@ -28,6 +29,7 @@ interface ScraperState {
   isLoading: boolean;
   error: string | null;
   abortController: AbortController | null;
+  retryingIndex: number | null;
   debugLogs: DebugLog[];
 
   // Actions
@@ -51,6 +53,7 @@ const initialState = {
   url: "",
   adapter: null as SiteAdapter | null,
   extensionAvailable: null as boolean | null,
+  extensionVersion: null as string | null,
   novelInfo: null as NovelInfo | null,
   selectedChapterUrls: new Set<string>(),
   scrapedChapters: [] as ChapterContent[],
@@ -58,6 +61,7 @@ const initialState = {
   isLoading: false,
   error: null as string | null,
   abortController: null as AbortController | null,
+  retryingIndex: null as number | null,
   debugLogs: [] as DebugLog[],
 };
 
@@ -86,8 +90,8 @@ export const useScraperStore = create<ScraperState>((set, get) => ({
   },
 
   checkExtension: async () => {
-    const available = await isExtensionAvailable();
-    set({ extensionAvailable: available });
+    const { available, version } = await checkExtensionStatus();
+    set({ extensionAvailable: available, extensionVersion: version });
   },
 
   fetchNovelInfo: async () => {
@@ -215,12 +219,12 @@ export const useScraperStore = create<ScraperState>((set, get) => ({
     const { novelInfo, scrapedChapters, adapter } = get();
     if (!novelInfo || !adapter) return;
 
-    // Find the original chapter link by matching index to selected chapters
     const selectedUrls = get().selectedChapterUrls;
     const selectedChapters = novelInfo.chapters.filter((ch) => selectedUrls.has(ch.url));
     const chapterLink = selectedChapters[index];
     if (!chapterLink) return;
 
+    set({ retryingIndex: index });
     addLog(`Retry: ${chapterLink.title}`, "Re-scraping...");
     try {
       const { html, contentText } = await extensionFetch(
@@ -234,12 +238,13 @@ export const useScraperStore = create<ScraperState>((set, get) => ({
       }
       const updated = [...scrapedChapters];
       updated[index] = content;
-      set({ scrapedChapters: updated });
+      set({ scrapedChapters: updated, retryingIndex: null });
       addLog(`Retry: ${chapterLink.title}`, {
         len: content.content.length,
         warning: content.warning || null,
       });
     } catch (err) {
+      set({ retryingIndex: null });
       addLog(`Retry failed: ${chapterLink.title}`, err instanceof Error ? err.message : String(err));
     }
   },

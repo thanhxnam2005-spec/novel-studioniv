@@ -112,9 +112,13 @@ export async function extensionFetch(
 
 /**
  * Check if the extension is installed and responsive.
+ * Returns the version string if available, or null if not connected.
  */
-export async function isExtensionAvailable(): Promise<boolean> {
-  if (!getExtensionId()) return false;
+export async function checkExtensionStatus(): Promise<{
+  available: boolean;
+  version: string | null;
+}> {
+  if (!getExtensionId()) return { available: false, version: null };
 
   try {
     const response = await Promise.race([
@@ -123,8 +127,19 @@ export async function isExtensionAvailable(): Promise<boolean> {
         setTimeout(() => reject(new Error("Timeout")), 1500),
       ),
     ]);
-    return response.ok === true;
+    return {
+      available: response.ok === true,
+      version: response.version ?? null,
+    };
   } catch {
-    return false;
+    return { available: false, version: null };
   }
+}
+
+/**
+ * @deprecated Use checkExtensionStatus instead
+ */
+export async function isExtensionAvailable(): Promise<boolean> {
+  const { available } = await checkExtensionStatus();
+  return available;
 }
