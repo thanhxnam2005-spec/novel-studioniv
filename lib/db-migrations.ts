@@ -106,4 +106,10 @@ export function registerMigrations(db: NovelStudioDB) {
   db.version(6).stores({
     conversations: "id, providerId, modelId, novelId, createdAt, updatedAt",
   });
+
+  // v7: Add nameFrequency table for cross-chapter name detection tracking
+  db.version(7).stores({
+    nameFrequency:
+      "id, novelId, chinese, status, [novelId+chinese], [novelId+status]",
+  });
 }

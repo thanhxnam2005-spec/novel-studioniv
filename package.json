@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "zip:ext": "zip -j public/novel-studio-connector.zip extension/manifest.json extension/background.js"
+    "zip:ext": "zip -j public/novel-studio-connector.zip extension/manifest.json extension/background.js",
+    "postinstall": "mkdir -p public/wasm && cp node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm public/wasm/ 2>/dev/null || true"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
@@ -34,6 +35,7 @@
     "dompurify": "^3.3.3",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "jieba-wasm": "^2.4.0",
     "lucide-react": "^1.0.1",
     "minisearch": "^7.2.0",
     "motion": "^12.38.0",

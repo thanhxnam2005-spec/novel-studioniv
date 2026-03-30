@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# wasm build artifacts
+public/wasm
+.claude/local
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

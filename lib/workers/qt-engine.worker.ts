@@ -13,6 +13,8 @@ import {
   CAP_PASSTHROUGH,
   CAP_TRIGGERS,
   COMPOUND_SURNAMES,
+  DIALOGUE_CLOSE,
+  DIALOGUE_OPEN,
   DIGIT_LEADING,
   DIGIT_TRAILING,
   WORD_CHAR_LEADING,
@@ -28,6 +30,13 @@ import {
   SINGLE_SURNAMES,
   normalizeFullwidthPunct,
 } from "./qt-engine.constants";
+import {
+  enrichSegmentsWithPOS,
+  initPOSTagger,
+  isPOSReady,
+} from "./pos-tagger";
+import { buildRuleIndex, applyGrammarRules } from "./grammar-engine";
+import { ALL_GRAMMAR_RULES } from "./grammar-rules";
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -58,6 +67,30 @@ function capitalizeFirst(str: string): string {
   return str;
 }
 
+// ─── First-char indexed dictionary ──────────────────────────
+
+interface CharBucket {
+  entries: Map<string, string>;
+  maxleng: number;
+}
+
+type IndexedDict = Map<string, CharBucket>;
+
+function buildIndexedDict(source: Map<string, string>): IndexedDict {
+  const indexed: IndexedDict = new Map();
+  for (const [key, value] of source) {
+    const fc = key[0];
+    let bucket = indexed.get(fc);
+    if (!bucket) {
+      bucket = { entries: new Map(), maxleng: 0 };
+      indexed.set(fc, bucket);
+    }
+    bucket.entries.set(key, value);
+    if (key.length > bucket.maxleng) bucket.maxleng = key.length;
+  }
+  return indexed;
+}
+
 // ─── State ───────────────────────────────────────────────────
 
 let namesMap: Map<string, string>;
@@ -71,6 +104,7 @@ let luatNhanPatterns: Array<{
 let luatNhanPrefixIndex: Map<string, number[]>;
 let maxKeyLength = 0;
 let maxNameLength = 0;
+const grammarRuleIndex = buildRuleIndex(ALL_GRAMMAR_RULES);
 
 // ─── Init ────────────────────────────────────────────────────
 
@@ -319,39 +353,33 @@ function convert(
   // Insert auto-detected names into priority chain
   if (autoDetected) {
     if (o.nameVsPriority === "name-first") {
-      // [novel, global, qt, AUTO, vp] — insert before last (VP)
       priorityMaps.splice(priorityMaps.length - 1, 0, [
         "auto-name",
         autoDetected,
       ]);
     } else {
-      // [vp, novel, global, qt] → append auto after all
       priorityMaps.push(["auto-name", autoDetected]);
     }
-    // Also add to allNames for LuatNhan matching
     for (const [k, v] of autoDetected) allNames.set(k, v);
   }
 
-  let effectiveMaxKey = Math.min(maxKeyLength, o.maxPhraseLength);
+  // Build first-char indexed versions of priority maps
+  type IndexedPriorityEntry = [ConvertSource, IndexedDict];
+  const indexedPriorityMaps: IndexedPriorityEntry[] = priorityMaps.map(
+    ([source, map]) => [source, buildIndexedDict(map)],
+  );
+
+  // Compute effectiveMaxName for LuatNhan (still needs global scan)
   let effectiveMaxName = maxNameLength;
   if (novelNamesMap)
-    for (const k of novelNamesMap.keys()) {
-      if (k.length > effectiveMaxKey)
-        effectiveMaxKey = Math.min(k.length, o.maxPhraseLength);
+    for (const k of novelNamesMap.keys())
       if (k.length > effectiveMaxName) effectiveMaxName = k.length;
-    }
   if (globalNamesMap)
-    for (const k of globalNamesMap.keys()) {
-      if (k.length > effectiveMaxKey)
-        effectiveMaxKey = Math.min(k.length, o.maxPhraseLength);
+    for (const k of globalNamesMap.keys())
       if (k.length > effectiveMaxName) effectiveMaxName = k.length;
-    }
   if (autoDetected)
-    for (const k of autoDetected.keys()) {
-      if (k.length > effectiveMaxKey)
-        effectiveMaxKey = Math.min(k.length, o.maxPhraseLength);
+    for (const k of autoDetected.keys())
       if (k.length > effectiveMaxName) effectiveMaxName = k.length;
-    }
 
   const segments: ConvertSegment[] = [];
   let i = 0;
@@ -401,14 +429,24 @@ function convert(
       }
     }
 
-    // 2. Priority Maps (longest match first)
+    // 2. Priority Maps — first-char indexed longest match
     if (!matched) {
-      const maxLen = Math.min(effectiveMaxKey, text.length - i);
-      for (let j = maxLen; j >= 1; j--) {
-        const sub = text.slice(i, i + j);
-        for (const [source, map] of priorityMaps) {
-          if (map.has(sub)) {
-            segments.push({ original: sub, translated: map.get(sub)!, source });
+      for (const [source, indexed] of indexedPriorityMaps) {
+        const bucket = indexed.get(text[i]);
+        if (!bucket) continue;
+        const maxLen = Math.min(
+          bucket.maxleng,
+          text.length - i,
+          o.maxPhraseLength,
+        );
+        for (let j = maxLen; j >= 1; j--) {
+          const sub = text.slice(i, i + j);
+          if (bucket.entries.has(sub)) {
+            segments.push({
+              original: sub,
+              translated: bucket.entries.get(sub)!,
+              source,
+            });
             i += j;
             matched = true;
             break;
@@ -434,6 +472,15 @@ function convert(
     }
   }
 
+  // Post-processing pipeline
+  markDialogue(segments);
+  if (o.posTaggingEnabled && isPOSReady()) {
+    enrichSegmentsWithPOS(segments, text);
+  }
+  if (o.grammarRulesEnabled) {
+    applyGrammarRules(segments, grammarRuleIndex);
+  }
+
   if (autoDetected?.size) capitalizeDetectedNames(segments, autoDetected);
   capitalizeNameAdjacent(segments);
   capitalizeSentences(segments);
@@ -447,6 +494,29 @@ function convert(
     }));
   }
   return result;
+}
+
+// ─── Dialogue detection ─────────────────────────────────────
+
+function markDialogue(segments: ConvertSegment[]): void {
+  let inside = false;
+  for (const seg of segments) {
+    const text = seg.source === "unknown" ? seg.original : seg.translated;
+    const trimmed = text.trim();
+    if (DIALOGUE_OPEN.has(trimmed)) {
+      inside = true;
+      seg.inDialogue = true;
+      continue;
+    }
+    if (DIALOGUE_CLOSE.has(trimmed)) {
+      seg.inDialogue = true;
+      inside = false;
+      continue;
+    }
+    if (inside) {
+      seg.inDialogue = true;
+    }
+  }
 }
 
 // ─── Post-processing ─────────────────────────────────────────
@@ -597,7 +667,11 @@ function segmentsToPlainText(segments: ConvertSegment[]): string {
     parts.push(text);
   }
 
-  return parts.join("").replace(/ {2,}/g, " ");
+  return parts
+    .join("")
+    .replace(/ {2,}/g, " ")
+    .replace(/\n /g, "\n")
+    .replace(/\.{4,}/g, "...");
 }
 
 // ─── Message Handler ─────────────────────────────────────────
@@ -614,6 +688,10 @@ self.onmessage = (event: MessageEvent<QTWorkerRequest>) => {
       try {
         initDicts(msg.dictData);
         post({ type: "ready" });
+        // Start POS tagger init in background (non-blocking)
+        initPOSTagger().catch((err) =>
+          console.warn("POS tagger init failed:", err),
+        );
       } catch (err) {
         post({
           type: "error",

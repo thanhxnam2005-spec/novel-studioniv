@@ -295,6 +295,23 @@ export interface DictCache {
   rawText: string;
 }
 
+// ─── Name Frequency Tracking ────────────────────────────────
+
+export type NameFrequencyStatus = "pending" | "approved" | "rejected";
+
+export interface NameFrequency {
+  id: string;
+  novelId: string;
+  chinese: string;
+  reading: string;
+  count: number;
+  chapters: string[];
+  surnameType: "compound" | "single" | "rare";
+  status: NameFrequencyStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // ─── Convert Settings ────────────────────────────────────────
 
 export type { ConvertOptions } from "@/lib/workers/qt-engine.types";
@@ -332,6 +349,7 @@ export class NovelStudioDB extends Dexie {
   dictMeta!: EntityTable<DictMeta, "id">;
   dictCache!: EntityTable<DictCache, "source">;
   convertSettings!: EntityTable<ConvertSettings, "id">;
+  nameFrequency!: EntityTable<NameFrequency, "id">;
 
   constructor() {
     super("novel-studio");
