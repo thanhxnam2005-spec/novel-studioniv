@@ -353,7 +353,7 @@ function UrlStep() {
             <div className="mt-1.5 flex gap-2">
               <Input
                 id="novel-url"
-                placeholder="https://sangtacviet.app/truyen/..."
+                placeholder="https://domain.com/truyen/..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => {

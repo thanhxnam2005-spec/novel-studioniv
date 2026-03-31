@@ -214,8 +214,11 @@ export function NameDictPanel() {
       <header className="flex h-12 shrink-0 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2">
           <BookTextIcon className="size-4" />
-          <h3 className="text-sm font-medium">Từ điển tên</h3>
-          <Badge variant="outline" className="text-xs">
+          <h3 className="text-sm font-medium no-wrap">Từ điển tên</h3>
+          <Badge
+            variant="outline"
+            className="text-xs max-w-[220px] line-clamp-1"
+          >
             {novel ? novel.title : "Chung"}
           </Badge>
         </div>

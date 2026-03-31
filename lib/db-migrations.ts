@@ -112,4 +112,9 @@ export function registerMigrations(db: NovelStudioDB) {
     nameFrequency:
       "id, novelId, chinese, status, [novelId+chinese], [novelId+status]",
   });
+
+  // v8: Add ttsSettings table for TTS configuration persistence
+  db.version(8).stores({
+    ttsSettings: "id",
+  });
 }

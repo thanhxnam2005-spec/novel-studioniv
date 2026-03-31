@@ -330,6 +330,17 @@ export interface ConvertSettings {
 
 // ─── Database ────────────────────────────────────────────────
 
+export interface TTSSettings {
+  id: "default";
+  providerId: string;
+  voiceId: string;
+  rate: number;
+  pitch: number;
+  highlightColor: string;
+  fluencyAdjust: number;
+  providerApiKeys?: Record<string, string>;
+}
+
 export class NovelStudioDB extends Dexie {
   novels!: EntityTable<Novel, "id">;
   chapters!: EntityTable<Chapter, "id">;
@@ -350,6 +361,7 @@ export class NovelStudioDB extends Dexie {
   dictCache!: EntityTable<DictCache, "source">;
   convertSettings!: EntityTable<ConvertSettings, "id">;
   nameFrequency!: EntityTable<NameFrequency, "id">;
+  ttsSettings!: EntityTable<TTSSettings, "id">;
 
   constructor() {
     super("novel-studio");

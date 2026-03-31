@@ -1,7 +1,7 @@
 import type { SiteAdapter } from "../types";
-import { sangtacvietAdapter } from "./sangtacviet";
+import { STVAdapter } from "./STV";
 
-const adapters: SiteAdapter[] = [sangtacvietAdapter];
+const adapters: SiteAdapter[] = [STVAdapter];
 
 /** Find the adapter that matches the given URL, or null. */
 export function detectAdapter(url: string): SiteAdapter | null {
@@ -13,4 +13,4 @@ export function getAdapters(): SiteAdapter[] {
   return adapters;
 }
 
-export { sangtacvietAdapter };
+export { STVAdapter };

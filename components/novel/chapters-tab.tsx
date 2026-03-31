@@ -271,9 +271,12 @@ export function ChaptersTab({
               <div key={ch.id} className="rounded-lg border">
                 {/* Mobile: two-line layout */}
                 <div className="sm:hidden">
-                  <button
-                    className="flex w-full items-center gap-2 px-3 pt-2 pb-1 text-left"
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="flex w-full cursor-pointer items-center gap-2 px-3 pt-2 pb-1 text-left"
                     onClick={() => setExpandedId(isExpanded ? null : ch.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(isExpanded ? null : ch.id); } }}
                   >
                     <Checkbox
                       checked={selected.has(ch.id)}
@@ -292,7 +295,7 @@ export function ChaptersTab({
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {ch.title}
                     </span>
-                  </button>
+                  </div>
                   <div className="flex items-center gap-1 px-3 pb-1.5 pl-[3.75rem]">
                     <span className="text-xs text-muted-foreground">
                       {(wordCounts.get(ch.id) ?? 0).toLocaleString()} từ

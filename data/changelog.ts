@@ -65,6 +65,43 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.9.0",
+    date: "2026-03-31",
+    title: "Đọc truyện bằng giọng nói",
+    summary:
+      "Nghe đọc truyện ngay trong trang đọc với 6 nhà cung cấp giọng nói, tự động đánh dấu câu đang đọc, và lưu cài đặt giọng đọc yêu thích.",
+    changes: [
+      {
+        category: "feature",
+        description: "Text-to-Speech — nghe đọc truyện",
+        details:
+          "Nhấn nút loa trên trang đọc truyện để mở bảng điều khiển. Chọn nhà cung cấp và giọng đọc, nhấn Phát để nghe từng câu. Câu đang đọc được làm nổi bật và tự cuộn theo. Có thể nhấn vào bất kỳ câu nào để nhảy tới.",
+        tags: ["đọc truyện", "giọng nói"],
+      },
+      {
+        category: "feature",
+        description: "6 nhà cung cấp giọng đọc",
+        details:
+          "Hỗ trợ Bing (Hoài My, Nam Minh và giọng đa ngôn ngữ), Google Cloud (6 giọng Việt), Google Translate, TikTok, Gemini (cần API key), và giọng trình duyệt. Mỗi nhà cung cấp có bộ giọng riêng để lựa chọn.",
+        tags: ["đọc truyện", "giọng nói"],
+      },
+      {
+        category: "feature",
+        description: "Điều chỉnh tốc độ, cao độ và ngữ cảnh",
+        details:
+          "Tùy chỉnh tốc độ đọc, cao độ giọng nói, và mức điều chỉnh theo ngữ cảnh — lời thoại nhân vật, câu cảm thán, hiệu ứng âm thanh sẽ được đọc với giọng điệu khác nhau. Chọn màu làm nổi bật câu đang đọc.",
+        tags: ["đọc truyện", "tùy chỉnh"],
+      },
+      {
+        category: "feature",
+        description: "Cài đặt giọng đọc được lưu vĩnh viễn",
+        details:
+          "Nhà cung cấp, giọng đọc, tốc độ, cao độ và API key được lưu trong cơ sở dữ liệu. Mở lại ứng dụng vẫn giữ nguyên cài đặt.",
+        tags: ["đọc truyện", "cài đặt"],
+      },
+    ],
+  },
+  {
     version: "0.8.1",
     date: "2026-03-30",
     title: "Phân tích thông minh & Giao diện di động",

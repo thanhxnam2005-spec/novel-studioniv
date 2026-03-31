@@ -1,7 +1,7 @@
 import type { SiteAdapter } from "../types";
 
 /**
- * Adapter for sangtacviet.app
+ * Adapter for stv
  *
  * Novel page structure:
  * - `bookinfo` JS variable contains novel metadata (id, host, name, namevi, thumb, author)
@@ -12,8 +12,8 @@ import type { SiteAdapter } from "../types";
  * Chapter page:
  * - Content loaded via JS into #contentbox or similar container
  */
-export const sangtacvietAdapter: SiteAdapter = {
-  name: "Sáng Tác Việt",
+export const STVAdapter: SiteAdapter = {
+  name: "STV",
   urlPattern: /sangtacviet\.\w+/,
   chapterWaitSelector: "#content-container .contentbox",
   chapterClickSelector: "#content-container .contentbox",
@@ -27,7 +27,10 @@ export const sangtacvietAdapter: SiteAdapter = {
     // Title: from bookinfo.namevi or <title> tag
     const title =
       bookinfo?.namevi?.trim() ||
-      doc.querySelector("title")?.textContent?.replace(/ - \d+ chương$/, "").trim() ||
+      doc
+        .querySelector("title")
+        ?.textContent?.replace(/ - \d+ chương$/, "")
+        .trim() ||
       "";
 
     const author = bookinfo?.author ?? undefined;
@@ -59,9 +62,13 @@ export const sangtacvietAdapter: SiteAdapter = {
   },
 
   getChapterContent(html, _url, contentText) {
-    const chapterTitle = extractChapterTitle(html) ??
-      new DOMParser().parseFromString(html, "text/html")
-        .querySelector("title")?.textContent?.trim() ?? "";
+    const chapterTitle =
+      extractChapterTitle(html) ??
+      new DOMParser()
+        .parseFromString(html, "text/html")
+        .querySelector("title")
+        ?.textContent?.trim() ??
+      "";
 
     // Prefer contentText (innerText from live DOM — bypasses CSS font obfuscation)
     const rawText = contentText ?? "";
@@ -113,8 +120,6 @@ function extractBookInfo(html: string): BookInfo | null {
 
 /**
  * Extract base URL for chapter construction.
- * Input:  https://sangtacviet.app/truyen/faloo/1/1519683/
- * Output: https://sangtacviet.app/truyen/faloo/1/1519683/
  * (ensures trailing slash)
  */
 function extractBaseUrl(url: string): string {

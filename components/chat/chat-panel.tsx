@@ -39,6 +39,7 @@ import {
 } from "@/lib/hooks";
 import { useChapterTools } from "@/lib/stores/chapter-tools";
 import { useChatPanel } from "@/lib/stores/chat-panel";
+import { useReaderPanel } from "@/lib/stores/reader-panel";
 import { cn } from "@/lib/utils";
 import { APICallError, stepCountIs, streamText } from "ai";
 import {
@@ -68,7 +69,9 @@ export function ChatPanel() {
     setActiveConversation,
     setAttachedContext,
   } = useChatPanel();
-  const toolActive = useChapterTools((s) => s.activeMode !== null);
+  const chapterToolActive = useChapterTools((s) => s.activeMode !== null);
+  const readerToolsOpen = useReaderPanel((s) => s.isOpen);
+  const toolActive = chapterToolActive || readerToolsOpen;
   const isMobile = useIsMobile();
 
   const providers = useAIProviders();
