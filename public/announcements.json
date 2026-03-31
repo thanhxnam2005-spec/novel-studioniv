@@ -1,0 +1,18 @@
+{
+  "announcements": [
+    {
+      "id": "tts-feature-2026-03-31",
+      "enabled": true,
+      "type": "info",
+      "content": "v0.9.0 - Tính năng mới: **Đọc truyện bằng giọng nói** — nghe đọc ngay trong trang đọc với 6 nhà cung cấp giọng nói. [Xem chi tiết](/changelog)",
+      "bgColor": "bg-violet-500/10 dark:bg-violet-500/15",
+      "textColor": "text-violet-700 dark:text-violet-300"
+    },
+    {
+      "id": "beta-notice-2026",
+      "enabled": false,
+      "type": "info",
+      "content": "**Novel Studio** đang trong giai đoạn phát triển. Dữ liệu được lưu trữ cục bộ trên trình duyệt — hãy thường xuyên [sao lưu dữ liệu](/settings) để tránh mất mát."
+    }
+  ]
+}

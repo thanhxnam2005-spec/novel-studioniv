@@ -83,7 +83,7 @@ export default function DashboardPage() {
         {stats === undefined ? (
           Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="animate-pulse">
-              <CardContent className="py-4">
+              <CardContent className="py-0">
                 <div className="h-3 w-16 rounded bg-muted" />
                 <div className="mt-2 h-7 w-12 rounded bg-muted" />
               </CardContent>
@@ -266,7 +266,7 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-3 py-4">
+      <CardContent className="flex items-center gap-3 py-0">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
           <Icon className="size-4 text-primary" />
         </div>

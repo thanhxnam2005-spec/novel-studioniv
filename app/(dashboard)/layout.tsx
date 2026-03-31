@@ -1,5 +1,6 @@
 "use client";
 
+import { AnnouncementBanner } from "@/components/announcement-banner";
 import { AppSidebar, miscNav, navConfig } from "@/components/app-sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { DictInitializer } from "@/components/dict-initializer";
@@ -92,6 +93,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
+        <AnnouncementBanner />
         <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1" />
           <Breadcrumb>
