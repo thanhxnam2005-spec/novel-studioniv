@@ -190,27 +190,9 @@ export function useMediaSession({
       jumpTo(timeToIndex(targetTime, s, ttsSettings.rate));
     });
 
-    trySetHandler(
-      "previoustrack",
-      hasPrev
-        ? () => {
-            const s = useReaderPanel.getState();
-            if (s.isPlaying || s.isPaused) s.setAutoPlayOnLoad(true);
-            onPrev();
-          }
-        : null,
-    );
+    trySetHandler("previoustrack", hasPrev ? () => onPrev() : null);
 
-    trySetHandler(
-      "nexttrack",
-      hasNext
-        ? () => {
-            const s = useReaderPanel.getState();
-            if (s.isPlaying || s.isPaused) s.setAutoPlayOnLoad(true);
-            onNext();
-          }
-        : null,
-    );
+    trySetHandler("nexttrack", hasNext ? () => onNext() : null);
 
     return () => {
       const actions: MediaSessionAction[] = [
