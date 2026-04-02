@@ -96,6 +96,14 @@ const DETAIL_CONFIG: Record<
   },
 };
 
+const CHARACTER_ROLE_COLORS = [
+  "bg-purple-500/10 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400",
+  "bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-400",
+  "bg-rose-500/10 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400",
+  "bg-yellow-500/10 text-yellow-600 dark:bg-yellow-500/15 dark:text-yellow-400",
+  "bg-gray-500/10 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400",
+];
+
 function DetailRow({
   field,
   label,
@@ -147,6 +155,10 @@ function CharacterCard({
     char.motivations ||
     char.goals ||
     (char.relationships && char.relationships.length > 0);
+  const roleColor =
+    char?.roleKey !== undefined
+      ? CHARACTER_ROLE_COLORS[char.roleKey]
+      : CHARACTER_ROLE_COLORS[CHARACTER_ROLE_COLORS.length - 1];
 
   return (
     <Card className="overflow-hidden">
@@ -154,7 +166,12 @@ function CharacterCard({
         <CardHeader className="pb-2">
           <div className="flex items-start gap-2.5">
             {/* Avatar placeholder with initial */}
-            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-sm font-bold text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
+            <span
+              className={cn(
+                "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
+                roleColor,
+              )}
+            >
               {char.name.charAt(0)}
             </span>
             <div className="min-w-0 flex-1">
@@ -241,12 +258,13 @@ function CharacterCard({
                     </p>
                     <div className="mt-1 space-y-1">
                       {char.relationships.map((r, i) => (
-                        <div
-                          key={i}
-                          className="flex items-baseline gap-1.5 text-xs"
-                        >
-                          <span className="font-medium">{r.characterName}</span>
-                          <span className="text-muted-foreground/70">—</span>
+                        <div key={i} className="text-xs">
+                          <span className="font-medium whitespace-nowrap">
+                            {r.characterName}
+                          </span>
+                          <span className="text-muted-foreground/70 px-0.5">
+                            —
+                          </span>
                           <span className="text-muted-foreground">
                             {r.description}
                           </span>

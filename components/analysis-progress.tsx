@@ -101,18 +101,28 @@ export function AnalysisProgress() {
   const isRunning =
     phase === "chapters" || phase === "aggregation" || phase === "characters";
 
-  const progressPercent =
-    totalChapters > 0
-      ? phase === "chapters"
-        ? (chaptersCompleted / totalChapters) * 70
-        : phase === "aggregation"
-          ? 80
-          : phase === "characters"
-            ? 90
-            : isDone
-              ? 100
-              : 0
-      : 0;
+  // True when all phase results are final — bridges the gap between the last
+  // phaseResult "done" signal and the "complete" phase signal that follows
+  // after the post-processing DB writes (character linking, novel status update).
+  const allPhasesDone =
+    phaseResults.chapters !== "pending" &&
+    phaseResults.chapters !== "running" &&
+    phaseResults.aggregation !== "pending" &&
+    phaseResults.aggregation !== "running" &&
+    phaseResults.characters !== "pending" &&
+    phaseResults.characters !== "running";
+
+  const effectiveDone = isDone || allPhasesDone;
+
+  const progressPercent = effectiveDone
+    ? 100
+    : phase === "aggregation"
+      ? 75
+      : phase === "characters"
+        ? 90
+        : totalChapters > 0
+          ? Math.min((chaptersCompleted / totalChapters) * 70, 70)
+          : 0;
 
   const chapterErrorCount = useMemo(
     () => errors.filter((e) => e.phase === "chapters").length,
@@ -125,13 +135,13 @@ export function AnalysisProgress() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium">
-            {isDone
+            {effectiveDone
               ? hasErrors
                 ? "Hoàn tất với lỗi"
                 : "Phân tích hoàn tất"
               : "Đang phân tích..."}
           </p>
-          {isRunning && (
+          {isRunning && !effectiveDone && (
             <Button
               variant="ghost"
               size="sm"
@@ -230,7 +240,7 @@ export function AnalysisProgress() {
       )}
 
       {/* Result summary */}
-      {resultSummary && isDone && <ResultSummaryView summary={resultSummary} />}
+      {resultSummary && effectiveDone && <ResultSummaryView summary={resultSummary} />}
     </div>
   );
 }

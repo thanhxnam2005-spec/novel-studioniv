@@ -131,6 +131,7 @@ export function AnalysisDialog({
     isAnalyzing,
     phase,
     errors,
+    phaseResults,
     enabledSteps,
     start,
     updateProgress,
@@ -149,8 +150,20 @@ export function AnalysisDialog({
     phase === "completed_with_errors" ||
     phase === "error";
 
+  // Bridges the gap between the last phaseResult "done" signal and the
+  // "complete" phase signal (which arrives after post-processing DB writes).
+  const allPhasesDone =
+    phaseResults.chapters !== "pending" &&
+    phaseResults.chapters !== "running" &&
+    phaseResults.aggregation !== "pending" &&
+    phaseResults.aggregation !== "running" &&
+    phaseResults.characters !== "pending" &&
+    phaseResults.characters !== "running";
+
+  const effectiveDone = isDone || allPhasesDone;
+
   const { showConfirm, guard, confirm, dismiss } = useConfirmInterrupt(
-    isAnalyzing && !isDone,
+    isAnalyzing && !effectiveDone,
   );
   const [depth, setDepth] = useState<AnalysisDepth>("standard");
   const [showConfigOnError, setShowConfigOnError] = useState(false);
@@ -349,8 +362,8 @@ export function AnalysisDialog({
     [enabledSteps, hasAnalyzedChapters, setEnabledSteps],
   );
 
-  const showConfig = !isAnalyzing && !isDone;
-  const showErrorConfig = isDone && errors.length > 0 && showConfigOnError;
+  const showConfig = !isAnalyzing && !effectiveDone;
+  const showErrorConfig = effectiveDone && errors.length > 0 && showConfigOnError;
 
   return (
     <Dialog
@@ -387,10 +400,10 @@ export function AnalysisDialog({
         <ScrollArea className="max-h-[65vh]">
           <div className="space-y-4 p-1 pr-4">
             {/* Running state */}
-            {isAnalyzing && !isDone && <AnalysisProgress />}
+            {isAnalyzing && !effectiveDone && <AnalysisProgress />}
 
             {/* Done state */}
-            {isDone && <AnalysisProgress />}
+            {effectiveDone && <AnalysisProgress />}
 
             {/* Config: initial or error-retry config */}
             {(showConfig || showErrorConfig) && (
@@ -472,7 +485,7 @@ export function AnalysisDialog({
         )}
 
         {/* Footer: done with errors — show config toggle + retry */}
-        {isDone && errors.length > 0 && (
+        {effectiveDone && errors.length > 0 && (
           <div className="flex items-center justify-between gap-2 pt-2">
             <Button
               variant="ghost"
@@ -504,7 +517,7 @@ export function AnalysisDialog({
         )}
 
         {/* Footer: done without errors */}
-        {isDone && errors.length === 0 && (
+        {effectiveDone && errors.length === 0 && (
           <div className="flex justify-end gap-2 pt-2">
             <Button
               onClick={() => {

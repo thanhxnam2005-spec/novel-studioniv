@@ -86,6 +86,7 @@ export interface Character {
   novelId: string;
   name: string;
   role: string;
+  roleKey?: number;
   description: string;
   notes?: string;
   imageUrl?: string;
