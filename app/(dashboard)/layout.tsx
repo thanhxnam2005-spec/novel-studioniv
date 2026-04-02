@@ -6,6 +6,7 @@ import { ChatPanel } from "@/components/chat-panel";
 import { DictInitializer } from "@/components/dict-initializer";
 import { GlobalSearchDialog } from "@/components/global-search-dialog";
 import { NameDictPanel } from "@/components/name-dict/name-dict-panel";
+import { ReaderPanel } from "@/components/reader/reader-panel";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,7 +22,15 @@ import {
 import { useChatPanel } from "@/lib/stores/chat-panel";
 import { useGlobalSearch } from "@/lib/stores/global-search";
 import { useNameDictPanel } from "@/lib/stores/name-dict-panel";
-import { BookTextIcon, BotIcon, MoonIcon, SearchIcon, SunIcon } from "lucide-react";
+import { useReaderPanel } from "@/lib/stores/reader-panel";
+import {
+  BookTextIcon,
+  BotIcon,
+  MoonIcon,
+  SearchIcon,
+  SunIcon,
+  Volume2Icon,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -44,7 +53,11 @@ export default function DashboardLayout({
   const currentNovelId = novelIdMatch?.[1] ?? null;
   const chapterIdMatch = pathname.match(/^\/novels\/[^/]+\/chapters\/([^/]+)/);
   const currentChapterId = chapterIdMatch?.[1] ?? null;
+  const isReadingPage = /^\/novels\/[^/]+\/read(\/|$|\?)/.test(pathname);
   const toggleChat = useChatPanel((s) => s.toggle);
+  const isReaderOpen = useReaderPanel((s) => s.isOpen);
+  const isReaderPlaying = useReaderPanel((s) => s.isPlaying);
+  const toggleReader = useReaderPanel((s) => s.toggle);
   const setPageContext = useChatPanel((s) => s.setPageContext);
   const toggleSearch = useGlobalSearch((s) => s.toggle);
   const nameDictToggle = useNameDictPanel((s) => s.toggle);
@@ -104,6 +117,24 @@ export default function DashboardLayout({
             </BreadcrumbList>
           </Breadcrumb>
           <div className="ml-auto flex items-center gap-1">
+            {(isReadingPage || isReaderOpen || isReaderPlaying) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleReader}
+                className={
+                  isReaderPlaying
+                    ? !isReaderOpen
+                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 animate-pulse"
+                      : "bg-muted"
+                    : undefined
+                }
+                title="Đọc truyện (TTS)"
+              >
+                <Volume2Icon className="mr-0.5" />
+                Đọc truyện
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -140,6 +171,7 @@ export default function DashboardLayout({
         </header>
         <div className="min-w-0 flex-1 overflow-auto">{children}</div>
       </SidebarInset>
+      <ReaderPanel />
       <ChatPanel />
       <NameDictPanel />
       <DictInitializer />

@@ -57,6 +57,15 @@ export class Player {
   private rate = 1.0;
   private pitch = 1.0;
   private maxPreload = 2;
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_BASE_DELAY_MS = 600;
+
+  // -- Concurrency guard ---------------------------------------------------
+  // Incremented on every cancel/jump so in-flight async ops can self-abort.
+  private playbackGeneration = 0;
+
+  // -- Retry state ---------------------------------------------------------
+  private sentenceRetryCount = 0;
 
   // -- Callbacks -----------------------------------------------------------
   private callbacks: PlayerCallbacks = {};
@@ -137,6 +146,7 @@ export class Player {
 
     this.sentences = sentences;
     this._currentIndex = startIndex;
+    this.sentenceRetryCount = 0;
     this.setState("playing");
     this.playCurrentSentence();
   }
@@ -182,6 +192,7 @@ export class Player {
     const wasPlaying = this._state === "playing";
     this.cancelCurrentPlayback();
     this._currentIndex = index;
+    this.sentenceRetryCount = 0;
 
     if (wasPlaying) {
       this.setState("playing");
@@ -207,6 +218,11 @@ export class Player {
   private async playCurrentSentence(): Promise<void> {
     if (this._state !== "playing") return;
 
+    // Snapshot generation — if it changes while we're awaiting, this
+    // invocation is stale and must abort to prevent concurrent playback.
+    const gen = this.playbackGeneration;
+    const stale = () => gen !== this.playbackGeneration;
+
     const sentence = this.sentences[this._currentIndex];
     if (!sentence) {
       // Past the end — finished
@@ -217,9 +233,9 @@ export class Player {
 
     this.callbacks.onSentenceStart?.(this._currentIndex);
 
-    try {
-      // Direct-only providers (e.g. BrowserTTS) play audio themselves
-      if (this.provider!.isDirectOnly && "speakDirect" in this.provider!) {
+    // Direct-only providers (e.g. BrowserTTS) handle playback internally
+    if (this.provider!.isDirectOnly && "speakDirect" in this.provider!) {
+      try {
         this.callbacks.onAudioPlay?.();
         const adjusted = this.adjuster.getAdjustmentFor(sentence.originalText, {
           voice: this.voiceId,
@@ -231,22 +247,59 @@ export class Player {
             speakDirect(text: string, options?: unknown): Promise<void>;
           }
         ).speakDirect(sentence.text, adjusted);
-        if (this._state !== "playing") return;
+        if (stale() || this._state !== "playing") return;
         this.advanceToNext();
-        return;
+      } catch (err) {
+        if (!stale()) this.handleError(err);
+      }
+      return;
+    }
+
+    // Fetch-and-play path with retry + exponential backoff
+    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      if (stale() || this._state !== "playing") return;
+
+      if (attempt > 0) {
+        const adjusted = this.adjuster.getAdjustmentFor(sentence.originalText, {
+          voice: this.voiceId,
+          rate: this.rate,
+          pitch: this.pitch,
+        });
+        this.cache.invalidate(
+          sentence.text,
+          this.voiceId,
+          adjusted.rate ?? this.rate,
+          adjusted.pitch ?? this.pitch,
+        );
+        await this.delay(this.RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
+        if (stale() || this._state !== "playing") return;
+        console.warn(
+          `[TTS Player] Retrying sentence ${this._currentIndex} (attempt ${attempt}/${this.MAX_RETRIES})`,
+        );
       }
 
-      // Kick off preloading of upcoming sentences
-      this.preloadAhead();
+      try {
+        this.preloadAhead();
+        const blob = await this.fetchAudioForSentence(sentence);
+        if (stale() || this._state !== "playing") return;
+        await this.playBlob(blob, sentence);
+        if (stale()) return;
+        this.sentenceRetryCount = 0;
+        return;
+      } catch (err) {
+        if (stale()) return;
+        if (attempt < this.MAX_RETRIES) continue;
 
-      const blob = await this.fetchAudioForSentence(sentence);
-
-      // State may have changed while we were fetching
-      if (this._state !== "playing") return;
-
-      await this.playBlob(blob, sentence);
-    } catch (err) {
-      this.handleError(err);
+        // All retries exhausted — skip sentence instead of halting playback
+        console.error(
+          `[TTS Player] Sentence ${this._currentIndex} failed after ${this.MAX_RETRIES} retries, skipping.`,
+          err,
+        );
+        this.sentenceRetryCount = 0;
+        if (this._state === "playing") {
+          this.advanceToNext();
+        }
+      }
     }
   }
 
@@ -349,12 +402,22 @@ export class Player {
     });
   }
 
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   /** Move index forward and play the next sentence. */
   private advanceToNext(): void {
     this.revokeBlobUrl();
     this._currentIndex++;
+    // Capture generation NOW so that if cancelCurrentPlayback() fires between
+    // here and the setTimeout callback, the stale check will abort this chain.
+    const gen = this.playbackGeneration;
     // Use setTimeout(0) to avoid deep call stacks on long documents
-    setTimeout(() => this.playCurrentSentence(), 0);
+    setTimeout(() => {
+      if (gen !== this.playbackGeneration) return;
+      this.playCurrentSentence();
+    }, 0);
   }
 
   // ========================================================================
@@ -400,6 +463,7 @@ export class Player {
   }
 
   private cancelCurrentPlayback(): void {
+    this.playbackGeneration++;
     this.clearEarlyEndingTimer();
     if (this.audioElement) {
       this.audioElement.pause();

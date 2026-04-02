@@ -105,12 +105,19 @@ interface ReaderPanelState {
   // TTS settings snapshot (synced from Dexie by the UI)
   ttsSettings: TTSSettings;
 
-  // Callback invoked when TTS finishes the current content (e.g. to auto-advance chapter)
-  onFinishChapter?: () => void;
+  // Chapter context — fully owned by the store; reading page is a consumer
+  novelId: string | null;
+  novelTitle: string;
+  chapterTitle: string;
+  chapterIndex: number;
+  totalChapters: number;
 
-  // Actions
+  // --- Panel actions ---
   toggle: () => void;
   setOpen: (open: boolean) => void;
+  setPanelWidth: (width: number) => void;
+
+  // --- Playback actions ---
   play: () => void;
   pause: () => void;
   resume: () => void;
@@ -118,11 +125,30 @@ interface ReaderPanelState {
   jumpTo: (index: number) => void;
   setSentences: (sentences: Sentence[]) => void;
   setCurrentSentenceIndex: (index: number) => void;
+
+  // --- Settings actions ---
   syncSettings: (settings: TTSSettings) => void;
   updateSettings: (partial: Partial<Omit<TTSSettings, "id">>) => void;
-  setPanelWidth: (width: number) => void;
-  setOnFinishChapter: (fn: (() => void) | undefined) => void;
-  setAutoPlayOnLoad: (value: boolean) => void;
+
+  // --- Chapter navigation (store is the single source of truth) ---
+  /** Called by the reading page on mount to initialise or update novel context. */
+  setNovelContext: (ctx: {
+    novelId: string;
+    novelTitle: string;
+    totalChapters: number;
+    /** Provide only when the store should be reset to a specific chapter (e.g. novel change). */
+    chapterIndex?: number;
+  }) => void;
+  /** Called by the reading page to keep the displayed chapter title in sync. */
+  setChapterTitle: (title: string) => void;
+  /**
+   * Navigate to a chapter.
+   * Stops the current playback, updates chapterIndex, and optionally
+   * schedules auto-play for when the new chapter's sentences arrive.
+   */
+  navigateTo: (index: number, opts?: { autoPlay?: boolean }) => void;
+  nextChapter: () => void;
+  prevChapter: () => void;
 }
 
 const DEFAULT_TTS: TTSSettings = {
@@ -146,10 +172,27 @@ export const useReaderPanel = create<ReaderPanelState>((set, get) => ({
   sentences: [],
   autoPlayOnLoad: false,
   ttsSettings: DEFAULT_TTS,
+  novelId: null,
+  novelTitle: "",
+  chapterTitle: "",
+  chapterIndex: 0,
+  totalChapters: 0,
+
+  // --- Panel ---
 
   toggle: () => set((s) => ({ isOpen: !s.isOpen })),
 
   setOpen: (open) => set({ isOpen: open }),
+
+  setPanelWidth: (width) => {
+    const clamped = Math.max(PANEL_MIN_WIDTH, Math.min(width, PANEL_MAX_WIDTH));
+    if (clamped !== get().panelWidth) {
+      saveWidth(clamped);
+      set({ panelWidth: clamped });
+    }
+  },
+
+  // --- Playback ---
 
   play: () => {
     const { sentences, currentSentenceIndex, ttsSettings } = get();
@@ -179,7 +222,11 @@ export const useReaderPanel = create<ReaderPanelState>((set, get) => ({
       },
       onFinish: () => {
         set({ isPlaying: false, isPaused: false, isLoading: false, currentSentenceIndex: 0 });
-        get().onFinishChapter?.();
+        // Auto-advance to the next chapter if available
+        const { chapterIndex, totalChapters } = get();
+        if (totalChapters > 0 && chapterIndex < totalChapters - 1) {
+          get().navigateTo(chapterIndex + 1, { autoPlay: true });
+        }
       },
       onError: (err) => {
         console.error("[TTS] Playback error:", err);
@@ -217,14 +264,26 @@ export const useReaderPanel = create<ReaderPanelState>((set, get) => ({
   },
 
   setSentences: (sentences) => {
+    const { isPlaying, isPaused, autoPlayOnLoad } = get();
+
+    if (isPlaying || isPaused) {
+      // Player is running — update sentences but preserve playback position
+      set({ sentences });
+      return;
+    }
+
     set({ sentences, currentSentenceIndex: 0 });
-    if (get().autoPlayOnLoad) {
+
+    if (autoPlayOnLoad && sentences.length > 0) {
       set({ autoPlayOnLoad: false });
-      get().play();
+      // Defer to ensure we're outside any React render cycle
+      setTimeout(() => get().play(), 0);
     }
   },
 
   setCurrentSentenceIndex: (index) => set({ currentSentenceIndex: index }),
+
+  // --- Settings ---
 
   /** Called by the UI component to keep the store in sync with Dexie data. */
   syncSettings: (settings) => set({ ttsSettings: settings }),
@@ -241,18 +300,52 @@ export const useReaderPanel = create<ReaderPanelState>((set, get) => ({
     }
   },
 
-  setOnFinishChapter: (fn) => set({ onFinishChapter: fn }),
+  // --- Chapter navigation ---
 
-  setAutoPlayOnLoad: (value) => set({ autoPlayOnLoad: value }),
+  setNovelContext: ({ novelId, novelTitle, totalChapters, chapterIndex }) => {
+    const current = get();
+    const isNewNovel = current.novelId !== novelId;
+    set({
+      novelId,
+      novelTitle,
+      totalChapters,
+      // Only reset chapter index when switching to a different novel
+      ...(isNewNovel && chapterIndex !== undefined ? { chapterIndex } : {}),
+    });
+  },
 
-  setPanelWidth: (width) => {
-    const clamped = Math.max(
-      PANEL_MIN_WIDTH,
-      Math.min(width, PANEL_MAX_WIDTH),
-    );
-    if (clamped !== get().panelWidth) {
-      saveWidth(clamped);
-      set({ panelWidth: clamped });
+  setChapterTitle: (title) => set({ chapterTitle: title }),
+
+  navigateTo: (index, opts) => {
+    const { isPlaying, totalChapters } = get();
+    if (index < 0 || (totalChapters > 0 && index >= totalChapters)) return;
+
+    const autoPlay = opts?.autoPlay ?? isPlaying;
+
+    player?.stop();
+    set({
+      isPlaying: false,
+      isPaused: false,
+      isLoading: false,
+      currentSentenceIndex: 0,
+      chapterIndex: index,
+      autoPlayOnLoad: autoPlay,
+      // Ensure panel is open so SentenceRenderer can mount and trigger playback
+      ...(autoPlay ? { isOpen: true } : {}),
+    });
+  },
+
+  nextChapter: () => {
+    const { chapterIndex, totalChapters } = get();
+    if (totalChapters > 0 && chapterIndex < totalChapters - 1) {
+      get().navigateTo(chapterIndex + 1);
+    }
+  },
+
+  prevChapter: () => {
+    const { chapterIndex } = get();
+    if (chapterIndex > 0) {
+      get().navigateTo(chapterIndex - 1);
     }
   },
 }));

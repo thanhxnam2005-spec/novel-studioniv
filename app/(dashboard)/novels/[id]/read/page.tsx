@@ -1,13 +1,12 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  Volume2Icon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,23 +15,19 @@ import {
 } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useNovel, useChapters, useScenes } from "@/lib/hooks";
-import { ReaderPanel } from "@/components/reader/reader-panel";
 import { SentenceRenderer } from "@/components/reader/sentence-renderer";
 import { useReaderPanel } from "@/lib/stores/reader-panel";
+import { useMediaSession } from "@/lib/hooks/use-media-session";
 
 function ChapterContent({
   chapterId,
   readerOpen,
+  chapterHeader,
 }: {
   chapterId: string;
   readerOpen: boolean;
+  chapterHeader?: string;
 }) {
   const scenes = useScenes(chapterId);
   if (!scenes) return <Skeleton className="h-64 w-full" />;
@@ -49,9 +44,10 @@ function ChapterContent({
   }
 
   if (readerOpen) {
+    const ttsContent = chapterHeader ? `${chapterHeader}\n\n${text}` : text;
     return (
       <div className="prose prose-sm max-w-none dark:prose-invert">
-        <SentenceRenderer content={text} />
+        <SentenceRenderer content={ttsContent} />
       </div>
     );
   }
@@ -63,56 +59,63 @@ function ChapterContent({
   );
 }
 
-/** Collect the full text content for a chapter from its scenes */
-function useChapterText(chapterId: string | undefined) {
-  const scenes = useScenes(chapterId ?? "");
-  if (!scenes || !chapterId) return "";
-  return scenes.map((s) => s.content).join("\n\n");
-}
-
 export default function ReadingView() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const novel = useNovel(id);
   const chapters = useChapters(id);
 
-  const initialChapter = parseInt(searchParams.get("chapter") ?? "0", 10);
-  const [currentIndex, setCurrentIndex] = useState(initialChapter);
-
+  // The store owns chapterIndex; this page is a subscriber + context provider.
+  const chapterIndex = useReaderPanel((s) => s.chapterIndex);
   const isReaderOpen = useReaderPanel((s) => s.isOpen);
 
-  // Clamp index to valid range
+  // Clamp to valid range in case chapters haven't loaded yet
   const clampedIndex = chapters
-    ? Math.min(currentIndex, Math.max(0, chapters.length - 1))
-    : currentIndex;
+    ? Math.min(chapterIndex, Math.max(0, chapters.length - 1))
+    : chapterIndex;
 
   const chapter = chapters?.[clampedIndex];
   const hasPrev = clampedIndex > 0;
   const hasNext = chapters ? clampedIndex < chapters.length - 1 : false;
 
-  // Get the full chapter text for the ReaderPanel
-  const chapterText = useChapterText(chapter?.id);
-
-  // Stop TTS playback when switching chapters
-  const handleChapterChange = useCallback((newIndex: number) => {
-    useReaderPanel.getState().stop();
-    setCurrentIndex(newIndex);
-  }, []);
-
-  // Register auto-advance callback: when TTS finishes, move to next chapter and continue reading
+  // Initialise novel context in the store when the novel/chapters data loads.
+  // If this is a different novel than what the store last saw, reset chapterIndex
+  // to whatever the URL specifies (for deep-linking). Otherwise keep store's value.
   useEffect(() => {
-    if (hasNext) {
-      useReaderPanel.getState().setOnFinishChapter(() => {
-        useReaderPanel.getState().setAutoPlayOnLoad(true);
-        handleChapterChange(clampedIndex + 1);
-      });
-    } else {
-      useReaderPanel.getState().setOnFinishChapter(undefined);
+    if (!novel || !chapters || chapters.length === 0) return;
+
+    const storeNovelId = useReaderPanel.getState().novelId;
+    const urlChapter = parseInt(searchParams.get("chapter") ?? "0", 10);
+    const clampedUrl = Math.min(Math.max(0, urlChapter), chapters.length - 1);
+
+    useReaderPanel.getState().setNovelContext({
+      novelId: id,
+      novelTitle: novel.title,
+      totalChapters: chapters.length,
+      // Pass chapterIndex only when switching novels so we reset to the URL's chapter
+      ...(storeNovelId !== id ? { chapterIndex: clampedUrl } : {}),
+    });
+  // searchParams intentionally excluded: URL chapter param is only used on novel change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, novel?.title, chapters?.length]);
+
+  // Keep chapter title in sync whenever the displayed chapter changes
+  useEffect(() => {
+    if (chapter?.title) {
+      useReaderPanel.getState().setChapterTitle(chapter.title);
     }
-    return () => {
-      useReaderPanel.getState().setOnFinishChapter(undefined);
-    };
-  }, [hasNext, clampedIndex, handleChapterChange]);
+  }, [chapter?.title]);
+
+  // Sync with OS media controls (lock screen, Bluetooth, notification bar)
+  useMediaSession({
+    novelTitle: novel?.title ?? "",
+    chapterTitle: chapter?.title ?? "",
+    chapterNumber: clampedIndex + 1,
+    hasPrev,
+    hasNext,
+    onPrev: () => useReaderPanel.getState().prevChapter(),
+    onNext: () => useReaderPanel.getState().nextChapter(),
+  });
 
   if (novel === undefined || !chapters) {
     return (
@@ -132,90 +135,72 @@ export default function ReadingView() {
   }
 
   return (
-    <div className="flex h-[calc(100svh-3rem)] overflow-hidden">
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden px-6 py-4">
-        {/* Header */}
-        <div className="mb-4 flex shrink-0 items-center gap-3">
-          <Button variant="ghost" size="icon-sm" asChild>
-            <Link href={`/novels/${id}`}>
-              <ArrowLeftIcon className="size-4" />
-            </Link>
-          </Button>
-          <span className="text-sm font-medium text-muted-foreground">
-            {novel.title}
-          </span>
-          <NativeSelect
-            className="ml-auto w-48"
-            value={clampedIndex}
-            onChange={(e) => handleChapterChange(Number(e.target.value))}
-          >
-            {chapters.map((ch, i) => (
-              <NativeSelectOption key={ch.id} value={i}>
-                {i + 1}. {ch.title}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => useReaderPanel.getState().toggle()}
-                  className={isReaderOpen ? "bg-muted" : undefined}
-                  aria-label="Đọc truyện"
-                >
-                  <Volume2Icon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Đọc truyện</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+    <main className="flex h-[calc(100svh-3rem)] flex-col overflow-hidden px-6 py-4">
+      {/* Header */}
+      <div className="mb-4 flex shrink-0 items-center gap-3">
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link href={`/novels/${id}`}>
+            <ArrowLeftIcon className="size-4" />
+          </Link>
+        </Button>
+        <span className="text-sm font-medium text-muted-foreground">
+          {novel.title}
+        </span>
+        <NativeSelect
+          className="ml-auto w-48"
+          value={clampedIndex}
+          onChange={(e) =>
+            useReaderPanel.getState().navigateTo(Number(e.target.value))
+          }
+        >
+          {chapters.map((ch, i) => (
+            <NativeSelectOption key={ch.id} value={i}>
+              {i + 1}. {ch.title}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
 
-        {/* Chapter content */}
-        {chapter && (
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="mx-auto max-w-3xl pb-12">
-              <h2 className="mb-6 text-center font-heading text-2xl font-bold">
-                {chapter.title}
-              </h2>
-              <ChapterContent
-                chapterId={chapter.id}
-                readerOpen={isReaderOpen}
-              />
-            </div>
-          </ScrollArea>
-        )}
+      {/* Chapter content */}
+      {chapter && (
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="mx-auto max-w-3xl pb-12">
+            <h2 className="mb-6 text-center font-heading text-2xl font-bold">
+              {chapter.title}
+            </h2>
+            <ChapterContent
+              chapterId={chapter.id}
+              readerOpen={isReaderOpen}
+              chapterHeader={`Chương ${clampedIndex + 1}: ${chapter.title}`}
+            />
+          </div>
+        </ScrollArea>
+      )}
 
-        {/* Navigation */}
-        <div className="flex shrink-0 items-center justify-between border-t pt-3">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!hasPrev}
-            onClick={() => handleChapterChange(currentIndex - 1)}
-          >
-            <ChevronLeftIcon className="mr-1 size-4" />
-            Trước
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {clampedIndex + 1} / {chapters.length}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!hasNext}
-            onClick={() => handleChapterChange(currentIndex + 1)}
-          >
-            Tiếp
-            <ChevronRightIcon className="ml-1 size-4" />
-          </Button>
-        </div>
-      </main>
-
-      {/* TTS Reader Panel — sticky, fixed to viewport height */}
-      <ReaderPanel content={chapterText} />
-    </div>
+      {/* Navigation */}
+      <div className="flex shrink-0 items-center justify-between border-t pt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!hasPrev}
+          onClick={() => useReaderPanel.getState().prevChapter()}
+        >
+          <ChevronLeftIcon className="mr-1 size-4" />
+          Trước
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {clampedIndex + 1} / {chapters.length}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!hasNext}
+          onClick={() => useReaderPanel.getState().nextChapter()}
+        >
+          Tiếp
+          <ChevronRightIcon className="ml-1 size-4" />
+        </Button>
+      </div>
+    </main>
   );
 }

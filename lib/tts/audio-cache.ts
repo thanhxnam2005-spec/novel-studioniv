@@ -78,6 +78,18 @@ export class AudioCache {
     return promise;
   }
 
+  /** Remove a single entry from the cache (e.g. before a retry). */
+  invalidate(
+    text: string,
+    voiceId: number | string,
+    rate = 1,
+    pitch = 1,
+  ): void {
+    const key = cacheKey(text, voiceId, rate, pitch);
+    this.cache.delete(key);
+    this.pending.delete(key);
+  }
+
   /** Drop all cached blobs and cancel tracking of pending fetches. */
   clear(): void {
     this.cache.clear();
