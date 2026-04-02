@@ -30,11 +30,15 @@ export function splitChapters(
     : pattern.flags + "g";
   const regex = new RegExp(pattern.source, flags);
 
-  const matches: { title: string; index: number }[] = [];
+  const matches: { title: string; index: number; end: number }[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
-    matches.push({ title: match[0].trim(), index: match.index });
+    matches.push({
+      title: match[0].trim(),
+      index: match.index,
+      end: match.index + match[0].length,
+    });
   }
 
   if (matches.length === 0) {
@@ -58,7 +62,7 @@ export function splitChapters(
 
   // Each match to the next match (or end of text)
   for (let i = 0; i < matches.length; i++) {
-    const start = matches[i].index + matches[i].title.length;
+    const start = matches[i].end;
     const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
     const content = text.slice(start, end).trim();
 

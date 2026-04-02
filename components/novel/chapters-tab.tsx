@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { HighlightedText } from "@/components/ui/highlighted-text";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -25,7 +27,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Chapter } from "@/lib/db";
+import { fuzzyMatch } from "@/lib/fuzzy";
 import { deleteChapter, type ChapterAnalysisStatus } from "@/lib/hooks";
+import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   BookOpenIcon,
@@ -43,6 +47,7 @@ import {
   SearchIcon,
   TrashIcon,
   WrenchIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
@@ -120,6 +125,8 @@ export function ChaptersTab({
   const [deleteTarget, setDeleteTarget] = useState<Chapter | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(searchQuery, 350);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -133,8 +140,22 @@ export function ChaptersTab({
     return map;
   }, [analysisStatuses]);
 
+  /** Chapters filtered by fuzzy query, with pre-computed match indices. */
+  const filteredChapters = useMemo(() => {
+    const q = debouncedQuery.trim();
+    if (!q) {
+      return chapters.map((ch) => ({ chapter: ch, indices: [] as number[] }));
+    }
+    const results: { chapter: Chapter; indices: number[] }[] = [];
+    for (const ch of chapters) {
+      const { matched, indices } = fuzzyMatch(q, ch.title);
+      if (matched) results.push({ chapter: ch, indices });
+    }
+    return results;
+  }, [chapters, debouncedQuery]);
+
   const virtualizer = useVirtualizer({
-    count: chapters.length,
+    count: filteredChapters.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 52,
     overscan: 10,
@@ -157,10 +178,16 @@ export function ChaptersTab({
   };
 
   const toggleAll = () => {
-    if (selected.size === chapters.length) {
-      setSelected(new Set());
+    const filteredIds = filteredChapters.map((f) => f.chapter.id);
+    const allFilteredSelected = filteredIds.every((id) => selected.has(id));
+    if (allFilteredSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of filteredIds) next.delete(id);
+        return next;
+      });
     } else {
-      setSelected(new Set(chapters.map((c) => c.id)));
+      setSelected((prev) => new Set([...prev, ...filteredIds]));
     }
   };
 
@@ -178,7 +205,7 @@ export function ChaptersTab({
   return (
     <div className="max-w-full overflow-x-hidden">
       {/* Toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
         <Button size="sm" onClick={() => setAddOpen(true)}>
           <PlusIcon className="size-3.5 sm:mr-1.5" />
           <span className="hidden sm:inline">Thêm chương</span>
@@ -260,6 +287,25 @@ export function ChaptersTab({
         </div>
       </div>
 
+      {/* Search bar */}
+      <div className="relative mb-3 mx-1">
+        <SearchIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Tìm chương..."
+          className="h-8 pl-8 text-sm"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Chapter list */}
       {chapters.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
@@ -270,7 +316,10 @@ export function ChaptersTab({
           {/* Header row — hidden on mobile since layout changes */}
           <div className="hidden min-w-0 items-center gap-2 px-3 pb-2 text-xs text-muted-foreground sm:flex">
             <Checkbox
-              checked={selected.size === chapters.length && chapters.length > 0}
+              checked={
+                filteredChapters.length > 0 &&
+                filteredChapters.every((f) => selected.has(f.chapter.id))
+              }
               onCheckedChange={toggleAll}
               className="size-3.5 shrink-0"
             />
@@ -290,77 +339,181 @@ export function ChaptersTab({
           {/* Virtualized chapter list */}
           <div
             ref={scrollContainerRef}
-            className="h-[calc(100svh-390px)] min-h-[300px] overflow-auto"
+            className="h-[calc(100svh-320px)] min-h-[300px] overflow-auto"
           >
-            <div
-              style={{
-                height: virtualizer.getTotalSize(),
-                position: "relative",
-              }}
-            >
-              {virtualizer.getVirtualItems().map((virtualRow) => {
-                const ch = chapters[virtualRow.index];
-                const status = getStatus(ch.id);
-                const statusCfg = STATUS_CONFIG[status];
-                const StatusIcon = statusCfg.icon;
-                const isExpanded = expandedId === ch.id;
+            {filteredChapters.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Không tìm thấy chương nào khớp với &ldquo;{searchQuery}&rdquo;.
+              </p>
+            ) : (
+              <div
+                style={{
+                  height: virtualizer.getTotalSize(),
+                  position: "relative",
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const { chapter: ch, indices } =
+                    filteredChapters[virtualRow.index];
+                  const status = getStatus(ch.id);
+                  const statusCfg = STATUS_CONFIG[status];
+                  const StatusIcon = statusCfg.icon;
+                  const isExpanded = expandedId === ch.id;
 
-                return (
-                  <div
-                    key={ch.id}
-                    data-index={virtualRow.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  >
-                    <div className="rounded-lg border">
-                      {/* Mobile: two-line layout */}
-                      <div className="sm:hidden">
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          className="flex w-full cursor-pointer items-center gap-2 px-3 pt-2 pb-1 text-left"
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : ch.id)
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setExpandedId(isExpanded ? null : ch.id);
+                  return (
+                    <div
+                      key={ch.id}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <div className="rounded-lg border">
+                        {/* Mobile: two-line layout */}
+                        <div className="sm:hidden">
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="flex w-full cursor-pointer items-center gap-2 px-3 pt-2 pb-1 text-left"
+                            onClick={() =>
+                              setExpandedId(isExpanded ? null : ch.id)
                             }
-                          }}
-                        >
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setExpandedId(isExpanded ? null : ch.id);
+                              }
+                            }}
+                          >
+                            <Checkbox
+                              checked={selected.has(ch.id)}
+                              onCheckedChange={() => toggleSelect(ch.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="size-3.5 shrink-0"
+                            />
+                            <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">
+                              {ch.order + 1}
+                            </span>
+                            {isExpanded ? (
+                              <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                              <HighlightedText
+                                text={ch.title}
+                                indices={indices}
+                              />
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 px-3 pb-1.5 pl-[3.75rem]">
+                            <span className="text-xs text-muted-foreground">
+                              {(wordCounts.get(ch.id) ?? 0).toLocaleString()} từ
+                            </span>
+                            <StatusIcon
+                              className={`ml-1 size-3 ${statusCfg.className}`}
+                            />
+                            <div className="ml-auto flex gap-0.5">
+                              <Button variant="ghost" size="icon-xs" asChild>
+                                <Link
+                                  href={`/novels/${novelId}/read?chapter=${ch.order}`}
+                                >
+                                  <BookOpenIcon className="size-3.5" />
+                                </Link>
+                              </Button>
+                              <Button variant="ghost" size="icon-xs" asChild>
+                                <Link
+                                  href={`/novels/${novelId}/chapters/${ch.id}`}
+                                >
+                                  <PencilIcon className="size-3.5" />
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeleteTarget(ch)}
+                              >
+                                <TrashIcon className="size-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop: single-line layout */}
+                        <div className="hidden min-w-0 items-center gap-2 px-3 py-2 sm:flex">
                           <Checkbox
                             checked={selected.has(ch.id)}
                             onCheckedChange={() => toggleSelect(ch.id)}
-                            onClick={(e) => e.stopPropagation()}
                             className="size-3.5 shrink-0"
                           />
-                          <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">
+                          <span className="w-8 shrink-0 text-center text-xs text-muted-foreground">
                             {ch.order + 1}
                           </span>
-                          {isExpanded ? (
-                            <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                          ) : (
-                            <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                          )}
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                            {ch.title}
+                          <button
+                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm"
+                            onClick={() =>
+                              setExpandedId(isExpanded ? null : ch.id)
+                            }
+                          >
+                            {isExpanded ? (
+                              <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="truncate font-medium">
+                              <HighlightedText
+                                text={ch.title}
+                                indices={indices}
+                              />
+                            </span>
+                          </button>
+                          <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">
+                            {(wordCounts.get(ch.id) ?? 0).toLocaleString()}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1 px-3 pb-1.5 pl-[3.75rem]">
-                          <span className="text-xs text-muted-foreground">
-                            {(wordCounts.get(ch.id) ?? 0).toLocaleString()} từ
+
+                          {/* Edited time — only on wide screens */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="hidden w-20 shrink-0 text-right text-xs text-muted-foreground lg:block">
+                                {formatDateTime(ch.updatedAt)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {formatDateTimeFull(ch.updatedAt)}
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Analyzed time — only on wide screens */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className={`hidden w-20 shrink-0 items-center justify-end gap-1 text-xs lg:flex ${statusCfg.className}`}
+                              >
+                                <StatusIcon className="size-3" />
+                                {ch.analyzedAt
+                                  ? formatDateTime(ch.analyzedAt)
+                                  : statusCfg.label}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {ch.analyzedAt
+                                ? `${statusCfg.label} — ${formatDateTimeFull(ch.analyzedAt)}`
+                                : statusCfg.label}
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Compact status icon when date columns are hidden */}
+                          <span className="flex w-6 shrink-0 justify-end lg:hidden">
+                            <StatusIcon
+                              className={`size-3.5 ${statusCfg.className}`}
+                            />
                           </span>
-                          <StatusIcon
-                            className={`ml-1 size-3 ${statusCfg.className}`}
-                          />
-                          <div className="ml-auto flex gap-0.5">
+                          <div className="flex w-[4.5rem] shrink-0 justify-end gap-0.5">
                             <Button variant="ghost" size="icon-xs" asChild>
                               <Link
                                 href={`/novels/${novelId}/read?chapter=${ch.order}`}
@@ -384,117 +537,28 @@ export function ChaptersTab({
                             </Button>
                           </div>
                         </div>
+
+                        {/* Collapsible summary */}
+                        {isExpanded && ch.summary && (
+                          <div className="border-t px-4 py-2 sm:px-10">
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {ch.summary}
+                            </p>
+                          </div>
+                        )}
+                        {isExpanded && !ch.summary && (
+                          <div className="border-t px-4 py-2 sm:px-10">
+                            <p className="text-xs italic text-muted-foreground">
+                              Chưa có tóm tắt — chạy phân tích để tạo.
+                            </p>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Desktop: single-line layout */}
-                      <div className="hidden min-w-0 items-center gap-2 px-3 py-2 sm:flex">
-                        <Checkbox
-                          checked={selected.has(ch.id)}
-                          onCheckedChange={() => toggleSelect(ch.id)}
-                          className="size-3.5 shrink-0"
-                        />
-                        <span className="w-8 shrink-0 text-center text-xs text-muted-foreground">
-                          {ch.order + 1}
-                        </span>
-                        <button
-                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm"
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : ch.id)
-                          }
-                        >
-                          {isExpanded ? (
-                            <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                          ) : (
-                            <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                          )}
-                          <span className="truncate font-medium">
-                            {ch.title}
-                          </span>
-                        </button>
-                        <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">
-                          {(wordCounts.get(ch.id) ?? 0).toLocaleString()}
-                        </span>
-
-                        {/* Edited time — only on wide screens */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="hidden w-20 shrink-0 text-right text-xs text-muted-foreground lg:block">
-                              {formatDateTime(ch.updatedAt)}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {formatDateTimeFull(ch.updatedAt)}
-                          </TooltipContent>
-                        </Tooltip>
-
-                        {/* Analyzed time — only on wide screens */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className={`hidden w-20 shrink-0 items-center justify-end gap-1 text-xs lg:flex ${statusCfg.className}`}
-                            >
-                              <StatusIcon className="size-3" />
-                              {ch.analyzedAt
-                                ? formatDateTime(ch.analyzedAt)
-                                : statusCfg.label}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {ch.analyzedAt
-                              ? `${statusCfg.label} — ${formatDateTimeFull(ch.analyzedAt)}`
-                              : statusCfg.label}
-                          </TooltipContent>
-                        </Tooltip>
-
-                        {/* Compact status icon when date columns are hidden */}
-                        <span className="flex w-6 shrink-0 justify-end lg:hidden">
-                          <StatusIcon
-                            className={`size-3.5 ${statusCfg.className}`}
-                          />
-                        </span>
-                        <div className="flex w-[4.5rem] shrink-0 justify-end gap-0.5">
-                          <Button variant="ghost" size="icon-xs" asChild>
-                            <Link
-                              href={`/novels/${novelId}/read?chapter=${ch.order}`}
-                            >
-                              <BookOpenIcon className="size-3.5" />
-                            </Link>
-                          </Button>
-                          <Button variant="ghost" size="icon-xs" asChild>
-                            <Link href={`/novels/${novelId}/chapters/${ch.id}`}>
-                              <PencilIcon className="size-3.5" />
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => setDeleteTarget(ch)}
-                          >
-                            <TrashIcon className="size-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Collapsible summary */}
-                      {isExpanded && ch.summary && (
-                        <div className="border-t px-4 py-2 sm:px-10">
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            {ch.summary}
-                          </p>
-                        </div>
-                      )}
-                      {isExpanded && !ch.summary && (
-                        <div className="border-t px-4 py-2 sm:px-10">
-                          <p className="text-xs italic text-muted-foreground">
-                            Chưa có tóm tắt — chạy phân tích để tạo.
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

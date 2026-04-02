@@ -7,6 +7,7 @@ import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  PencilIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -146,6 +147,18 @@ export default function ReadingView() {
         <span className="text-sm font-medium text-muted-foreground">
           {novel.title}
         </span>
+        {chapter && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            asChild
+            title="Chỉnh sửa chương"
+          >
+            <Link href={`/novels/${id}/chapters/${chapter.id}`}>
+              <PencilIcon className="size-4" />
+            </Link>
+          </Button>
+        )}
         <NativeSelect
           className="ml-auto w-48"
           value={clampedIndex}

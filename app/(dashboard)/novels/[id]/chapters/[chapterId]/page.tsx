@@ -50,6 +50,7 @@ import {
 } from "@/lib/stores/chapter-tools";
 import {
   ArrowLeftIcon,
+  BookOpenIcon,
   ChevronDownIcon,
   HistoryIcon,
   Redo2Icon,
@@ -315,6 +316,13 @@ export default function ChapterEditorPage() {
               <Link href={`/novels/${novelId}`}>
                 <ArrowLeftIcon className="size-4" />
                 Trở lại
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon-sm" asChild title="Chế độ đọc">
+              <Link
+                href={`/novels/${novelId}/read?chapter=${chapter.order}`}
+              >
+                <BookOpenIcon className="size-4" />
               </Link>
             </Button>
             <TooltipProvider>
