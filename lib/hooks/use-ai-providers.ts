@@ -77,19 +77,33 @@ const WEBGPU_SYSTEM_MODELS = (() => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { WEBGPU_MODELS } = require("@/lib/ai/webgpu-provider");
-    return (WEBGPU_MODELS as Array<{ modelId: string; name: string; sizeLabel: string }>).map(
-      (m) => ({
-        id: m.modelId,
-        providerId: WEBGPU_SYSTEM_PROVIDER.id,
-        modelId: m.modelId,
-        name: `${m.name} (${m.sizeLabel})`,
-        createdAt: new Date(0),
-      }),
-    );
+    return (
+      WEBGPU_MODELS as Array<{
+        modelId: string;
+        name: string;
+        sizeLabel: string;
+      }>
+    ).map((m) => ({
+      id: m.modelId,
+      providerId: WEBGPU_SYSTEM_PROVIDER.id,
+      modelId: m.modelId,
+      name: `${m.name} (${m.sizeLabel})`,
+      createdAt: new Date(0),
+    }));
   } catch {
     return [];
   }
 })();
+
+function sortModels<T extends { modelId: string; name?: string }>(
+  models: T[],
+): T[] {
+  const key = (id: string) =>
+    id.includes("/") ? id.slice(id.lastIndexOf("/") + 1) : id;
+  return models.sort((a, b) =>
+    key(a.name || a.modelId).localeCompare(key(b.name || b.modelId)),
+  );
+}
 
 export function useAIModels(providerId: string | undefined) {
   const dbModels = useLiveQuery(
@@ -100,7 +114,7 @@ export function useAIModels(providerId: string | undefined) {
     [providerId],
   );
   if (isSystemProvider(providerId)) return WEBGPU_SYSTEM_MODELS;
-  return dbModels;
+  return dbModels ? sortModels(dbModels) : dbModels;
 }
 
 export function useAllAIModels() {
@@ -108,6 +122,25 @@ export function useAllAIModels() {
 }
 
 // ─── Model Mutations ────────────────────────────────────────
+
+export async function createAIModelManual(
+  providerId: string,
+  modelId: string,
+  label: string,
+) {
+  const now = new Date();
+  await db.aiModels.add({
+    id: crypto.randomUUID(),
+    providerId,
+    modelId: modelId.trim(),
+    name: label.trim() || modelId.trim(),
+    createdAt: now,
+  });
+}
+
+export async function updateAIModel(id: string, name: string) {
+  await db.aiModels.update(id, { name: name.trim() });
+}
 
 export async function deleteAIModel(id: string) {
   await db.aiModels.delete(id);
@@ -183,9 +216,7 @@ async function fetchAnthropicModels(
       id: m.id ?? m.name ?? "",
       name: m.name ?? m.id,
     }))
-    .sort((a: { id: string }, b: { id: string }) =>
-      a.id.localeCompare(b.id),
-    );
+    .sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id));
 }
 
 async function fetchGoogleModels(

@@ -116,6 +116,8 @@ export function ModelSelectorButton({
               <div className="space-y-0.5">
                 {models.map((model) => {
                   const isSelected = model.modelId === selectedModelId;
+                  const isFree =
+                    model.id?.includes("free") || model.name?.includes("free");
                   return (
                     <button
                       key={model.id}
@@ -137,7 +139,11 @@ export function ModelSelectorButton({
                           isSelected ? "opacity-100" : "opacity-0",
                         )}
                       />
-                      <span className="truncate">{model.name}</span>
+                      <span
+                        className={`truncate ${isFree ? "text-green-700 dark:text-green-400" : ""}`}
+                      >
+                        {model.name}
+                      </span>
                     </button>
                   );
                 })}

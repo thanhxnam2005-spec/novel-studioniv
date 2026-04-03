@@ -105,7 +105,7 @@ export function SyncSettingsCard({
           <div>
             <Label className="text-sm font-medium">Tải lên cloud</Label>
             <p className="text-sm text-muted-foreground">
-              Không đồng bộ dữ liệu từ điển lớn để giảm dung lượng.
+              Không đồng bộ dữ liệu từ điển lớn để giảm dung lượng. Tối đa 10MB.
             </p>
           </div>
           <div>

@@ -55,15 +55,18 @@ import { PROVIDER_PRESETS, getPreset } from "@/lib/ai/presets";
 import type { AIProvider, ProviderType } from "@/lib/db";
 import { db } from "@/lib/db";
 import {
+  createAIModelManual,
   createAIProvider,
   deleteAIModel,
   deleteAIProvider,
   fetchAndSyncModels,
   isSystemProvider,
+  updateAIModel,
   updateAIProvider,
   useAIModels,
   useAIProviders,
 } from "@/lib/hooks";
+import type { AIModel } from "@/lib/db";
 import {
   ExternalLinkIcon,
   EyeIcon,
@@ -71,11 +74,11 @@ import {
   HardDriveIcon,
   LoaderIcon,
   PencilIcon,
+  PencilLineIcon,
   PlusIcon,
   RefreshCwIcon,
   ServerIcon,
   TrashIcon,
-  XIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -182,35 +185,37 @@ function ProviderFormDialog({
                 <Field>
                   <FieldLabel>Nền tảng</FieldLabel>
                   <div className="flex flex-wrap gap-1.5">
-                    {PROVIDER_PRESETS.filter((p) => p.type !== "webgpu").map((p) => (
-                      <Tooltip key={p.type}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => handlePresetChange(p.type)}
-                            className={`relative flex size-10 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
-                              providerType === p.type
-                                ? "border-primary bg-primary/10"
-                                : "hover:bg-muted/50"
-                            }`}
+                    {PROVIDER_PRESETS.filter((p) => p.type !== "webgpu").map(
+                      (p) => (
+                        <Tooltip key={p.type}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => handlePresetChange(p.type)}
+                              className={`relative flex size-10 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                                providerType === p.type
+                                  ? "border-primary bg-primary/10"
+                                  : "hover:bg-muted/50"
+                              }`}
+                            >
+                              <ProviderIcon
+                                iconKey={p.iconKey}
+                                className="size-5"
+                              />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="bottom"
+                            className="flex flex-col items-center max-w-[200px]"
                           >
-                            <ProviderIcon
-                              iconKey={p.iconKey}
-                              className="size-5"
-                            />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          side="bottom"
-                          className="flex flex-col items-center max-w-[200px]"
-                        >
-                          <p className="font-medium block">{p.label}</p>
-                          <p className="text-xs text-gray-300 block text-center">
-                            {p.description}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
+                            <p className="font-medium block">{p.label}</p>
+                            <p className="text-xs text-gray-300 block text-center">
+                              {p.description}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ),
+                    )}
                   </div>
                 </Field>
               )}
@@ -309,6 +314,145 @@ function ProviderFormDialog({
   );
 }
 
+// ─── Model Form Dialog ───────────────────────────────────────
+
+function ModelFormDialog({
+  open,
+  onOpenChange,
+  providerId,
+  model,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  providerId: string;
+  model?: AIModel;
+}) {
+  const isEditing = !!model;
+  const [modelId, setModelId] = useState(model?.modelId ?? "");
+  const [label, setLabel] = useState(model?.name ?? "");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!modelId.trim() && !isEditing) return;
+    setSaving(true);
+    try {
+      if (isEditing) {
+        await updateAIModel(model.id, label || model.modelId);
+        toast.success("Đã cập nhật nhãn mô hình");
+      } else {
+        await createAIModelManual(providerId, modelId, label);
+        toast.success("Đã thêm mô hình");
+      }
+      onOpenChange(false);
+    } catch {
+      toast.error(
+        isEditing ? "Cập nhật nhãn thất bại" : "Thêm mô hình thất bại",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!model) return;
+    setDeleting(true);
+    try {
+      await deleteAIModel(model.id);
+      toast.success("Đã xóa mô hình");
+      onOpenChange(false);
+    } catch {
+      toast.error("Xóa mô hình thất bại");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {isEditing ? "Sửa mô hình" : "Thêm mô hình thủ công"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? "Đặt tên hiển thị cho mô hình này."
+              : "Nhập ID mô hình và tên hiển thị tùy chọn."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <FieldSet>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>Model ID</FieldLabel>
+                {isEditing ? (
+                  <code className="block rounded-md border bg-muted px-3 py-2 text-sm font-mono text-muted-foreground">
+                    {model.modelId}
+                  </code>
+                ) : (
+                  <>
+                    <Input
+                      placeholder="gpt-4o, claude-3-5-sonnet-20241022, ..."
+                      value={modelId}
+                      onChange={(e) => setModelId(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                    <FieldDescription>
+                      ID chính xác mà API của nhà cung cấp sử dụng.
+                    </FieldDescription>
+                  </>
+                )}
+              </Field>
+              <Field>
+                <FieldLabel>Nhãn hiển thị</FieldLabel>
+                <Input
+                  placeholder={
+                    isEditing ? model.modelId : modelId || "Tên hiển thị..."
+                  }
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  autoFocus={isEditing}
+                />
+                <FieldDescription>
+                  Tên thân thiện hiển thị trong giao diện. Để trống để dùng
+                  Model ID.
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </FieldSet>
+          <DialogFooter className="mt-4">
+            {isEditing && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting || saving}
+                className="mr-auto"
+              >
+                <TrashIcon />
+                {deleting ? "Đang xóa..." : "Xóa"}
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Hủy
+            </Button>
+            <Button type="submit" disabled={saving || deleting}>
+              {saving ? "Đang lưu..." : isEditing ? "Lưu nhãn" : "Thêm mô hình"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Provider Card ──────────────────────────────────────────
 
 function ProviderCard({ provider }: { provider: AIProvider }) {
@@ -316,8 +460,20 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [modelManagerOpen, setModelManagerOpen] = useState(false);
+  const [modelFormOpen, setModelFormOpen] = useState(false);
+  const [editingModel, setEditingModel] = useState<AIModel | undefined>();
   const [fetching, setFetching] = useState(false);
   const [showKey, setShowKey] = useState(false);
+
+  function openAddModel() {
+    setEditingModel(undefined);
+    setModelFormOpen(true);
+  }
+
+  function openEditModel(m: AIModel) {
+    setEditingModel(m);
+    setModelFormOpen(true);
+  }
 
   const preset = getPreset(provider.providerType ?? "openai-compatible");
   const isWebGPU = provider.providerType === "webgpu";
@@ -425,19 +581,25 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
               <span className="text-xs font-medium text-muted-foreground">
                 Mô hình ({models?.length ?? 0})
               </span>
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={handleFetchModels}
-                disabled={fetching}
-              >
-                {fetching ? (
-                  <LoaderIcon className="animate-spin" />
-                ) : (
-                  <RefreshCwIcon />
-                )}
-                {fetching ? "Đang tải..." : "Tải mô hình"}
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="outline" size="xs" onClick={openAddModel}>
+                  <PlusIcon />
+                  Thêm
+                </Button>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={handleFetchModels}
+                  disabled={fetching}
+                >
+                  {fetching ? (
+                    <LoaderIcon className="animate-spin" />
+                  ) : (
+                    <RefreshCwIcon />
+                  )}
+                  {fetching ? "Đang tải..." : "Tải mô hình"}
+                </Button>
+              </div>
             </div>
             {models && models.length > 0 ? (
               <div className="h-32 overflow-y-auto rounded-md border p-2">
@@ -446,15 +608,30 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
                     <Badge
                       key={m.id}
                       variant="secondary"
-                      className="gap-1 pr-1"
+                      className="group gap-1 pr-1"
                     >
-                      {m.name}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="max-w-[180px] truncate">
+                            {m.name}
+                          </span>
+                        </TooltipTrigger>
+                        {m.name !== m.modelId && (
+                          <TooltipContent
+                            side="top"
+                            className="font-mono text-xs"
+                          >
+                            {m.modelId}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                       <button
                         type="button"
-                        onClick={() => deleteAIModel(m.id)}
-                        className="ml-0.5 rounded-sm p-0.5 opacity-50 transition-opacity hover:bg-muted hover:opacity-100"
+                        onClick={() => openEditModel(m)}
+                        className="ml-0.5 rounded-sm p-0.5 hover:bg-muted"
+                        title="Sửa"
                       >
-                        <XIcon className="size-3" />
+                        <PencilLineIcon className="size-2" />
                       </button>
                     </Badge>
                   ))}
@@ -463,7 +640,7 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
             ) : (
               <p className="text-xs text-muted-foreground">
                 Chưa tải mô hình. Nhấn &quot;Tải mô hình&quot; để tải danh sách
-                mô hình có sẵn.
+                mô hình có sẵn hoặc &quot;Thêm thủ công&quot; để thêm mô hình.
               </p>
             )}
           </div>
@@ -506,6 +683,18 @@ function ProviderCard({ provider }: { provider: AIProvider }) {
         <WebGPUModelManagerDialog
           open={modelManagerOpen}
           onOpenChange={setModelManagerOpen}
+        />
+      )}
+
+      {modelFormOpen && (
+        <ModelFormDialog
+          open={modelFormOpen}
+          onOpenChange={(v) => {
+            setModelFormOpen(v);
+            if (!v) setEditingModel(undefined);
+          }}
+          providerId={provider.id}
+          model={editingModel}
         />
       )}
     </>
@@ -571,9 +760,7 @@ export function AIProviderSettings() {
   const [addOpen, setAddOpen] = useState(false);
 
   // Filter out system providers — they are not user-manageable
-  const providers = allProviders?.filter(
-    (p) => !isSystemProvider(p.id),
-  );
+  const providers = allProviders?.filter((p) => !isSystemProvider(p.id));
 
   return (
     <div className="space-y-6">
