@@ -4,9 +4,9 @@
       "id": "fix-bugs-and-enhancements-2026-04-03",
       "enabled": true,
       "type": "info",
-      "content": "v0.10.1 - **Sửa lỗi & Nâng cấp**: Panel đọc truyện liên tục, hỗ trợ media control, và đọc văn bản convert. [Xem chi tiết](/changelog)",
-      "bgColor": "bg-cyan-500/10 dark:bg-cyan-500/15",
-      "textColor": "text-cyan-700 dark:text-cyan-300"
+      "content": "v0.10 - **Viết AI và nâng cấp Chat**: Ra mắt tính năng viết truyện tự động và nâng cấp công cụ chat AI. [Xem chi tiết](/changelog)",
+      "bgColor": "bg-emerald-500/10 dark:bg-emerald-500/15",
+      "textColor": "text-emerald-700 dark:text-emerald-300"
     },
     {
       "id": "auto-write-feature-2026-04-02",

@@ -65,6 +65,29 @@ export const CATEGORY_META: Record<
 
 export const changelog: ChangelogRelease[] = [
   {
+    version: "0.10.3",
+    date: "2026-04-04",
+    title: "Mở rộng công cụ chat AI",
+    summary:
+      "Chat AI hỗ trợ đính kèm file để phân tích và cho phép chỉnh sửa dữ liệu tiểu thuyết trực tiếp.",
+    changes: [
+      {
+        category: "feature",
+        description: "Đính kèm ảnh và file trong chat AI",
+        details:
+          "Cho phép tải và đính kèm ảnh hoặc file văn bản vào cuộc trò chuyện để AI đọc nội dung, phân tích và phản hồi theo ngữ cảnh tài liệu kèm theo.",
+        tags: ["chat", "AI", "ảnh"],
+      },
+      {
+        category: "feature",
+        description: "Chỉnh sửa dữ liệu tiểu thuyết qua chat",
+        details:
+          "Bổ sung nhóm công cụ chỉnh sửa trong chat để AI có thể cập nhật dữ liệu tiểu thuyết, bối cảnh và nhân vật.",
+        tags: ["chat", "AI"],
+      },
+    ],
+  },
+  {
     version: "0.10.2",
     date: "2026-04-04",
     title: "Trang phản hồi & báo lỗi",

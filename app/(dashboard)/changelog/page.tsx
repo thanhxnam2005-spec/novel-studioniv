@@ -118,7 +118,7 @@ function ReleaseCard({
         <CollapsibleTrigger className="group/trigger flex w-full cursor-pointer items-start gap-2">
           <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]/trigger:rotate-90 mt-2" />
           <div className="flex-1">
-            <div className="w-full flex items-center gap-2 text-left">
+            <div className="w-full flex sm:items-center gap-0.5 sm:gap-2 text-left flex-col sm:flex-row mb-1 sm:mb-0">
               <Badge
                 variant={isLatest ? "default" : "outline"}
                 className="h-5 px-2"
@@ -126,11 +126,11 @@ function ReleaseCard({
                 v{release.version}
               </Badge>
               {release.title && (
-                <h4 className="mb-1 font-heading text-lg font-semibold tracking-tight text-foreground">
+                <h4 className="mb-0.25 font-heading text-lg font-semibold tracking-tight text-foreground">
                   {release.title}
                 </h4>
               )}
-              <Badge variant="ghost">{formattedDate}</Badge>
+              <Badge variant="secondary">{formattedDate}</Badge>
             </div>
             {release.summary && (
               <p className="text-sm leading-relaxed text-muted-foreground text-left">
