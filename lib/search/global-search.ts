@@ -146,9 +146,7 @@ async function buildIndex(): Promise<MiniSearch<SearchDocument>> {
         novel.worldOverview,
         novel.storySetting,
         novel.factions?.map((f) => `${f.name} ${f.description}`).join(" "),
-        novel.keyLocations
-          ?.map((l) => `${l.name} ${l.description}`)
-          .join(" "),
+        novel.keyLocations?.map((l) => `${l.name} ${l.description}`).join(" "),
       ]
         .filter(Boolean)
         .join(" "),
@@ -211,9 +209,7 @@ async function buildIndex(): Promise<MiniSearch<SearchDocument>> {
       title: scene.title,
       text: scene.content,
       route: `/novels/${scene.novelId}/chapters/${scene.chapterId}`,
-      subtitle: chapter
-        ? `${chapter.title} · ${novelTitle}`
-        : novelTitle,
+      subtitle: chapter ? `${chapter.title} · ${novelTitle}` : novelTitle,
       novelId: scene.novelId,
     });
   }
@@ -239,7 +235,7 @@ export async function getSearchIndex(): Promise<MiniSearch<SearchDocument>> {
  */
 export async function globalSearch(
   query: string,
-  options?: { novelId?: string; limit?: number },
+  options?: { novelId?: string; limit?: number; types?: SearchResultType[] },
 ): Promise<SearchResult[]> {
   const index = await getSearchIndex();
   const normalizedQuery = query.normalize("NFC");
@@ -249,6 +245,12 @@ export async function globalSearch(
   if (options?.novelId) {
     results = results.filter(
       (r) => r.novelId === options.novelId || r.type === "page",
+    );
+  }
+  if (options?.types?.length) {
+    const allowedTypes = new Set(options.types);
+    results = results.filter((r) =>
+      allowedTypes.has(r.type as SearchResultType),
     );
   }
 

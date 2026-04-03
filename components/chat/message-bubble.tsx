@@ -28,6 +28,16 @@ import { WrenchIcon } from "../ui/wrench";
 import { chatStreamdownComponents } from "./streamdown-components";
 
 const TOOL_LABELS: Record<string, string> = {
+  updateNovelSynopsis: "Cập nhật tóm tắt",
+  updateGenresTags: "Cập nhật thể loại & nhãn",
+  updateWorldBuilding: "Cập nhật thế giới quan",
+  addFaction: "Thêm phe phái",
+  updateFaction: "Cập nhật phe phái",
+  addLocation: "Thêm địa điểm",
+  updateLocation: "Cập nhật địa điểm",
+  addCharacter: "Thêm nhân vật",
+  updateCharacter: "Cập nhật nhân vật",
+  addRelationship: "Thêm mối quan hệ",
   getNovelOverview: "Tra cứu tổng quan tiểu thuyết",
   getWorldBuilding: "Tra cứu thế giới quan",
   getChapterDetails: "Tra cứu chi tiết chương",
@@ -59,6 +69,9 @@ function ToolCallItem({
   const [open, setOpen] = useState(false);
   const label = TOOL_LABELS[toolCall.toolName] ?? toolCall.toolName;
   const hasArgs = Object.keys(toolCall.args).length > 0;
+  const isEditTool =
+    toolCall.toolName.startsWith("update") ||
+    toolCall.toolName.startsWith("add");
 
   return (
     <div className="rounded-md border border-border/40 bg-background/50 text-[11px] text-muted-foreground">
@@ -67,7 +80,11 @@ function ToolCallItem({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-muted/50"
       >
-        <BookSearchIcon className="size-3 shrink-0" />
+        {isEditTool ? (
+          <PencilIcon className="size-3 shrink-0" />
+        ) : (
+          <BookSearchIcon className="size-3 shrink-0" />
+        )}
         <span className="flex-1 truncate font-medium">{label}</span>
         {noCollapse ? null : open ? (
           <ChevronUp size={10} />
