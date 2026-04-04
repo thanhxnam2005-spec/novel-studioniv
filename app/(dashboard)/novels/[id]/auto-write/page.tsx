@@ -31,6 +31,7 @@ import { db } from "@/lib/db";
 import {
   createWritingSession,
   getOrCreateWritingSettings,
+  resetWritingSessionProgress,
   updateChapterPlan,
   updateWritingSession,
   useActiveSession,
@@ -40,10 +41,15 @@ import {
   usePlotArcs,
   useSessionByPlan,
   useStepResults,
+  useWritingSettings,
 } from "@/lib/hooks";
 import { useWritingPipelineStore } from "@/lib/stores/writing-pipeline";
-import { runWritingPipeline } from "@/lib/writing";
+import {
+  repairSessionIfWriterOutputEmpty,
+  runWritingPipeline,
+} from "@/lib/writing";
 import type {
+  ContextAgentOutput,
   DirectionAgentOutput,
   OutlineAgentOutput,
 } from "@/lib/writing/types";
@@ -54,6 +60,7 @@ import {
   PauseIcon,
   PencilIcon,
   PlayIcon,
+  RotateCcwIcon,
   SettingsIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -61,6 +68,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ContextStepPanel } from "@/components/writing/context-step-panel";
 import { ChapterPreview } from "@/components/writing/chapter-preview";
 import { DirectionSelector } from "@/components/writing/direction-selector";
 import { IdeaForm, type IdeaFormData } from "@/components/writing/idea-form";
@@ -110,6 +118,10 @@ export default function AutoWritePage() {
   const planSession = useSessionByPlan(effectivePlanId ?? undefined);
   const activeSession = effectivePlanId ? planSession : latestSession;
   const stepResults = useStepResults(activeSession?.id);
+  const writingSettings = useWritingSettings(novelId);
+
+  const writingTabsScrollClass =
+    "h-[calc(100dvh-144px)] min-h-[240px] w-full";
 
   const {
     isRunning,
@@ -120,11 +132,14 @@ export default function AutoWritePage() {
     cancelPipeline,
     appendStreamingContent,
     clearStreamingContent,
+    clearWriterActivityLabel,
     pipelinePreRunRole,
     setPipelinePreRunRole,
+    requestReviewCompareFocus,
   } = useWritingPipelineStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [refreshSessionOpen, setRefreshSessionOpen] = useState(false);
   const [staleWarning, setStaleWarning] = useState(false);
   const [ideaData, setIdeaData] = useState<IdeaFormData | null>(null);
   const [modeOverride, setModeOverride] = useState<PageMode | null>(null);
@@ -177,6 +192,16 @@ export default function AutoWritePage() {
     }
   }, [resultMap]);
 
+  const contextOutput = useMemo(() => {
+    const raw = resultMap.get("context")?.output;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as ContextAgentOutput;
+    } catch {
+      return null;
+    }
+  }, [resultMap]);
+
   const outlineOutput = useMemo(() => {
     const raw = resultMap.get("outline")?.output;
     if (!raw) return null;
@@ -195,6 +220,12 @@ export default function AutoWritePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const sid = activeSession?.id;
+    if (!sid) return;
+    void repairSessionIfWriterOutputEmpty(sid);
+  }, [activeSession?.id]);
+
   // ── Pipeline Control ──────────────────────────────────────
 
   const handleStartPipeline = useCallback(
@@ -205,13 +236,12 @@ export default function AutoWritePage() {
 
       let sessionId = activeSession?.id;
       if (!sessionId) {
-        const ws = await getOrCreateWritingSettings(novelId);
+        await getOrCreateWritingSettings(novelId);
         sessionId = await createWritingSession({
           novelId,
           chapterPlanId: targetPlanId,
           currentStep: "context",
           status: "active",
-          pipelineMode: ws.smartWritingMode ? "smart" : "classic",
         });
       }
 
@@ -240,11 +270,14 @@ export default function AutoWritePage() {
         abortSignal: controller.signal,
         stepUserInstructions,
         onStepStart: (role) => {
+          if (role === "context") setActivePanel("context");
           if (role === "writer") setActivePanel("content");
         },
         onStepComplete: (role) => {
           switch (role) {
             case "context":
+              setActivePanel("context");
+              break;
             case "direction":
               setActivePanel("pipeline");
               break;
@@ -253,6 +286,7 @@ export default function AutoWritePage() {
               setActivePanel("outline");
               break;
             case "writer":
+              useWritingPipelineStore.getState().clearWriterActivityLabel();
               // writer done → review is next, switch to review
               setActivePanel("review");
               break;
@@ -264,16 +298,42 @@ export default function AutoWritePage() {
         onWriterChunk: (chunk) => {
           appendStreamingContent(chunk);
         },
+        onWriterActivity: (label) => {
+          useWritingPipelineStore.getState().setWriterActivityLabel(label);
+        },
       });
 
       // Pipeline returned — stop the running state
       useWritingPipelineStore.getState().abortController = null;
+      useWritingPipelineStore.getState().clearWriterActivityLabel();
       useWritingPipelineStore.setState({ isRunning: false });
 
       if (result === "awaiting-input") {
         const session = await db.writingSessions.get(sessionId!);
-        if (session?.currentStep === "direction") setActivePanel("pipeline");
-        else if (session?.currentStep === "outline") setActivePanel("outline");
+        if (session) {
+          const dirRow = await db.writingStepResults
+            .where("[sessionId+role]")
+            .equals([sessionId!, "direction"])
+            .first();
+          const directionStepDone = dirRow?.status === "completed";
+
+          if (session.currentStep === "direction") {
+            setActivePanel("pipeline");
+            setPipelinePreRunRole(directionStepDone ? null : "direction");
+          } else if (session.currentStep === "outline") {
+            setActivePanel("outline");
+            setPipelinePreRunRole(null);
+          } else if (session.currentStep === "review") {
+            setActivePanel("review");
+            setPipelinePreRunRole(null);
+          } else if (session.currentStep === "writer") {
+            setActivePanel("content");
+            setPipelinePreRunRole(null);
+          } else if (session.currentStep === "context") {
+            setActivePanel("context");
+            setPipelinePreRunRole(null);
+          }
+        }
       } else if (result === "stale-context") {
         setStaleWarning(true);
       } else if (result === "completed") {
@@ -293,6 +353,29 @@ export default function AutoWritePage() {
     ],
   );
 
+  const handleConfirmRefreshSession = useCallback(async () => {
+    if (!activeSession?.id) return;
+    setRefreshSessionOpen(false);
+    pausePipeline();
+    try {
+      await resetWritingSessionProgress(activeSession.id);
+      clearStreamingContent();
+      clearWriterActivityLabel();
+      setActivePanel("context");
+      setPipelinePreRunRole(null);
+      toast.success("Đã làm mới phiên viết");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Không thể làm mới phiên");
+    }
+  }, [
+    activeSession,
+    pausePipeline,
+    clearStreamingContent,
+    clearWriterActivityLabel,
+    setActivePanel,
+    setPipelinePreRunRole,
+  ]);
+
   const handleDirectionConfirm = useCallback(
     async (directions: string[]) => {
       if (!activeSession) return;
@@ -300,9 +383,10 @@ export default function AutoWritePage() {
       if (!plan) return;
       await updateChapterPlan(plan.id, { directions });
       await updateWritingSession(activeSession.id, { currentStep: "outline" });
-      handleStartPipeline();
+      setActivePanel("outline");
+      setPipelinePreRunRole(null);
     },
-    [activeSession, handleStartPipeline],
+    [activeSession, setActivePanel, setPipelinePreRunRole],
   );
 
   const handleOutlineApprove = useCallback(
@@ -322,9 +406,10 @@ export default function AutoWritePage() {
         title: outlineOutput.chapterTitle,
       });
       await updateWritingSession(activeSession.id, { currentStep: "writer" });
-      handleStartPipeline();
+      setActivePanel("content");
+      setPipelinePreRunRole(null);
     },
-    [activeSession, outlineOutput, handleStartPipeline],
+    [activeSession, outlineOutput, setActivePanel, setPipelinePreRunRole],
   );
 
   const selectNextPlan = useCallback(() => {
@@ -335,9 +420,9 @@ export default function AutoWritePage() {
     );
     if (next) {
       setSelectedPlanId(next.id);
-      setActivePanel("pipeline");
+      setActivePanel("context");
     } else {
-      setActivePanel("pipeline");
+      setActivePanel("context");
     }
   }, [chapterPlans, effectivePlanId, setActivePanel]);
 
@@ -378,27 +463,42 @@ export default function AutoWritePage() {
   const handleRewrite = useCallback(async () => {
     if (!activeSession) return;
     setIsRewriting(true);
+    setActivePanel("content");
     clearStreamingContent();
     try {
       const { runRewriteStep } = await import("@/lib/writing/orchestrator");
       const rewriteHint = useWritingPipelineStore
         .getState()
         .stepUserInstructions.rewrite?.trim();
-      await runRewriteStep({
+      const outcome = await runRewriteStep({
         novelId,
         sessionId: activeSession.id,
         onChunk: (chunk) => appendStreamingContent(chunk),
         ...(rewriteHint ? { userInstruction: rewriteHint } : {}),
       });
-      toast.success("Đã viết lại chương");
+      if (outcome === "completed") {
+        toast.success("Đã viết lại chương");
+        requestReviewCompareFocus();
+        setActivePanel("review");
+      } else {
+        toast.error("Viết lại thất bại");
+      }
     } catch (err) {
       if (err instanceof Error && err.name !== "AbortError") {
         toast.error(err.message);
       }
     } finally {
+      clearStreamingContent();
       setIsRewriting(false);
     }
-  }, [activeSession, novelId, clearStreamingContent, appendStreamingContent]);
+  }, [
+    activeSession,
+    novelId,
+    clearStreamingContent,
+    appendStreamingContent,
+    setActivePanel,
+    requestReviewCompareFocus,
+  ]);
 
   const handleSaveChapter = useCallback(async () => {
     if (!activeSession) return;
@@ -475,6 +575,21 @@ export default function AutoWritePage() {
     [activeSession, clearStreamingContent],
   );
 
+  const handleRerunContext = useCallback(async () => {
+    await resetStepsFromOnly("context", {
+      clearDirections: true,
+      clearOutline: true,
+    });
+    clearStreamingContent();
+    setPipelinePreRunRole("context");
+    setActivePanel("context");
+  }, [
+    resetStepsFromOnly,
+    clearStreamingContent,
+    setPipelinePreRunRole,
+    setActivePanel,
+  ]);
+
   const handleRerunDirection = useCallback(async () => {
     await resetStepsFromOnly("direction", {
       clearDirections: true,
@@ -530,6 +645,27 @@ export default function AutoWritePage() {
 
   if (!novel) return <Skeleton className="h-screen w-full" />;
 
+  const sessionNeedsResume =
+    activeSession?.status === "paused" || activeSession?.status === "error";
+
+  const writerOutputDone =
+    resultMap.get("writer")?.status === "completed" &&
+    !!resultMap.get("writer")?.output?.trim();
+  const reviewOutputDone = resultMap.get("review")?.status === "completed";
+
+  const outlineStepComplete = resultMap.get("outline")?.status === "completed";
+  const showWriterSetupOnContentTab =
+    !writerOutputDone &&
+    !isRunning &&
+    activeSession &&
+    outlineStepComplete &&
+    activeSession.currentStep !== "context" &&
+    activeSession.currentStep !== "direction" &&
+    activeSession.currentStep !== "outline" &&
+    (activeSession.currentStep === "writer" ||
+      activeSession.currentStep === "review" ||
+      activeSession.status === "error");
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -573,11 +709,24 @@ export default function AutoWritePage() {
               ) : null}
             </>
           )}
+          {activeSession && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              title="Làm mới phiên"
+              onClick={() => setRefreshSessionOpen(true)}
+            >
+              <RotateCcwIcon className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-8 w-8 shrink-0"
             onClick={() => setSettingsOpen(true)}
+            title="Cài đặt viết truyện"
           >
             <SettingsIcon className="h-4 w-4" />
           </Button>
@@ -635,13 +784,14 @@ export default function AutoWritePage() {
                 <PipelineProgress
                   sessionId={activeSession?.id}
                   currentStep={activeSession?.currentStep}
-                  onRetryAction={() => handleStartPipeline()}
+                  sessionStatus={activeSession?.status}
+                  onRetryAction={() => void handleStartPipeline()}
                   onStepClick={(role) => {
                     const panelMap: Record<
                       WritingAgentRole,
                       typeof activePanel
                     > = {
-                      context: "pipeline",
+                      context: "context",
                       direction: "pipeline",
                       outline: "outline",
                       writer: "content",
@@ -672,7 +822,9 @@ export default function AutoWritePage() {
                     return (
                       <div key={plan.id} className="group/plan-item relative">
                         <button
-                          onClick={() => !isLocked && setSelectedPlanId(plan.id)}
+                          onClick={() =>
+                            !isLocked && setSelectedPlanId(plan.id)
+                          }
                           disabled={isLocked}
                           className={`w-full text-left rounded-md px-3 py-1 pr-7 text-xs transition-colors flex ${
                             isLocked
@@ -740,184 +892,316 @@ export default function AutoWritePage() {
 
           <ResizableHandle />
 
-          <ResizablePanel minSize="300px" className="h-full">
+          <ResizablePanel minSize="300px" className="h-full min-h-0">
             <Tabs
               value={activePanel}
               onValueChange={(v) => setActivePanel(v as typeof activePanel)}
-              className="flex h-full flex-col"
+              className="flex h-full min-h-0 flex-col"
             >
-              <TabsList className="mx-auto mt-2 w-fit [&_button]:text-xs [&_button]:min-w-24">
+              <TabsList className="mx-auto mt-2 max-w-full w-fit shrink-0 flex-wrap justify-center gap-0.5 px-1 [&_button]:text-xs [&_button]:px-2 sm:[&_button]:min-w-20">
+                <TabsTrigger value="context">Bối cảnh</TabsTrigger>
                 <TabsTrigger value="pipeline">Hướng đi</TabsTrigger>
                 <TabsTrigger value="outline">Giàn ý</TabsTrigger>
                 <TabsTrigger value="content">Nội dung</TabsTrigger>
                 <TabsTrigger value="review">Đánh giá</TabsTrigger>
               </TabsList>
-              <ScrollArea className="h-[calc(100dvh-144px)]">
-                <TabsContent value="pipeline" className="p-4">
-                  {pipelinePreRunRole === "direction" ? (
-                    <PipelineStepConfig
-                      novelId={novelId}
-                      role="direction"
-                      instructionKey="direction"
-                      title="Tạo lại hướng đi"
-                      description="Chỉnh mô hình, yêu cầu và system prompt, sau đó chạy AI."
-                      runLabel="Chạy AI"
-                      onRun={() => void handleStartPipeline()}
-                      disabled={isRunning}
-                    />
-                  ) : directionOutput ? (
-                    <DirectionSelector
-                      options={directionOutput.options}
-                      onConfirm={handleDirectionConfirm}
-                      onRegenerateAction={handleRerunDirection}
-                      isLoading={isRunning}
-                    />
-                  ) : isRunning &&
-                    (activeSession?.currentStep === "context" ||
-                      activeSession?.currentStep === "direction") ? (
-                    <Empty className="h-[60vh]">
-                      <EmptyMedia>
-                        <Loader2Icon className="h-10 w-10 animate-spin text-primary" />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle>
-                          {activeSession?.currentStep === "context"
-                            ? "Đang phân tích bối cảnh"
-                            : "Đang đề xuất hướng đi"}
-                        </EmptyTitle>
-                        <EmptyDescription>
-                          {activeSession?.currentStep === "context"
-                            ? "AI đang tổng hợp bối cảnh từ nhân vật, thế giới quan và các chương trước..."
-                            : "AI đang sáng tạo các hướng đi cho chương mới..."}
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  ) : !activeSession && effectivePlanId ? (
-                    <PipelineStepConfig
-                      novelId={novelId}
-                      role="context"
-                      instructionKey="context"
-                      title="Bắt đầu viết chương"
-                      description="Chọn kế hoạch chương bên trái nếu cần, cấu hình bước bối cảnh rồi chạy pipeline."
-                      runLabel="Chạy pipeline"
-                      onRun={() => void handleStartPipeline()}
-                      disabled={isRunning}
-                    />
-                  ) : (
-                    <Empty className="h-[60vh]">
-                      <EmptyMedia variant="icon">
-                        <CompassIcon />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle>Chọn hướng đi</EmptyTitle>
-                        <EmptyDescription>
-                          Chọn một kế hoạch chương ở sidebar bên trái, sau đó
-                          cấu hình và nhấn &quot;Chạy pipeline&quot; (hoặc nút
-                          Viết chương trên thanh công cụ).
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  )}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <TabsContent
+                  value="context"
+                  className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                >
+                  <ScrollArea className={writingTabsScrollClass}>
+                    <div className="p-4">
+                      <ContextStepPanel
+                        key={`${activeSession?.id ?? "nosess"}-${effectivePlanId ?? "noplan"}`}
+                        novelId={novelId}
+                        effectivePlanId={effectivePlanId}
+                        activeSession={activeSession}
+                        isRunning={isRunning}
+                        smartWritingMode={Boolean(
+                          writingSettings?.smartWritingMode,
+                        )}
+                        contextResult={resultMap.get("context")}
+                        contextOutput={contextOutput}
+                        pipelinePreRunRole={pipelinePreRunRole}
+                        onStartPipeline={() => void handleStartPipeline()}
+                        onRerunContext={() => void handleRerunContext()}
+                      />
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+                <TabsContent
+                  value="pipeline"
+                  className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                >
+                  <ScrollArea className={writingTabsScrollClass}>
+                    <div className="p-4">
+                      {pipelinePreRunRole === "direction" ||
+                      (sessionNeedsResume &&
+                        activeSession?.currentStep === "direction" &&
+                        resultMap.get("direction")?.status !== "completed") ? (
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="direction"
+                          instructionKey="direction"
+                          title={
+                            directionOutput
+                              ? "Tạo lại hướng đi"
+                              : "Đề xuất hướng đi"
+                          }
+                          description={
+                            directionOutput
+                              ? "Chỉnh mô hình, yêu cầu và system prompt, sau đó chạy AI."
+                              : "Cấu hình bước này rồi chạy để AI đề xuất các hướng đi."
+                          }
+                          runLabel={
+                            directionOutput
+                              ? "Chạy AI"
+                              : "Chạy pipeline (tiếp tục)"
+                          }
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning}
+                        />
+                      ) : directionOutput ? (
+                        <DirectionSelector
+                          options={directionOutput.options}
+                          recommendedOptionIds={
+                            directionOutput.recommendedOptionIds
+                          }
+                          onConfirm={handleDirectionConfirm}
+                          onRegenerateAction={handleRerunDirection}
+                          isLoading={isRunning}
+                        />
+                      ) : isRunning &&
+                        activeSession?.currentStep === "context" ? (
+                        <Empty className="h-[60vh]">
+                          <EmptyMedia variant="icon">
+                            <CompassIcon />
+                          </EmptyMedia>
+                          <EmptyHeader>
+                            <EmptyTitle>Đang tạo bối cảnh</EmptyTitle>
+                            <EmptyDescription>
+                              Mở tab &quot;Bối cảnh&quot; để xem tiến trình. Sau
+                              khi xong, hướng đi sẽ chạy tại đây nếu pipeline
+                              tiếp tục.
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
+                      ) : isRunning &&
+                        activeSession?.currentStep === "direction" ? (
+                        <Empty className="h-[60vh]">
+                          <EmptyMedia>
+                            <Loader2Icon className="h-10 w-10 animate-spin text-primary" />
+                          </EmptyMedia>
+                          <EmptyHeader>
+                            <EmptyTitle>Đang đề xuất hướng đi</EmptyTitle>
+                            <EmptyDescription>
+                              AI đang sáng tạo các hướng đi cho chương mới…
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
+                      ) : !activeSession && effectivePlanId ? (
+                        <Empty className="h-[60vh]">
+                          <EmptyMedia variant="icon">
+                            <CompassIcon />
+                          </EmptyMedia>
+                          <EmptyHeader>
+                            <EmptyTitle>Bắt đầu từ bối cảnh</EmptyTitle>
+                            <EmptyDescription>
+                              Mở tab &quot;Bối cảnh&quot; để cấu hình và chạy
+                              bước đầu tiên, rồi quay lại đây chọn hướng đi.
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
+                      ) : activeSession && effectivePlanId && !isRunning ? (
+                        <div className="space-y-6">
+                          <PipelineStepConfig
+                            novelId={novelId}
+                            role="direction"
+                            instructionKey="direction"
+                            title="Hướng đi"
+                            description="Giữ bối cảnh đã có, xóa hướng đi và các bước sau."
+                            runLabel="Chạy lại hướng đi"
+                            onRun={() => void handleRerunDirection()}
+                            disabled={isRunning}
+                          />
+                        </div>
+                      ) : (
+                        <Empty className="h-[60vh]">
+                          <EmptyMedia variant="icon">
+                            <CompassIcon />
+                          </EmptyMedia>
+                          <EmptyHeader>
+                            <EmptyTitle>Chọn hướng đi</EmptyTitle>
+                            <EmptyDescription>
+                              Chọn kế hoạch chương ở sidebar, hoàn tất bước bối
+                              cảnh (tab Bối cảnh), sau đó cấu hình hướng đi tại
+                              đây hoặc nhấn &quot;Chạy pipeline&quot;.
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </TabsContent>
 
-                <TabsContent value="outline" className="p-4">
-                  {pipelinePreRunRole === "outline" ? (
-                    <PipelineStepConfig
-                      novelId={novelId}
-                      role="outline"
-                      instructionKey="outline"
-                      title="Tạo lại giàn ý"
-                      description="Chỉnh cấu hình rồi chạy lại bước giàn ý."
-                      runLabel="Chạy AI"
-                      onRun={() => void handleStartPipeline()}
-                      disabled={isRunning}
-                    />
-                  ) : outlineOutput ? (
-                    <OutlineEditor
-                      chapterTitle={outlineOutput.chapterTitle}
-                      synopsis={outlineOutput.synopsis}
-                      scenes={outlineOutput.scenes}
-                      onApprove={handleOutlineApprove}
-                      onRegenerateAction={handleRerunOutline}
-                      isLoading={isRunning}
-                    />
-                  ) : isRunning && activeSession?.currentStep === "outline" ? (
-                    <Empty className="h-[60vh]">
-                      <EmptyMedia>
-                        <Loader2Icon className="h-10 w-10 animate-spin text-primary" />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle>Đang tạo giàn ý</EmptyTitle>
-                        <EmptyDescription>
-                          AI đang xây dựng cấu trúc phân cảnh chi tiết...
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
-                  ) : (
-                    <PipelineStepConfig
-                      novelId={novelId}
-                      role="outline"
-                      instructionKey="outline"
-                      title="Giàn ý chương"
-                      description="Giàn ý xuất hiện sau khi bạn chọn hướng đi. Bạn có thể cấu hình sẵn prompt và yêu cầu cho bước này."
-                      runLabel="Chạy pipeline (tiếp tục)"
-                      onRun={() => void handleStartPipeline()}
-                      disabled={isRunning || !activeSession}
-                    />
-                  )}
+                <TabsContent
+                  value="outline"
+                  className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                >
+                  <ScrollArea className={writingTabsScrollClass}>
+                    <div className="p-4">
+                      {pipelinePreRunRole === "outline" ? (
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="outline"
+                          instructionKey="outline"
+                          title="Tạo lại giàn ý"
+                          description="Chỉnh cấu hình rồi chạy lại bước giàn ý."
+                          runLabel="Chạy AI"
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning}
+                        />
+                      ) : outlineOutput ? (
+                        <OutlineEditor
+                          chapterTitle={outlineOutput.chapterTitle}
+                          synopsis={outlineOutput.synopsis}
+                          scenes={outlineOutput.scenes}
+                          onApprove={handleOutlineApprove}
+                          onRegenerateAction={handleRerunOutline}
+                          isLoading={isRunning}
+                        />
+                      ) : isRunning &&
+                        activeSession?.currentStep === "outline" ? (
+                        <Empty className="h-[60vh]">
+                          <EmptyMedia>
+                            <Loader2Icon className="h-10 w-10 animate-spin text-primary" />
+                          </EmptyMedia>
+                          <EmptyHeader>
+                            <EmptyTitle>Đang tạo giàn ý</EmptyTitle>
+                            <EmptyDescription>
+                              AI đang xây dựng cấu trúc phân cảnh chi tiết...
+                            </EmptyDescription>
+                          </EmptyHeader>
+                        </Empty>
+                      ) : (
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="outline"
+                          instructionKey="outline"
+                          title="Giàn ý chương"
+                          description="Giàn ý xuất hiện sau khi bạn chọn hướng đi. Bạn có thể cấu hình sẵn prompt và yêu cầu cho bước này."
+                          runLabel="Chạy pipeline (tiếp tục)"
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning || !activeSession}
+                        />
+                      )}
+                    </div>
+                  </ScrollArea>
                 </TabsContent>
 
-                <TabsContent value="content" className="p-4">
+                <TabsContent
+                  value="content"
+                  className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                >
                   {pipelinePreRunRole === "writer" ? (
-                    <PipelineStepConfig
-                      novelId={novelId}
-                      role="writer"
-                      instructionKey="writer"
-                      title="Tạo lại nội dung"
-                      description="Chỉnh cấu hình rồi chạy lại bước viết chương."
-                      runLabel="Chạy AI"
-                      onRun={() => void handleStartPipeline()}
-                      disabled={isRunning}
-                    />
+                    <ScrollArea className={writingTabsScrollClass}>
+                      <div className="p-4">
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="writer"
+                          instructionKey="writer"
+                          title="Tạo lại nội dung"
+                          description="Chỉnh cấu hình rồi chạy lại bước viết chương."
+                          runLabel="Chạy AI"
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning}
+                        />
+                      </div>
+                    </ScrollArea>
+                  ) : showWriterSetupOnContentTab ? (
+                    <ScrollArea className={writingTabsScrollClass}>
+                      <div className="p-4">
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="writer"
+                          instructionKey="writer"
+                          title="Viết chương"
+                          description="Bước Viết chưa có nội dung hợp lệ (hoặc phiên đã lỗi). Cấu hình model và prompt rồi chạy lại."
+                          runLabel="Chạy pipeline (tiếp tục)"
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning || !activeSession}
+                        />
+                      </div>
+                    </ScrollArea>
                   ) : (
-                    <ChapterPreview
-                      sessionId={activeSession?.id}
-                      onRegenerateAction={
-                        activeSession && !isRunning
-                          ? handleRerunWriter
-                          : undefined
-                      }
-                    />
+                    <div
+                      className={`${writingTabsScrollClass} flex shrink-0 flex-col overflow-hidden`}
+                    >
+                      <ChapterPreview
+                        sessionId={activeSession?.id}
+                        assumeStreaming={
+                          isRunning && activeSession?.currentStep === "writer"
+                        }
+                        isRewriting={isRewriting}
+                        onRegenerateAction={
+                          activeSession && !isRunning && !isRewriting
+                            ? handleRerunWriter
+                            : undefined
+                        }
+                      />
+                    </div>
                   )}
                 </TabsContent>
 
-                <TabsContent value="review" className="p-4">
-                  {pipelinePreRunRole === "review" ? (
-                    <PipelineStepConfig
-                      novelId={novelId}
-                      role="review"
-                      instructionKey="review"
-                      title="Tạo lại đánh giá"
-                      description="Chỉnh cấu hình rồi chạy lại bước đánh giá."
-                      runLabel="Chạy AI"
-                      onRun={() => void handleStartPipeline()}
-                      disabled={isRunning}
-                    />
-                  ) : (
-                    <ReviewPanel
-                      sessionId={activeSession?.id}
-                      onRewriteAction={handleRewrite}
-                      onSaveAction={handleSaveChapter}
-                      onRegenerateReviewAction={
-                        activeSession && !isRunning
-                          ? handleRerunReview
-                          : undefined
-                      }
-                      isRewriting={isRewriting}
-                    />
-                  )}
+                <TabsContent
+                  value="review"
+                  className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                >
+                  <ScrollArea className={writingTabsScrollClass}>
+                    <div className="p-4">
+                      {pipelinePreRunRole === "review" ? (
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="review"
+                          instructionKey="review"
+                          title="Tạo lại đánh giá"
+                          description="Chỉnh cấu hình rồi chạy lại bước đánh giá."
+                          runLabel="Chạy AI"
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning}
+                        />
+                      ) : writerOutputDone &&
+                        !reviewOutputDone &&
+                        !isRunning &&
+                        activeSession ? (
+                        <PipelineStepConfig
+                          novelId={novelId}
+                          role="review"
+                          instructionKey="review"
+                          title="Đánh giá chương"
+                          description="Cấu hình model và yêu cầu trước khi AI đánh giá bản nháp."
+                          runLabel="Chạy pipeline (tiếp tục)"
+                          onRun={() => void handleStartPipeline()}
+                          disabled={isRunning || !activeSession}
+                        />
+                      ) : (
+                        <ReviewPanel
+                          sessionId={activeSession?.id}
+                          onRewriteAction={handleRewrite}
+                          onSaveAction={handleSaveChapter}
+                          onRegenerateReviewAction={
+                            activeSession && !isRunning
+                              ? handleRerunReview
+                              : undefined
+                          }
+                          isRewriting={isRewriting}
+                        />
+                      )}
+                    </div>
+                  </ScrollArea>
                 </TabsContent>
-              </ScrollArea>
+              </div>
             </Tabs>
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -929,6 +1213,39 @@ export default function AutoWritePage() {
         open={settingsOpen}
         onOpenChangeAction={setSettingsOpen}
       />
+
+      <AlertDialog
+        open={refreshSessionOpen}
+        onOpenChange={setRefreshSessionOpen}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Làm mới phiên viết?</AlertDialogTitle>
+            <AlertDialogDescription className="text-left sm:text-left">
+              Toàn bộ kết quả các bước pipeline (bối cảnh, hướng đi, giàn ý, nội
+              dung, đánh giá, viết lại) của phiên này sẽ bị xóa. Hướng đi và
+              giàn ý trên kế hoạch chương cũng được xóa; trạng thái kế hoạch về
+              &quot;Dự định&quot;. Phiên bắt đầu lại từ bước Bối cảnh.
+              {isRunning ? (
+                <>
+                  {" "}
+                  <span className="font-medium text-amber-600 dark:text-amber-500">
+                    Pipeline đang chạy sẽ bị dừng.
+                  </span>
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleConfirmRefreshSession()}
+            >
+              Làm mới phiên
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <GenerateMorePlansDialog
         novelId={novelId}
@@ -945,7 +1262,9 @@ export default function AutoWritePage() {
       <EditChapterPlanDialog
         plan={chapterPlans?.find((p) => p.id === editPlanId) ?? null}
         open={editPlanId !== null}
-        onOpenChangeAction={(open) => { if (!open) setEditPlanId(null); }}
+        onOpenChangeAction={(open) => {
+          if (!open) setEditPlanId(null);
+        }}
       />
 
       {/* Stale Context Warning */}

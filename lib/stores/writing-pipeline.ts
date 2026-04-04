@@ -5,24 +5,31 @@ interface WritingPipelineState {
   activeSessionId: string | null;
   isRunning: boolean;
   abortController: AbortController | null;
-  activePanel: "pipeline" | "outline" | "content" | "review";
+  activePanel: "context" | "pipeline" | "outline" | "content" | "review";
   streamingContent: string;
+  /** Smart writer: human-readable status (tool lookup vs generating text). */
+  writerActivityLabel: string;
   /** Ephemeral per-step user instructions (not persisted). Keys: wizard steps, agent roles, or "generate-more-plans". */
   stepUserInstructions: Record<string, string>;
   /** When set, show pipeline step config UI before running this role (after re-run). */
   pipelinePreRunRole: WritingAgentRole | null;
+  /** Incremented after a successful standalone rewrite; ReviewPanel opens compare view when it sees a new value. */
+  reviewCompareFocusNonce: number;
 
   // Actions
   startPipeline: (sessionId: string) => AbortController;
   pausePipeline: () => void;
   cancelPipeline: () => void;
   setActivePanel: (
-    panel: "pipeline" | "outline" | "content" | "review",
+    panel: "context" | "pipeline" | "outline" | "content" | "review",
   ) => void;
   appendStreamingContent: (chunk: string) => void;
   clearStreamingContent: () => void;
+  setWriterActivityLabel: (label: string) => void;
+  clearWriterActivityLabel: () => void;
   setStepUserInstruction: (key: string, value: string) => void;
   setPipelinePreRunRole: (role: WritingAgentRole | null) => void;
+  requestReviewCompareFocus: () => void;
   reset: () => void;
 }
 
@@ -31,10 +38,12 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
     activeSessionId: null,
     isRunning: false,
     abortController: null,
-    activePanel: "pipeline",
+    activePanel: "context",
     streamingContent: "",
+    writerActivityLabel: "",
     stepUserInstructions: {},
     pipelinePreRunRole: null,
+    reviewCompareFocusNonce: 0,
 
     startPipeline: (sessionId) => {
       const controller = new AbortController();
@@ -43,6 +52,7 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
         isRunning: true,
         abortController: controller,
         streamingContent: "",
+        writerActivityLabel: "",
       });
       return controller;
     },
@@ -50,7 +60,11 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
     pausePipeline: () => {
       const { abortController } = get();
       abortController?.abort();
-      set({ isRunning: false, abortController: null });
+      set({
+        isRunning: false,
+        abortController: null,
+        writerActivityLabel: "",
+      });
     },
 
     cancelPipeline: () => {
@@ -61,6 +75,7 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
         abortController: null,
         activeSessionId: null,
         streamingContent: "",
+        writerActivityLabel: "",
       });
     },
 
@@ -73,6 +88,10 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
 
     clearStreamingContent: () => set({ streamingContent: "" }),
 
+    setWriterActivityLabel: (label) => set({ writerActivityLabel: label }),
+
+    clearWriterActivityLabel: () => set({ writerActivityLabel: "" }),
+
     setStepUserInstruction: (key, value) =>
       set((state) => ({
         stepUserInstructions: { ...state.stepUserInstructions, [key]: value },
@@ -80,15 +99,20 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
 
     setPipelinePreRunRole: (role) => set({ pipelinePreRunRole: role }),
 
+    requestReviewCompareFocus: () =>
+      set((s) => ({ reviewCompareFocusNonce: s.reviewCompareFocusNonce + 1 })),
+
     reset: () =>
       set({
         activeSessionId: null,
         isRunning: false,
         abortController: null,
-        activePanel: "pipeline",
+        activePanel: "context",
         streamingContent: "",
+        writerActivityLabel: "",
         stepUserInstructions: {},
         pipelinePreRunRole: null,
+        reviewCompareFocusNonce: 0,
       }),
   }),
 );

@@ -109,5 +109,9 @@ ${outlineText}
     onChunk?.(chunk);
   }
 
+  if (config.abortSignal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+
   return accumulated;
 }

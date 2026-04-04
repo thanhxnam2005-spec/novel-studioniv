@@ -15,7 +15,9 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
@@ -35,8 +37,20 @@ import {
   PenLineIcon,
   RotateCcwIcon,
   SearchCheckIcon,
+  Settings2Icon,
+  SlidersHorizontalIcon,
 } from "lucide-react";
 import { useState } from "react";
+
+const SMART_WRITER_MIN_STEPS = 5;
+const SMART_WRITER_MAX_STEPS = 20;
+
+function clampSmartWriterSteps(n: number): number {
+  return Math.min(
+    SMART_WRITER_MAX_STEPS,
+    Math.max(SMART_WRITER_MIN_STEPS, Math.round(n)),
+  );
+}
 
 const AGENT_ROLES: {
   role: WritingAgentRole;
@@ -165,7 +179,10 @@ export function WritingSettingsDialog({
   const chapterLength = settings?.chapterLength ?? 3000;
   const smartWritingMode = settings?.smartWritingMode ?? false;
   const smartWriterMaxToolSteps = settings?.smartWriterMaxToolSteps;
+  const noAskingMode = settings?.noAskingMode ?? false;
   const [activeRole, setActiveRole] = useState<WritingAgentRole>("context");
+
+  const sliderSteps = clampSmartWriterSteps(smartWriterMaxToolSteps ?? 12);
 
   if (open && !settings) {
     getOrCreateWritingSettings(novelId);
@@ -175,7 +192,6 @@ export function WritingSettingsDialog({
     async (role: WritingAgentRole, value: string) => {
       const key = `${role}Prompt` as const;
       const defaultPrompt = getDefaultPrompt(role);
-      // Store undefined if identical to default (saves space, always uses latest default)
       await updateWritingSettings(novelId, {
         [key]: value === defaultPrompt ? undefined : value,
       });
@@ -190,14 +206,25 @@ export function WritingSettingsDialog({
   const handleSmartModeChange = async (checked: boolean) => {
     await updateWritingSettings(novelId, {
       smartWritingMode: checked,
-      ...(checked ? {} : { smartWriterMaxToolSteps: undefined }),
+      ...(checked
+        ? {
+            smartWriterMaxToolSteps:
+              smartWriterMaxToolSteps != null
+                ? clampSmartWriterSteps(smartWriterMaxToolSteps)
+                : 12,
+          }
+        : { smartWriterMaxToolSteps: undefined }),
     });
   };
 
   const handleSmartMaxStepsChange = async (value: number) => {
     await updateWritingSettings(novelId, {
-      smartWriterMaxToolSteps: Number.isFinite(value) && value > 0 ? value : undefined,
+      smartWriterMaxToolSteps: clampSmartWriterSteps(value),
     });
+  };
+
+  const handleNoAskingChange = async (checked: boolean) => {
+    await updateWritingSettings(novelId, { noAskingMode: checked });
   };
 
   const handleResetPrompt = async (role: WritingAgentRole) => {
@@ -205,7 +232,6 @@ export function WritingSettingsDialog({
     await updateWritingSettings(novelId, { [key]: undefined });
   };
 
-  // Get the current prompt value — custom or default
   const getPromptValue = (role: WritingAgentRole): string => {
     const key = `${role}Prompt` as const;
     const custom = settings?.[key] as string | undefined;
@@ -221,161 +247,242 @@ export function WritingSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6 pb-2">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>Cài đặt viết truyện</DialogTitle>
           <DialogDescription>
-            Cấu hình mô hình AI và prompt cho từng bước trong pipeline viết
-            truyện.
+            Thiết lập hành vi pipeline và độ dài chương cũng như cấu hình AI
+            từng bước.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Chapter length — top bar */}
-        <div className="flex flex-col gap-3 px-6 pb-2 border-b">
-          <div className="flex items-center gap-3">
-            <Label className="text-sm shrink-0">Độ dài chương</Label>
-            <Input
-              type="number"
-              value={chapterLength}
-              onChange={(e) =>
-                handleLengthChange(Number(e.target.value) || 3000)
-              }
-              min={500}
-              max={10000}
-              step={500}
-              className="w-24"
-            />
-            <span className="text-xs text-muted-foreground">từ / chương</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="smart-writing"
-                checked={smartWritingMode}
-                onCheckedChange={handleSmartModeChange}
-              />
-              <Label htmlFor="smart-writing" className="text-sm cursor-pointer">
-                Viết thông minh (công cụ tra cứu, không dùng LLM bối cảnh)
-              </Label>
-            </div>
-            {smartWritingMode && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-muted-foreground shrink-0">
-                  Giới hạn bước công cụ
-                </Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={64}
-                  placeholder="Mặc định chat"
-                  value={smartWriterMaxToolSteps ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === "") {
-                      void updateWritingSettings(novelId, {
-                        smartWriterMaxToolSteps: undefined,
-                      });
-                      return;
-                    }
-                    void handleSmartMaxStepsChange(Number(v));
-                  }}
-                  className="w-20 h-8 text-xs"
-                />
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground -mt-1">
-            Chế độ viết thông minh chỉ áp dụng khi bắt đầu phiên pipeline mới (đã
-            khóa theo phiên).
-          </p>
-        </div>
+        <Tabs
+          defaultValue="general"
+          className="flex min-h-0 flex-1 flex-col gap-0"
+        >
+          <TabsList
+            variant="line"
+            className="mx-6 mb-0 h-10 w-auto shrink-0 justify-start rounded-none border-b border-border bg-transparent p-0 gap-0"
+          >
+            <TabsTrigger
+              value="general"
+              className="rounded-none border-0 shadow-none data-active:shadow-none px-4"
+            >
+              <Settings2Icon className="size-4" />
+              Chung
+            </TabsTrigger>
+            <TabsTrigger
+              value="steps"
+              className="rounded-none border-0 shadow-none data-active:shadow-none px-4"
+            >
+              <SlidersHorizontalIcon className="size-4" />
+              Mô hình &amp; prompt
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Two-column layout: role tabs + config panel */}
-        <div className="flex min-h-0 flex-1">
-          {/* Left: role selector */}
-          <div className="w-48 shrink-0 border-r bg-muted/30">
-            <div className="p-2 space-y-0.5">
-              {AGENT_ROLES.map(({ role, label, icon: Icon }) => {
-                const hasCustom = isCustomPrompt(role);
-                const hasModel = !!(settings?.[`${role}Model` as const] as
-                  | StepModelConfig
-                  | undefined);
-                return (
-                  <button
-                    key={role}
-                    onClick={() => setActiveRole(role)}
+          <TabsContent
+            value="general"
+            className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+          >
+            <ScrollArea className="h-[min(70vh,calc(85vh-10rem))]">
+              <div className="space-y-6 px-6 py-4 pb-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Độ dài chương</Label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Input
+                      type="number"
+                      value={chapterLength}
+                      onChange={(e) =>
+                        handleLengthChange(Number(e.target.value) || 3000)
+                      }
+                      min={500}
+                      max={10000}
+                      step={500}
+                      className="w-28"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      từ / chương
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Hành vi pipeline
+                  </p>
+                  <div className="flex items-start gap-3">
+                    <Switch
+                      id="smart-writing"
+                      className="mt-0.5"
+                      checked={smartWritingMode}
+                      onCheckedChange={handleSmartModeChange}
+                    />
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="smart-writing"
+                        className="text-sm cursor-pointer font-medium leading-snug"
+                      >
+                        Viết thông minh
+                      </Label>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Tra cứu tiểu thuyết bằng công cụ, không gọi LLM bước bối
+                        cảnh. Áp dụng theo cài đặt hiện tại mỗi lần chạy hoặc tiếp
+                        tục pipeline.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Switch
+                      id="no-asking"
+                      className="mt-0.5"
+                      checked={noAskingMode}
+                      onCheckedChange={handleNoAskingChange}
+                    />
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="no-asking"
+                        className="text-sm cursor-pointer font-medium leading-snug"
+                      >
+                        Không hỏi lại
+                      </Label>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Chạy liền tới khi đánh giá xong; tự chọn hướng theo gợi
+                        ý AI. Theo cài đặt hiện tại mỗi bước pipeline.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
                     className={cn(
-                      "flex items-center gap-2.5 w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
-                      activeRole === role
-                        ? "bg-background shadow-sm font-medium"
-                        : "hover:bg-background/60 text-muted-foreground",
+                      "space-y-3 pt-1 border-t border-border/60",
+                      !smartWritingMode && "opacity-50 pointer-events-none",
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="flex-1 truncate">{label}</span>
-                    {(hasCustom || hasModel) && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                    <div className="flex items-center justify-between gap-4">
+                      <Label className="text-sm font-medium">
+                        Giới hạn bước công cụ (smart writer)
+                      </Label>
+                      <span className="tabular-nums text-sm font-semibold text-foreground min-w-[2ch] text-right">
+                        {sliderSteps}
+                      </span>
+                    </div>
+                    <Slider
+                      min={SMART_WRITER_MIN_STEPS}
+                      max={SMART_WRITER_MAX_STEPS}
+                      step={1}
+                      value={[sliderSteps]}
+                      onValueChange={(v) => {
+                        const n = v[0];
+                        if (n != null) void handleSmartMaxStepsChange(n);
+                      }}
+                      disabled={!smartWritingMode}
+                      aria-label="Giới hạn bước công cụ smart writer"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      <span className="mr-0.5">
+                        {SMART_WRITER_MIN_STEPS}–{SMART_WRITER_MAX_STEPS}
+                      </span>
+                      vòng gọi công cụ mỗi lần viết. Khi tắt &quot;Viết thông
+                      minh&quot;, giá trị không dùng.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent
+            value="steps"
+            className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden border-t data-[state=inactive]:hidden"
+          >
+            <div className="flex min-h-0 flex-1">
+              <div className="w-48 shrink-0 border-r bg-muted/30">
+                <div className="p-2 space-y-0.5">
+                  {AGENT_ROLES.map(({ role, label, icon: Icon }) => {
+                    const hasCustom = isCustomPrompt(role);
+                    const hasModel = !!(settings?.[`${role}Model` as const] as
+                      | StepModelConfig
+                      | undefined);
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => setActiveRole(role)}
+                        className={cn(
+                          "flex items-center gap-2.5 w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
+                          activeRole === role
+                            ? "bg-background shadow-sm font-medium"
+                            : "hover:bg-background/60 text-muted-foreground",
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="flex-1 truncate">{label}</span>
+                        {(hasCustom || hasModel) && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 h-[min(70vh,calc(85vh-10rem))]">
+                <div className="p-5 space-y-5">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <activeConfig.icon className="h-4 w-4" />
+                      <h3 className="text-sm font-medium">
+                        {activeConfig.label}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {activeConfig.description}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Mô hình AI</Label>
+                    <StepModelPicker novelId={novelId} role={activeRole} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">
+                        System Prompt
+                      </Label>
+                      {isCustomPrompt(activeRole) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs text-muted-foreground"
+                          onClick={() => handleResetPrompt(activeRole)}
+                        >
+                          <RotateCcwIcon className="h-3 w-3 mr-1" />
+                          Khôi phục mặc định
+                        </Button>
+                      )}
+                    </div>
+                    <Textarea
+                      key={activeRole}
+                      defaultValue={getPromptValue(activeRole)}
+                      onChange={(e) =>
+                        debouncedPromptChange.run(activeRole, e.target.value)
+                      }
+                      rows={12}
+                      className="text-xs font-mono leading-relaxed resize-y"
+                    />
+                    {!isCustomPrompt(activeRole) && (
+                      <p className="text-xs text-muted-foreground">
+                        Đây là prompt mặc định. Chỉnh sửa trực tiếp để tùy biến.
+                      </p>
                     )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right: active role config */}
-          <ScrollArea className="flex-1 h-[70vh]">
-            <div className="p-5 space-y-5">
-              {/* Role header */}
-              <div>
-                <div className="flex items-center gap-2">
-                  <activeConfig.icon className="h-4 w-4" />
-                  <h3 className="text-sm font-medium">{activeConfig.label}</h3>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {activeConfig.description}
-                </p>
-              </div>
-
-              {/* Model picker */}
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Mô hình AI</Label>
-                <StepModelPicker novelId={novelId} role={activeRole} />
-              </div>
-
-              {/* Prompt editor — pre-filled with default, directly editable */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium">System Prompt</Label>
-                  {isCustomPrompt(activeRole) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs text-muted-foreground"
-                      onClick={() => handleResetPrompt(activeRole)}
-                    >
-                      <RotateCcwIcon className="h-3 w-3 mr-1" />
-                      Khôi phục mặc định
-                    </Button>
-                  )}
-                </div>
-                <Textarea
-                  key={activeRole}
-                  defaultValue={getPromptValue(activeRole)}
-                  onChange={(e) =>
-                    debouncedPromptChange.run(activeRole, e.target.value)
-                  }
-                  rows={12}
-                  className="text-xs font-mono leading-relaxed resize-y"
-                />
-                {!isCustomPrompt(activeRole) && (
-                  <p className="text-xs text-muted-foreground">
-                    Đây là prompt mặc định. Chỉnh sửa trực tiếp để tùy biến.
-                  </p>
-                )}
-              </div>
+              </ScrollArea>
             </div>
-          </ScrollArea>
-        </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

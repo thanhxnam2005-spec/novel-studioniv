@@ -9,15 +9,18 @@ import { useState } from "react";
 
 export function DirectionSelector({
   options,
+  recommendedOptionIds,
   onConfirm,
   onRegenerateAction,
   isLoading,
 }: {
   options: DirectionOption[];
+  recommendedOptionIds?: string[];
   onConfirm: (selectedDirections: string[]) => void;
   onRegenerateAction?: () => void;
   isLoading?: boolean;
 }) {
+  const recommended = new Set(recommendedOptionIds ?? []);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [customDirection, setCustomDirection] = useState("");
   const [showCustom, setShowCustom] = useState(false);
@@ -78,15 +81,30 @@ export function DirectionSelector({
                   aria-checked={selected.has(option.id)}
                 >
                   {selected.has(option.id) && (
-                    <svg className="h-3 w-3 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      className="h-3 w-3 text-primary"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   )}
                 </div>
                 <div className="flex-1 space-y-1">
-                  <CardTitle className="text-sm font-medium">
-                    {option.title}
-                  </CardTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle className="text-sm font-medium">
+                      {option.title}
+                    </CardTitle>
+                    {recommended.has(option.id) && (
+                      <span className="rounded-full bg-linear-to-r from-purple-600 via-pink-600 to-red-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                        Gợi ý AI
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {option.description}
                   </p>

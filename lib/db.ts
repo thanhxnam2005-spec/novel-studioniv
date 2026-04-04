@@ -441,8 +441,10 @@ export interface WritingSettings {
   chapterLength: number;
   /** When true, new writing sessions use synthetic context + tool-assisted writer (no context LLM). */
   smartWritingMode?: boolean;
-  /** Max tool rounds for smart writer; falls back to chat maxToolSteps when unset. */
+  /** Max tool rounds for smart writer (UI 5–20); falls back to chat maxToolSteps when unset. */
   smartWriterMaxToolSteps?: number;
+  /** When true, new sessions run the pipeline hands-free until review completes. */
+  noAskingMode?: boolean;
   contextModel?: StepModelConfig;
   directionModel?: StepModelConfig;
   outlineModel?: StepModelConfig;
@@ -466,8 +468,10 @@ export interface WritingSession {
   currentStep: WritingAgentRole;
   status: "active" | "paused" | "completed" | "error";
   contextHash?: string;
-  /** Locked when session is created from WritingSettings.smartWritingMode. */
+  /** Legacy; ignored. Pipeline uses WritingSettings.smartWritingMode each run. */
   pipelineMode?: "classic" | "smart";
+  /** Legacy; ignored. Pipeline uses WritingSettings.noAskingMode each run. */
+  handsFree?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

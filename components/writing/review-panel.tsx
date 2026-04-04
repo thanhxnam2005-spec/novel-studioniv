@@ -30,7 +30,7 @@ import {
   SearchCheckIcon,
   XCircleIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const SEVERITY_CONFIG = {
   critical: {
@@ -79,7 +79,11 @@ export function ReviewPanel({
   const setStepUserInstruction = useWritingPipelineStore(
     (s) => s.setStepUserInstruction,
   );
+  const reviewCompareFocusNonce = useWritingPipelineStore(
+    (s) => s.reviewCompareFocusNonce,
+  );
   const [viewMode, setViewMode] = useState<"issues" | "diff">("issues");
+  const consumedCompareNonce = useRef(0);
 
   const review = useMemo((): ReviewAgentOutput | null => {
     if (!reviewResult?.output) return null;
@@ -96,6 +100,13 @@ export function ReviewPanel({
   const hasRewrite = !!rewrittenContent;
   const rewriteFailed = rewriteResult?.status === "error";
   const rewriteRunning = rewriteResult?.status === "running";
+
+  useEffect(() => {
+    if (reviewCompareFocusNonce === consumedCompareNonce.current) return;
+    if (!rewrittenContent) return;
+    consumedCompareNonce.current = reviewCompareFocusNonce;
+    setViewMode("diff");
+  }, [reviewCompareFocusNonce, rewrittenContent]);
 
   if (!review) {
     return (
@@ -246,7 +257,7 @@ export function ReviewPanel({
                 <span className="text-sm font-medium text-red-600 dark:text-red-400">
                   {rewriteResult?.error
                     ? `Viết lại thất bại: ${rewriteResult.error}`
-                    : "Viết lại thất bại — nhấn \"Viết lại\" để thử lại"}
+                    : 'Viết lại thất bại — nhấn "Viết lại" để thử lại'}
                 </span>
               </div>
             )}
@@ -271,44 +282,42 @@ export function ReviewPanel({
           </Label>
           <Textarea
             value={rewriteUserInstruction}
-            onChange={(e) =>
-              setStepUserInstruction("rewrite", e.target.value)
-            }
+            onChange={(e) => setStepUserInstruction("rewrite", e.target.value)}
             placeholder="Gợi ý thêm cho bước viết lại..."
             rows={2}
             className="text-xs resize-y"
           />
         </div>
         <div className="flex gap-2 pb-3">
-        {hasIssues && (
-          <Button
-            onClick={onRewriteAction}
-            disabled={isRewriting || rewriteRunning}
-            className="flex-1"
-            variant={hasRewrite ? "outline" : hasCritical ? "default" : "outline"}
-          >
-            {isRewriting || rewriteRunning ? (
-              <>
-                <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-                Đang viết lại...
-              </>
-            ) : hasRewrite ? (
-              <>
-                <RefreshCwIcon className="h-4 w-4 mr-1" />
-                Viết lại khác
-              </>
-            ) : (
-              <>
-                <PenLineIcon className="h-4 w-4 mr-1" />
-                Viết lại
-              </>
-            )}
+          {hasIssues && (
+            <Button
+              onClick={onRewriteAction}
+              disabled={isRewriting || rewriteRunning}
+              className="flex-1"
+              variant={hasCritical && !hasRewrite ? "destructive" : "outline"}
+            >
+              {isRewriting || rewriteRunning ? (
+                <>
+                  <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
+                  Đang viết lại...
+                </>
+              ) : hasRewrite ? (
+                <>
+                  <RefreshCwIcon className="h-4 w-4 mr-1" />
+                  Viết lại khác
+                </>
+              ) : (
+                <>
+                  <PenLineIcon className="h-4 w-4 mr-1" />
+                  Viết lại
+                </>
+              )}
+            </Button>
+          )}
+          <Button onClick={onSaveAction} className="flex-1">
+            <SaveIcon className="h-4 w-4 mr-1" />
+            {hasRewrite ? "Lưu bản viết lại" : "Lưu chương"}
           </Button>
-        )}
-        <Button onClick={onSaveAction} className="flex-1">
-          <SaveIcon className="h-4 w-4 mr-1" />
-          {hasRewrite ? "Lưu bản viết lại" : "Lưu chương"}
-        </Button>
         </div>
       </div>
     </div>

@@ -14,6 +14,8 @@ import { runRewriteAgent } from "./agents/rewrite-agent";
 import type {
   AgentConfig,
   ContextAgentOutput,
+  DirectionAgentOutput,
+  DirectionOption,
   OutlineAgentOutput,
   ReviewAgentOutput,
   WritingContext,
@@ -35,8 +37,15 @@ export interface WritingPipelineOptions {
   onStepStart?: (role: WritingAgentRole) => void;
   onStepComplete?: (role: WritingAgentRole) => void;
   onWriterChunk?: (text: string) => void;
+  /** Smart writer only: status line (tool name / generating text). */
+  onWriterActivity?: (label: string) => void;
   /** Ephemeral user instructions per pipeline step (not persisted). */
   stepUserInstructions?: Partial<Record<WritingAgentRole, string>>;
+  /**
+   * When true, run context→direction→outline→writer→review without interactive pauses
+   * (except errors). Overrides WritingSettings.noAskingMode when set.
+   */
+  handsFree?: boolean;
 }
 
 const STEP_ORDER: WritingAgentRole[] = [
@@ -99,6 +108,94 @@ async function getAgentConfig(
 function nextStep(current: WritingAgentRole): WritingAgentRole | null {
   const idx = STEP_ORDER.indexOf(current);
   return idx < STEP_ORDER.length - 1 ? STEP_ORDER[idx + 1] : null;
+}
+
+function isAbortLikeError(err: unknown): boolean {
+  if (err instanceof DOMException && err.name === "AbortError") return true;
+  if (err instanceof Error) {
+    if (
+      err.name === "AbortError" ||
+      err.name === "ResponseAborted" ||
+      err.name === "TimeoutError"
+    ) {
+      return true;
+    }
+    const c = (err as Error & { cause?: unknown }).cause;
+    if (c !== undefined && isAbortLikeError(c)) return true;
+  }
+  return false;
+}
+
+/**
+ * Drop bogus writer completion (empty output) and rewind session to writer
+ * when the UI had advanced to review. Safe to call on load or before pipeline.
+ */
+export async function repairSessionIfWriterOutputEmpty(
+  sessionId: string,
+): Promise<void> {
+  const writerRes = await db.writingStepResults
+    .where("[sessionId+role]")
+    .equals([sessionId, "writer"])
+    .first();
+  if (
+    !writerRes ||
+    writerRes.status !== "completed" ||
+    !!(writerRes.output?.trim())
+  ) {
+    return;
+  }
+  await db.writingStepResults.delete(writerRes.id);
+  const sess = await db.writingSessions.get(sessionId);
+  if (!sess) return;
+  if (sess.currentStep === "review" || sess.currentStep === "rewrite") {
+    await db.writingSessions.update(sessionId, {
+      currentStep: "writer",
+      status: "active",
+      updatedAt: new Date(),
+    });
+  } else {
+    await db.writingSessions.update(sessionId, {
+      status: "active",
+      updatedAt: new Date(),
+    });
+  }
+}
+
+async function clearInterruptedStepResult(
+  sessionId: string,
+  role: WritingAgentRole,
+) {
+  const existing = await db.writingStepResults
+    .where("[sessionId+role]")
+    .equals([sessionId, role])
+    .first();
+  if (!existing) return;
+  if (existing.status === "running") {
+    await db.writingStepResults.delete(existing.id);
+    return;
+  }
+  if (
+    role === "writer" &&
+    existing.status === "completed" &&
+    !(existing.output?.trim())
+  ) {
+    await db.writingStepResults.delete(existing.id);
+  }
+}
+
+function chapterDirectionsFromRecommendation(
+  output: DirectionAgentOutput,
+): string[] {
+  const byId = new Map<string, DirectionOption>(
+    output.options.map((o) => [o.id, o]),
+  );
+  const ordered: DirectionOption[] = [];
+  for (const id of output.recommendedOptionIds ?? []) {
+    const o = byId.get(id);
+    if (o) ordered.push(o);
+  }
+  const pick = ordered.length > 0 ? ordered : output.options.slice(0, 2);
+  return pick.map((o) => `${o.title}: ${o.description}`);
 }
 
 async function getStepOutput(
@@ -167,7 +264,8 @@ async function persistCompletedContextStep(
 
 /**
  * Run (or resume) the writing pipeline for a session.
- * Reads current step from WritingSession, runs agents sequentially.
+ * Reads current step from WritingSession; smart / hands-free / chapter length from
+ * WritingSettings on each step (live, not session snapshot).
  * Returns "awaiting-input" at Direction and Outline steps for user interaction.
  */
 export async function runWritingPipeline(
@@ -180,18 +278,19 @@ export async function runWritingPipeline(
     onStepStart,
     onStepComplete,
     onWriterChunk,
+    onWriterActivity,
     stepUserInstructions,
+    handsFree: handsFreeOption,
   } = options;
 
-  const session = await db.writingSessions.get(sessionId);
+  let session = await db.writingSessions.get(sessionId);
   if (!session) throw new Error("Writing session not found");
 
-  const chapterPlan = await db.chapterPlans.get(session.chapterPlanId);
-  if (!chapterPlan) throw new Error("Chapter plan not found");
+  await repairSessionIfWriterOutputEmpty(sessionId);
+  session = (await db.writingSessions.get(sessionId))!;
 
-  const settings = await db.writingSettings.get(novelId);
-  const chapterLength = settings?.chapterLength ?? 3000;
-  const smartMode = session.pipelineMode === "smart";
+  let chapterPlan = await db.chapterPlans.get(session.chapterPlanId);
+  if (!chapterPlan) throw new Error("Chapter plan not found");
 
   // ── Stale context check on resume ─────────────────────────
   if (session.contextHash && session.currentStep !== "context") {
@@ -218,6 +317,15 @@ export async function runWritingPipeline(
 
   // ── Step loop ─────────────────────────────────────────────
   while (currentStep) {
+    const planRow = await db.chapterPlans.get(session.chapterPlanId);
+    if (!planRow) throw new Error("Chapter plan not found");
+    chapterPlan = planRow;
+
+    const settings = await db.writingSettings.get(novelId);
+    const chapterLength = settings?.chapterLength ?? 3000;
+    const smartMode = Boolean(settings?.smartWritingMode);
+    const handsFree = handsFreeOption ?? Boolean(settings?.noAskingMode);
+
     // Check if step already completed (resume scenario)
     const existingResult = await db.writingStepResults
       .where("[sessionId+role]")
@@ -231,6 +339,10 @@ export async function runWritingPipeline(
       }
       if (currentStep === "outline" && !chapterPlan.outline) {
         return "awaiting-input";
+      }
+      if (currentStep === "writer" && !(existingResult.output?.trim())) {
+        await db.writingStepResults.delete(existingResult.id);
+        continue;
       }
       const next = nextStep(currentStep);
       if (!next) break;
@@ -257,6 +369,14 @@ export async function runWritingPipeline(
           chapterPlan.chapterOrder,
         );
         await persistCompletedContextStep(sessionId, output, writingContext);
+        if (!handsFree) {
+          onStepComplete?.("context");
+          await db.writingSessions.update(sessionId, {
+            currentStep: "direction",
+            updatedAt: new Date(),
+          });
+          return "awaiting-input";
+        }
         onStepComplete?.("context");
         const nextAfterCtx = nextStep("context");
         if (!nextAfterCtx) break;
@@ -285,6 +405,14 @@ export async function runWritingPipeline(
             configWithUser,
           );
           await persistCompletedContextStep(sessionId, output, writingContext);
+          if (!handsFree) {
+            onStepComplete?.("context");
+            await db.writingSessions.update(sessionId, {
+              currentStep: "direction",
+              updatedAt: new Date(),
+            });
+            return "awaiting-input";
+          }
           break;
         }
 
@@ -308,8 +436,18 @@ export async function runWritingPipeline(
             "completed",
             JSON.stringify(directionOutput),
           );
+          if (handsFree) {
+            const directionStrings =
+              chapterDirectionsFromRecommendation(directionOutput);
+            await db.chapterPlans.update(chapterPlan.id, {
+              directions: directionStrings,
+              updatedAt: new Date(),
+            });
+            const refreshed = await db.chapterPlans.get(chapterPlan.id);
+            if (refreshed) chapterPlan = refreshed;
+            break;
+          }
           onStepComplete?.(currentStep);
-          // Pause for user to select directions
           return "awaiting-input";
         }
 
@@ -343,16 +481,28 @@ export async function runWritingPipeline(
             title: outlineOutput.chapterTitle,
             updatedAt: new Date(),
           });
-          onStepComplete?.(currentStep);
-          // Pause for user to review/edit outline
-          return "awaiting-input";
+          if (!handsFree) {
+            onStepComplete?.(currentStep);
+            return "awaiting-input";
+          }
+          {
+            const refreshed = await db.chapterPlans.get(chapterPlan.id);
+            if (refreshed) chapterPlan = refreshed;
+          }
+          break;
         }
 
         case "writer": {
           const contextJson = await getStepOutput(sessionId, "context");
           const outlineJson = await getStepOutput(sessionId, "outline");
-          if (!contextJson || !outlineJson)
+          if (
+            contextJson == null ||
+            contextJson === "" ||
+            outlineJson == null ||
+            outlineJson === ""
+          ) {
             throw new Error("Previous step outputs not found");
+          }
 
           const contextOutput: ContextAgentOutput = JSON.parse(contextJson);
           const outlineOutput: OutlineAgentOutput = JSON.parse(outlineJson);
@@ -363,10 +513,11 @@ export async function runWritingPipeline(
           );
 
           const chatSettings = await db.chatSettings.get("default");
+          const rawCap = settings?.smartWriterMaxToolSteps;
           const smartWriterMaxSteps =
-            settings?.smartWriterMaxToolSteps ??
-            chatSettings?.maxToolSteps ??
-            15;
+            rawCap != null
+              ? Math.min(20, Math.max(5, rawCap))
+              : (chatSettings?.maxToolSteps ?? 15);
 
           const content = smartMode
             ? await runSmartWriterAgent(
@@ -380,6 +531,7 @@ export async function runWritingPipeline(
                 chapterLength,
                 smartWriterMaxSteps,
                 onWriterChunk,
+                onWriterActivity,
               )
             : await runWriterAgent(
                 {
@@ -392,19 +544,43 @@ export async function runWritingPipeline(
                 onWriterChunk,
               );
 
+          if (abortSignal?.aborted) {
+            throw new DOMException("Aborted", "AbortError");
+          }
+
+          if (!content.trim()) {
+            throw new Error(
+              "Không tạo được nội dung chương (bản rỗng). Chạy lại bước Viết.",
+            );
+          }
+
           await writeStepResult(sessionId, "writer", "completed", content);
           await db.chapterPlans.update(chapterPlan.id, {
             status: "written",
             updatedAt: new Date(),
           });
+          if (!handsFree) {
+            onStepComplete?.("writer");
+            await db.writingSessions.update(sessionId, {
+              currentStep: "review",
+              updatedAt: new Date(),
+            });
+            return "awaiting-input";
+          }
           break;
         }
 
         case "review": {
           const contextJson = await getStepOutput(sessionId, "context");
           const writerOutput = await getStepOutput(sessionId, "writer");
-          if (!contextJson || !writerOutput)
+          if (
+            contextJson == null ||
+            contextJson === "" ||
+            writerOutput == null ||
+            writerOutput === ""
+          ) {
             throw new Error("Previous step outputs not found");
+          }
 
           const contextOutput: ContextAgentOutput = JSON.parse(contextJson);
           const reviewOutput = await runReviewAgent(
@@ -428,7 +604,8 @@ export async function runWritingPipeline(
 
       onStepComplete?.(currentStep);
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
+      if (abortSignal?.aborted || isAbortLikeError(err)) {
+        await clearInterruptedStepResult(sessionId, currentStep);
         await db.writingSessions.update(sessionId, {
           status: "paused",
           updatedAt: new Date(),

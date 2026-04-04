@@ -35,6 +35,8 @@ export interface DirectionOption {
 
 export interface DirectionAgentOutput {
   options: DirectionOption[];
+  /** 1–3 option ids the model recommends for automatic selection (hands-free mode). */
+  recommendedOptionIds?: string[];
 }
 
 // ─── Outline Agent ──────────────────────────────────────────

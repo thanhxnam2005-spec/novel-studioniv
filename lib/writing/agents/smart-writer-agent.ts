@@ -1,6 +1,10 @@
 import { createNovelReadTools } from "@/lib/ai/novel-read-tools";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
 import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
+import {
+  getSmartWriterToolLabelVi,
+  SMART_WRITER_WRITING_LABEL_VI,
+} from "@/lib/writing/smart-writer-tool-labels";
 import { db } from "@/lib/db";
 import { stepCountIs, streamText } from "ai";
 import type { AgentConfig, ContextAgentOutput, OutlineAgentOutput } from "../types";
@@ -22,6 +26,7 @@ export async function runSmartWriterAgent(
   chapterLength: number,
   maxToolSteps: number,
   onChunk?: (text: string) => void,
+  onToolActivity?: (label: string) => void,
 ): Promise<string> {
   const { novelId, chapterOrder, contextOutput, outline } = input;
 
@@ -109,9 +114,21 @@ ${outlineText}
 
   let accumulated = "";
   let finishReason: string | undefined;
+  let streamPhase: "tool" | "text" | null = null;
+
+  const markWritingText = () => {
+    if (streamPhase !== "text") {
+      streamPhase = "text";
+      onToolActivity?.(SMART_WRITER_WRITING_LABEL_VI);
+    }
+  };
 
   for await (const part of result.fullStream) {
-    if (part.type === "text-delta") {
+    if (part.type === "tool-input-start") {
+      streamPhase = "tool";
+      onToolActivity?.(getSmartWriterToolLabelVi(part.toolName));
+    } else if (part.type === "text-delta") {
+      markWritingText();
       accumulated += part.text;
       onChunk?.(part.text);
     } else if (part.type === "finish-step") {
@@ -119,6 +136,10 @@ ${outlineText}
     } else if (part.type === "error") {
       throw part.error;
     }
+  }
+
+  if (config.abortSignal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
   }
 
   if (finishReason === "tool-calls" && !config.abortSignal?.aborted) {
@@ -137,8 +158,10 @@ ${outlineText}
         abortSignal: config.abortSignal,
       });
 
+      streamPhase = null;
       for await (const part of followUp.fullStream) {
         if (part.type === "text-delta") {
+          markWritingText();
           accumulated += part.text;
           onChunk?.(part.text);
         } else if (part.type === "error") {
@@ -148,6 +171,10 @@ ${outlineText}
     } catch {
       // Keep partial accumulated text
     }
+  }
+
+  if (config.abortSignal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
   }
 
   return accumulated;

@@ -1,4 +1,9 @@
-export { runWritingPipeline, type WritingPipelineOptions, type PipelineResult } from "./orchestrator";
+export {
+  runWritingPipeline,
+  repairSessionIfWriterOutputEmpty,
+  type WritingPipelineOptions,
+  type PipelineResult,
+} from "./orchestrator";
 export { buildWritingContext } from "./context-builder";
 export { getDefaultPrompt } from "./prompts";
 export { runContextAgent } from "./agents/context-agent";

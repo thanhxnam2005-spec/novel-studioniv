@@ -50,11 +50,13 @@ function StatusIcon({ status }: { status: WritingStepStatus | undefined }) {
 export function PipelineProgress({
   sessionId,
   currentStep,
+  sessionStatus,
   onStepClick,
   onRetryAction,
 }: {
   sessionId: string | undefined;
   currentStep?: WritingAgentRole;
+  sessionStatus?: "active" | "paused" | "completed" | "error";
   onStepClick?: (role: WritingAgentRole) => void;
   onRetryAction?: () => void;
 }) {
@@ -73,6 +75,13 @@ export function PipelineProgress({
         const result = resultMap.get(step.role);
         const isActive = currentStep === step.role;
         const Icon = step.icon;
+        const writerEmptyCompleted =
+          step.role === "writer" &&
+          result?.status === "completed" &&
+          !(result.output?.trim());
+        const displayStatus = writerEmptyCompleted
+          ? undefined
+          : result?.status;
 
         return (
           <button
@@ -89,17 +98,25 @@ export function PipelineProgress({
             <span className="flex-1">
               {i + 1}. {step.label}
             </span>
-            <StatusIcon status={result?.status} />
+            <StatusIcon status={displayStatus} />
           </button>
         );
       })}
 
       {(() => {
         const errorStep = currentStep ? resultMap.get(currentStep) : undefined;
-        if (errorStep?.status !== "error") return null;
+        const isError = errorStep?.status === "error";
+        const isPaused = sessionStatus === "paused";
+        if (!isError && !isPaused) return null;
         return (
           <div className="mt-2 space-y-2">
-            {errorStep.error && (
+            {isPaused && (
+              <p className="text-xs text-muted-foreground px-1">
+                Đã tạm dừng — chọn &quot;Thử lại&quot; hoặc mở tab bước tương ứng
+                để cấu hình và chạy tiếp.
+              </p>
+            )}
+            {isError && errorStep?.error && (
               <div className="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
                 {errorStep.error}
               </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollToBottom } from "@/components/chat/scroll-to-bottom";
 import {
   Empty,
   EmptyDescription,
@@ -10,53 +11,74 @@ import {
 import { useStepResult } from "@/lib/hooks";
 import { useWritingPipelineStore } from "@/lib/stores/writing-pipeline";
 import { countWords } from "@/lib/utils";
-import { ArrowDownIcon, Loader2Icon, PenLineIcon, RefreshCwIcon } from "lucide-react";
+import { LoaderIcon, PenLineIcon, RefreshCwIcon } from "lucide-react";
+import { useLayoutEffect } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
-function ScrollToBottomButton() {
-  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
-  if (isAtBottom) return null;
-  return (
-    <button
-      onClick={() => scrollToBottom()}
-      className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1.5 text-xs shadow-md backdrop-blur-sm hover:bg-background transition-colors"
-    >
-      <ArrowDownIcon className="h-3 w-3" />
-      Cuộn xuống
-    </button>
-  );
+/** Pins scroll during pipeline writer / rewrite streaming (ResizeObserver path uses preserveScrollPosition). */
+function StreamingScrollFollow({
+  isStreaming,
+  contentLength,
+}: {
+  isStreaming: boolean;
+  contentLength: number;
+}) {
+  const { scrollToBottom } = useStickToBottomContext();
+
+  useLayoutEffect(() => {
+    if (!isStreaming) return;
+    void scrollToBottom({
+      animation: "instant",
+      preserveScrollPosition: false,
+    });
+  }, [isStreaming, contentLength, scrollToBottom]);
+
+  return null;
 }
 
 export function ChapterPreview({
   sessionId,
   onRegenerateAction,
+  /** True while writer step is active but DB row may not be "running" yet (avoids empty flash). */
+  assumeStreaming,
+  /** True while standalone rewrite runs (uses same store streaming buffer as pipeline writer). */
+  isRewriting,
 }: {
   sessionId: string | undefined;
   onRegenerateAction?: () => void;
+  assumeStreaming?: boolean;
+  isRewriting?: boolean;
 }) {
   const stepResult = useStepResult(sessionId, "writer");
   const streamingContent = useWritingPipelineStore((s) => s.streamingContent);
+  const writerActivityLabel = useWritingPipelineStore(
+    (s) => s.writerActivityLabel,
+  );
   const isRunning = useWritingPipelineStore((s) => s.isRunning);
 
+  const writerDraft = stepResult?.output ?? "";
+  const streamText = streamingContent;
   const content =
-    isRunning && streamingContent
-      ? streamingContent
-      : (stepResult?.output ?? "");
+    (isRunning || isRewriting) && streamText ? streamText : writerDraft;
 
   const wordCount = countWords(content);
-  const isStreaming = isRunning && stepResult?.status === "running";
+  const writerStepRunning = stepResult?.status === "running";
+  const isStreaming =
+    !!assumeStreaming ||
+    (isRunning && writerStepRunning) ||
+    Boolean(isRewriting);
 
   if (!content && !isStreaming) {
     return (
-      <Empty className="h-[60vh]">
+      <Empty className="h-full min-h-[200px]">
         <EmptyMedia variant="icon">
           <PenLineIcon />
         </EmptyMedia>
         <EmptyHeader>
           <EmptyTitle>Nội dung chương</EmptyTitle>
           <EmptyDescription>
-            Nội dung sẽ được viết sau khi bạn duyệt giàn ý. AI sẽ viết từng
-            phân cảnh và hiển thị real-time tại đây.
+            Nội dung sẽ được viết sau khi bạn duyệt giàn ý. AI sẽ viết từng phân
+            cảnh và hiển thị real-time tại đây.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -64,14 +86,18 @@ export function ChapterPreview({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b px-4 py-2">
+    <div className="grid h-full min-h-0 w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
           {isStreaming && (
-            <Loader2Icon className="h-4 w-4 animate-spin text-primary" />
+            <LoaderIcon className="h-4 w-4 animate-spin text-primary" />
           )}
           <span className="text-sm font-medium">
-            {isStreaming ? "Đang viết..." : "Nội dung chương"}
+            {isStreaming
+              ? isRewriting
+                ? "Đang viết lại theo đánh giá..."
+                : writerActivityLabel.trim() || "Đang viết..."
+              : "Nội dung chương"}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -99,7 +125,11 @@ export function ChapterPreview({
         </div>
       </div>
 
-      <StickToBottom className="relative flex-1 overflow-hidden" resize="smooth" initial="smooth">
+      <StickToBottom
+        className="relative h-full min-h-0 overflow-hidden"
+        resize="smooth"
+        initial="instant"
+      >
         <StickToBottom.Content className="p-6">
           <div className="mx-auto max-w-2xl">
             <div className="prose prose-sm max-w-none whitespace-pre-wrap dark:prose-invert font-serif leading-relaxed">
@@ -110,7 +140,11 @@ export function ChapterPreview({
             </div>
           </div>
         </StickToBottom.Content>
-        <ScrollToBottomButton />
+        <StreamingScrollFollow
+          isStreaming={isStreaming}
+          contentLength={content.length}
+        />
+        <ScrollToBottom />
       </StickToBottom>
     </div>
   );

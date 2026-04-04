@@ -87,8 +87,16 @@ export const directionOutputSchema = jsonSchema<DirectionAgentOutput>({
       },
       description: "3-5 hướng đi đề xuất cho chương tiếp theo",
     },
+    recommendedOptionIds: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+      maxItems: 3,
+      description:
+        "1-3 id từ options mà bạn đánh giá là phù hợp nhất (phải trùng id trong options)",
+    },
   },
-  required: ["options"],
+  required: ["options", "recommendedOptionIds"],
   additionalProperties: false,
 });
 

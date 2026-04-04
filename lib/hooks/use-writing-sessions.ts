@@ -80,3 +80,32 @@ export async function updateWritingSession(
 ) {
   await db.writingSessions.update(id, { ...data, updatedAt: new Date() });
 }
+
+/** Delete all step results, reset session to context, clear plan directions/outline/scenes. */
+export async function resetWritingSessionProgress(sessionId: string) {
+  const session = await db.writingSessions.get(sessionId);
+  if (!session) throw new Error("Writing session not found");
+  const now = new Date();
+  await db.transaction(
+    "rw",
+    db.writingStepResults,
+    db.writingSessions,
+    db.chapterPlans,
+    async () => {
+      await db.writingStepResults.where("sessionId").equals(sessionId).delete();
+      await db.writingSessions.update(sessionId, {
+        currentStep: "context",
+        status: "active",
+        contextHash: undefined,
+        updatedAt: now,
+      });
+      await db.chapterPlans.update(session.chapterPlanId, {
+        directions: [],
+        outline: "",
+        scenes: [],
+        status: "planned",
+        updatedAt: now,
+      });
+    },
+  );
+}

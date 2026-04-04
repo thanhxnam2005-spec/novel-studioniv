@@ -111,8 +111,14 @@ export async function generateStructured<T>({
       abortSignal,
     });
   } catch (err) {
-    // Re-throw abort errors immediately
-    if (err instanceof Error && err.name === "AbortError") throw err;
+    if (
+      (err instanceof Error || err instanceof DOMException) &&
+      (err.name === "AbortError" ||
+        err.name === "ResponseAborted" ||
+        err.name === "TimeoutError")
+    ) {
+      throw err;
+    }
 
     // Try to recover from tool_use_failed with failed_generation
     const failedText = getFailedGeneration(err);

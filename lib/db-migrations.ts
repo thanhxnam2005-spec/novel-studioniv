@@ -141,4 +141,16 @@ export function registerMigrations(db: NovelStudioDB) {
       "id, novelId, chapterPlanId, status, [novelId+status], createdAt",
     writingStepResults: "id, sessionId, role, [sessionId+role]",
   });
+
+  // v11: noAskingMode (settings) + handsFree on session (legacy; pipeline reads settings)
+  db.version(11).stores({
+    plotArcs: "id, novelId, type, status, [novelId+type], createdAt",
+    chapterPlans:
+      "id, novelId, chapterOrder, status, [novelId+chapterOrder], createdAt",
+    characterArcs: "id, novelId, characterId, [novelId+characterId], createdAt",
+    writingSettings: "id",
+    writingSessions:
+      "id, novelId, chapterPlanId, status, [novelId+status], createdAt",
+    writingStepResults: "id, sessionId, role, [sessionId+role]",
+  });
 }
