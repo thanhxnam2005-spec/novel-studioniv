@@ -1,0 +1,154 @@
+import { createNovelReadTools } from "@/lib/ai/novel-read-tools";
+import { withGlobalInstruction } from "@/lib/ai/system-prompt";
+import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
+import { db } from "@/lib/db";
+import { stepCountIs, streamText } from "ai";
+import type { AgentConfig, ContextAgentOutput, OutlineAgentOutput } from "../types";
+
+function ellipsis(text: string, maxChars: number): string {
+  return text.length > maxChars ? text.slice(0, maxChars) + "…" : text;
+}
+
+export interface RunSmartWriterAgentInput {
+  novelId: string;
+  chapterOrder: number;
+  contextOutput: ContextAgentOutput;
+  outline: OutlineAgentOutput;
+}
+
+export async function runSmartWriterAgent(
+  input: RunSmartWriterAgentInput,
+  config: AgentConfig,
+  chapterLength: number,
+  maxToolSteps: number,
+  onChunk?: (text: string) => void,
+): Promise<string> {
+  const { novelId, chapterOrder, contextOutput, outline } = input;
+
+  const chapterPlan = await db.chapterPlans
+    .where("[novelId+chapterOrder]")
+    .equals([novelId, chapterOrder])
+    .first();
+
+  const directionsBlock =
+    chapterPlan && chapterPlan.directions.length > 0
+      ? chapterPlan.directions.map((d, i) => `${i + 1}. ${d}`).join("\n")
+      : "";
+
+  const unresolved =
+    contextOutput.unresolvedThreads?.length > 0
+      ? contextOutput.unresolvedThreads.join("; ")
+      : "(không ghi nhận)";
+
+  const contextSummary = [
+    `Sự kiện trước đó (rút gọn): ${ellipsis(contextOutput.previousEvents, 1200)}`,
+    `Tiến trình cốt truyện: ${contextOutput.plotProgress}`,
+    `Tuyến chưa giải quyết: ${unresolved}`,
+    `Trạng thái nhân vật (rút gọn): ${contextOutput.characterStates.slice(0, 8).map((c) => `${c.name}: ${c.currentState}`).join("; ")}${contextOutput.characterStates.length > 8 ? "…" : ""}`,
+    `Thế giới (rút gọn): ${ellipsis(contextOutput.worldState, 800)}`,
+  ].join("\n");
+
+  const directionsSection = directionsBlock
+    ? `## Hướng đi đã chọn (bắt buộc tuân thủ)
+${directionsBlock}
+
+`
+    : "";
+
+  const outlineText = outline.scenes
+    .map(
+      (s, i) =>
+        `### Phân cảnh ${i + 1}: ${s.title}
+Tóm tắt: ${s.summary}
+Nhân vật: ${s.characters.join(", ")}
+${s.location ? `Địa điểm: ${s.location}` : ""}
+Sự kiện: ${s.keyEvents.join("; ")}
+Tâm trạng: ${s.mood}
+Số từ: ~${s.wordCountTarget} từ`,
+    )
+    .join("\n\n");
+
+  const baseUser = `Viết chương truyện "${outline.chapterTitle}" (chương thứ ${chapterOrder} trong kế hoạch).
+
+Bạn có các công cụ chỉ đọc để tra cứu tiểu thuyết (nhân vật, chương trước, thế giới, tìm kiếm). Hãy gọi công cụ khi cần để đảm bảo tên, chi tiết và mạch truyện khớp dữ liệu gốc — không bịa thiết lập trái với DB.
+
+## Tóm tắt nhanh (bootstrap — có thể thiếu chi tiết; dùng công cụ để bổ sung)
+${contextSummary}
+
+${directionsSection}## Tóm tắt chương (giàn ý)
+${outline.synopsis}
+
+## Giàn ý chi tiết
+${outlineText}
+
+## Yêu cầu
+- Tổng số từ mục tiêu: ${outline.totalWordCountTarget} từ (mục tiêu chương: ~${chapterLength} từ nếu khác biệt thì ưu tiên giàn ý)
+- Bám sát giàn ý và hướng đi; sau khi đã tra cứu đủ, viết toàn bộ nội dung chương
+- Viết văn xuôi thuần túy, không dùng markdown
+- Viết bằng Tiếng Việt`;
+
+  const systemPrompt = config.systemPrompt.replace(
+    "{chapterLength}",
+    String(chapterLength),
+  );
+
+  const tools = createNovelReadTools(novelId);
+  const userContent = appendUserInstructionToPrompt(
+    baseUser,
+    config.userInstruction,
+  );
+
+  const result = streamText({
+    model: config.model,
+    system: withGlobalInstruction(systemPrompt, config.globalInstruction),
+    messages: [{ role: "user", content: userContent }],
+    tools,
+    stopWhen: stepCountIs(maxToolSteps),
+    abortSignal: config.abortSignal,
+  });
+
+  let accumulated = "";
+  let finishReason: string | undefined;
+
+  for await (const part of result.fullStream) {
+    if (part.type === "text-delta") {
+      accumulated += part.text;
+      onChunk?.(part.text);
+    } else if (part.type === "finish-step") {
+      finishReason = part.finishReason;
+    } else if (part.type === "error") {
+      throw part.error;
+    }
+  }
+
+  if (finishReason === "tool-calls" && !config.abortSignal?.aborted) {
+    try {
+      const { messages: responseMessages } = await result.response;
+      const followUp = streamText({
+        model: config.model,
+        messages: [
+          ...responseMessages,
+          {
+            role: "user",
+            content:
+              "Bạn đã đạt giới hạn số lần gọi công cụ. Dựa trên mọi thông tin đã có, hãy viết toàn bộ nội dung chương truyện ngay bây giờ: văn xuôi tiếng Việt, không markdown, bám giàn ý và hướng đi.",
+          },
+        ],
+        abortSignal: config.abortSignal,
+      });
+
+      for await (const part of followUp.fullStream) {
+        if (part.type === "text-delta") {
+          accumulated += part.text;
+          onChunk?.(part.text);
+        } else if (part.type === "error") {
+          throw part.error;
+        }
+      }
+    } catch {
+      // Keep partial accumulated text
+    }
+  }
+
+  return accumulated;
+}

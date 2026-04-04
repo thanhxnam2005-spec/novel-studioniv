@@ -2,6 +2,8 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
@@ -13,6 +15,7 @@ import {
 import { InlineDiffViewer } from "@/components/ui/inline-diff-viewer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useStepResult } from "@/lib/hooks";
+import { useWritingPipelineStore } from "@/lib/stores/writing-pipeline";
 import type { ReviewAgentOutput } from "@/lib/writing/types";
 import {
   AlertTriangleIcon,
@@ -70,6 +73,12 @@ export function ReviewPanel({
   const reviewResult = useStepResult(sessionId, "review");
   const writerResult = useStepResult(sessionId, "writer");
   const rewriteResult = useStepResult(sessionId, "rewrite");
+  const rewriteUserInstruction = useWritingPipelineStore(
+    (s) => s.stepUserInstructions.rewrite ?? "",
+  );
+  const setStepUserInstruction = useWritingPipelineStore(
+    (s) => s.setStepUserInstruction,
+  );
   const [viewMode, setViewMode] = useState<"issues" | "diff">("issues");
 
   const review = useMemo((): ReviewAgentOutput | null => {
@@ -255,7 +264,22 @@ export function ReviewPanel({
       )}
 
       {/* Action buttons */}
-      <div className="border-t p-3 flex gap-2">
+      <div className="border-t px-3 pt-3 space-y-2">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">
+            Yêu cầu khi viết lại (không lưu DB)
+          </Label>
+          <Textarea
+            value={rewriteUserInstruction}
+            onChange={(e) =>
+              setStepUserInstruction("rewrite", e.target.value)
+            }
+            placeholder="Gợi ý thêm cho bước viết lại..."
+            rows={2}
+            className="text-xs resize-y"
+          />
+        </div>
+        <div className="flex gap-2 pb-3">
         {hasIssues && (
           <Button
             onClick={onRewriteAction}
@@ -285,6 +309,7 @@ export function ReviewPanel({
           <SaveIcon className="h-4 w-4 mr-1" />
           {hasRewrite ? "Lưu bản viết lại" : "Lưu chương"}
         </Button>
+        </div>
       </div>
     </div>
   );

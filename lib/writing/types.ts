@@ -4,6 +4,7 @@ export interface AgentConfig {
   model: LanguageModel;
   systemPrompt: string;
   globalInstruction?: string;
+  userInstruction?: string;
   abortSignal?: AbortSignal;
 }
 

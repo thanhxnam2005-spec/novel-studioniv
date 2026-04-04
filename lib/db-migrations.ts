@@ -129,4 +129,16 @@ export function registerMigrations(db: NovelStudioDB) {
       "id, novelId, chapterPlanId, status, [novelId+status], createdAt",
     writingStepResults: "id, sessionId, role, [sessionId+role]",
   });
+
+  // v10: Smart writing (optional fields on writingSettings / writingSessions; schema unchanged)
+  db.version(10).stores({
+    plotArcs: "id, novelId, type, status, [novelId+type], createdAt",
+    chapterPlans:
+      "id, novelId, chapterOrder, status, [novelId+chapterOrder], createdAt",
+    characterArcs: "id, novelId, characterId, [novelId+characterId], createdAt",
+    writingSettings: "id",
+    writingSessions:
+      "id, novelId, chapterPlanId, status, [novelId+status], createdAt",
+    writingStepResults: "id, sessionId, role, [sessionId+role]",
+  });
 }

@@ -1,5 +1,6 @@
 import { streamText } from "ai";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
+import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
 import type { AgentConfig, ReviewAgentOutput } from "../types";
 
 /**
@@ -20,10 +21,7 @@ export async function runRewriteAgent(
     )
     .join("\n");
 
-  const result = streamText({
-    model: config.model,
-    system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
-    prompt: `Dựa trên đánh giá của biên tập viên, hãy viết lại chương truyện để khắc phục các vấn đề.
+  const basePrompt = `Dựa trên đánh giá của biên tập viên, hãy viết lại chương truyện để khắc phục các vấn đề.
 
 ## Đánh giá (${review.overallScore}/10)
 ${review.summary}
@@ -39,7 +37,12 @@ ${originalContent}
 - Giữ nguyên cốt truyện, nhân vật và sự kiện
 - Khắc phục tất cả vấn đề được nêu trong đánh giá
 - Giữ nguyên phong cách và giọng văn của tác giả
-- KHÔNG dùng markdown, chỉ văn xuôi thuần túy`,
+- KHÔNG dùng markdown, chỉ văn xuôi thuần túy`;
+
+  const result = streamText({
+    model: config.model,
+    system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
+    prompt: appendUserInstructionToPrompt(basePrompt, config.userInstruction),
     abortSignal: config.abortSignal,
   });
 

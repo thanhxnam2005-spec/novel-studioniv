@@ -1,5 +1,6 @@
 import { generateStructured } from "@/lib/ai/structured";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
+import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
 import { reviewOutputSchema } from "../schemas";
 import type { AgentConfig, ContextAgentOutput, ReviewAgentOutput } from "../types";
 
@@ -16,17 +17,19 @@ export async function runReviewAgent(
     `Tuyến chưa giải quyết: ${contextOutput.unresolvedThreads.join("; ")}`,
   ].join("\n");
 
-  const { object } = await generateStructured<ReviewAgentOutput>({
-    model: config.model,
-    schema: reviewOutputSchema,
-    system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
-    prompt: `Đánh giá chương truyện sau dựa trên bối cảnh đã thiết lập.
+  const basePrompt = `Đánh giá chương truyện sau dựa trên bối cảnh đã thiết lập.
 
 ## Bối cảnh đã thiết lập
 ${contextSummary}
 
 ## Nội dung chương cần đánh giá
-${chapterContent}`,
+${chapterContent}`;
+
+  const { object } = await generateStructured<ReviewAgentOutput>({
+    model: config.model,
+    schema: reviewOutputSchema,
+    system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
+    prompt: appendUserInstructionToPrompt(basePrompt, config.userInstruction),
     abortSignal: config.abortSignal,
   });
 

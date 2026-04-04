@@ -15,6 +15,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
@@ -162,6 +163,8 @@ export function WritingSettingsDialog({
 }) {
   const settings = useWritingSettings(novelId);
   const chapterLength = settings?.chapterLength ?? 3000;
+  const smartWritingMode = settings?.smartWritingMode ?? false;
+  const smartWriterMaxToolSteps = settings?.smartWriterMaxToolSteps;
   const [activeRole, setActiveRole] = useState<WritingAgentRole>("context");
 
   if (open && !settings) {
@@ -182,6 +185,19 @@ export function WritingSettingsDialog({
 
   const handleLengthChange = async (value: number) => {
     await updateWritingSettings(novelId, { chapterLength: value });
+  };
+
+  const handleSmartModeChange = async (checked: boolean) => {
+    await updateWritingSettings(novelId, {
+      smartWritingMode: checked,
+      ...(checked ? {} : { smartWriterMaxToolSteps: undefined }),
+    });
+  };
+
+  const handleSmartMaxStepsChange = async (value: number) => {
+    await updateWritingSettings(novelId, {
+      smartWriterMaxToolSteps: Number.isFinite(value) && value > 0 ? value : undefined,
+    });
   };
 
   const handleResetPrompt = async (role: WritingAgentRole) => {
@@ -215,18 +231,63 @@ export function WritingSettingsDialog({
         </DialogHeader>
 
         {/* Chapter length — top bar */}
-        <div className="flex items-center gap-3 px-6 pb-2 border-b">
-          <Label className="text-sm shrink-0">Độ dài chương</Label>
-          <Input
-            type="number"
-            value={chapterLength}
-            onChange={(e) => handleLengthChange(Number(e.target.value) || 3000)}
-            min={500}
-            max={10000}
-            step={500}
-            className="w-24"
-          />
-          <span className="text-xs text-muted-foreground">từ / chương</span>
+        <div className="flex flex-col gap-3 px-6 pb-2 border-b">
+          <div className="flex items-center gap-3">
+            <Label className="text-sm shrink-0">Độ dài chương</Label>
+            <Input
+              type="number"
+              value={chapterLength}
+              onChange={(e) =>
+                handleLengthChange(Number(e.target.value) || 3000)
+              }
+              min={500}
+              max={10000}
+              step={500}
+              className="w-24"
+            />
+            <span className="text-xs text-muted-foreground">từ / chương</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="smart-writing"
+                checked={smartWritingMode}
+                onCheckedChange={handleSmartModeChange}
+              />
+              <Label htmlFor="smart-writing" className="text-sm cursor-pointer">
+                Viết thông minh (công cụ tra cứu, không dùng LLM bối cảnh)
+              </Label>
+            </div>
+            {smartWritingMode && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground shrink-0">
+                  Giới hạn bước công cụ
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={64}
+                  placeholder="Mặc định chat"
+                  value={smartWriterMaxToolSteps ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") {
+                      void updateWritingSettings(novelId, {
+                        smartWriterMaxToolSteps: undefined,
+                      });
+                      return;
+                    }
+                    void handleSmartMaxStepsChange(Number(v));
+                  }}
+                  className="w-20 h-8 text-xs"
+                />
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Chế độ viết thông minh chỉ áp dụng khi bắt đầu phiên pipeline mới (đã
+            khóa theo phiên).
+          </p>
         </div>
 
         {/* Two-column layout: role tabs + config panel */}

@@ -439,6 +439,10 @@ export type WritingStepStatus =
 export interface WritingSettings {
   id: string;
   chapterLength: number;
+  /** When true, new writing sessions use synthetic context + tool-assisted writer (no context LLM). */
+  smartWritingMode?: boolean;
+  /** Max tool rounds for smart writer; falls back to chat maxToolSteps when unset. */
+  smartWriterMaxToolSteps?: number;
   contextModel?: StepModelConfig;
   directionModel?: StepModelConfig;
   outlineModel?: StepModelConfig;
@@ -462,6 +466,8 @@ export interface WritingSession {
   currentStep: WritingAgentRole;
   status: "active" | "paused" | "completed" | "error";
   contextHash?: string;
+  /** Locked when session is created from WritingSettings.smartWritingMode. */
+  pipelineMode?: "classic" | "smart";
   createdAt: Date;
   updatedAt: Date;
 }

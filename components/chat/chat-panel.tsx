@@ -937,9 +937,8 @@ export function ChatPanel() {
   const panelContent = (
     <>
       {/* Header */}
-      <div className="flex h-11 shrink-0 items-center justify-between border-b px-2.5">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b px-2.5">
         <div className="flex items-center gap-2 pl-1">
-          <BotIcon className="size-3.5 text-muted-foreground/70" />
           <span className="text-[13px] font-medium tracking-tight">
             Trò chuyện AI
           </span>
@@ -947,7 +946,7 @@ export function ChatPanel() {
         <div className="flex items-center">
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="icon-sm"
             onClick={handleNewConversation}
             title="Cuộc trò chuyện mới"
           >
@@ -955,7 +954,7 @@ export function ChatPanel() {
           </Button>
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="icon-sm"
             onClick={() => setHistoryOpen(true)}
             title="Lịch sử trò chuyện"
           >
@@ -963,14 +962,14 @@ export function ChatPanel() {
           </Button>
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="icon-sm"
             onClick={() => setSettingsOpen(true)}
             title="Cài đặt trò chuyện"
           >
             <SettingsIcon />
           </Button>
           <div className="mx-1 h-3.5 w-px bg-border/60" />
-          <Button variant="ghost" size="icon-xs" onClick={close}>
+          <Button variant="ghost" size="icon-sm" onClick={close}>
             <XIcon />
           </Button>
         </div>

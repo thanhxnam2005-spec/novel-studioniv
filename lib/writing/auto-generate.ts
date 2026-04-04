@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
+import type { WritingAgentRole } from "@/lib/db";
 import { resolveStep } from "@/lib/ai/resolve-step";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
 import { generateStructured } from "@/lib/ai/structured";
+import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
 import { jsonSchema } from "ai";
 import type { LanguageModel } from "ai";
 
@@ -12,6 +14,7 @@ interface GenerateFrameworkOptions {
   idea: string;
   style?: string;
   systemPrompt?: string;
+  userInstruction?: string;
   abortSignal?: AbortSignal;
   onPhase?: (phase: "world" | "characters" | "arcs" | "plans") => void;
 }
@@ -173,10 +176,15 @@ const chapterPlanSchema = jsonSchema<ChapterPlanResult>({
   required: ["plans"],
 });
 
-async function getModel(novelId: string): Promise<LanguageModel> {
+async function getModelForRole(
+  novelId: string,
+  role: WritingAgentRole,
+): Promise<LanguageModel> {
   const settings = await db.writingSettings.get(novelId);
-  if (settings?.contextModel) {
-    const model = await resolveStep(settings.contextModel);
+  const stepModelKey = `${role}Model` as const;
+  const stepConfig = settings?.[stepModelKey];
+  if (stepConfig) {
+    const model = await resolveStep(stepConfig);
     if (model) return model;
   }
   const chatSettings = await db.chatSettings.get("default");
@@ -201,8 +209,10 @@ async function getGlobalInstruction(): Promise<string | undefined> {
 export async function generateWorldBuilding(
   options: GenerateFrameworkOptions,
 ): Promise<WorldBuildingResult> {
-  const model = await getModel(options.novelId);
+  const model = await getModelForRole(options.novelId, "context");
   const globalInstruction = await getGlobalInstruction();
+
+  const basePrompt = `Thể loại: ${options.genre ?? "Tự suy luận"}\nBối cảnh: ${options.setting ?? "Tự suy luận"}\nÝ tưởng: ${options.idea}\n${options.style ? `Phong cách: ${options.style}` : ""}`;
 
   const { object } = await generateStructured<WorldBuildingResult>({
     model,
@@ -211,7 +221,7 @@ export async function generateWorldBuilding(
       options.systemPrompt ?? `Bạn là nhà xây dựng thế giới chuyên nghiệp cho tiểu thuyết. Tạo thế giới quan chi tiết dựa trên ý tưởng. Trả lời bằng Tiếng Việt.`,
       globalInstruction,
     ),
-    prompt: `Thể loại: ${options.genre ?? "Tự suy luận"}\nBối cảnh: ${options.setting ?? "Tự suy luận"}\nÝ tưởng: ${options.idea}\n${options.style ? `Phong cách: ${options.style}` : ""}`,
+    prompt: appendUserInstructionToPrompt(basePrompt, options.userInstruction),
     abortSignal: options.abortSignal,
   });
   return object;
@@ -224,8 +234,10 @@ export async function generateCharacters(
   options: GenerateFrameworkOptions,
   worldContext: string,
 ): Promise<CharacterResult> {
-  const model = await getModel(options.novelId);
+  const model = await getModelForRole(options.novelId, "direction");
   const globalInstruction = await getGlobalInstruction();
+
+  const basePrompt = `Ý tưởng: ${options.idea}\n\nThế giới:\n${worldContext}`;
 
   const { object } = await generateStructured<CharacterResult>({
     model,
@@ -234,7 +246,7 @@ export async function generateCharacters(
       options.systemPrompt ?? `Bạn là nhà văn chuyên tạo nhân vật cho tiểu thuyết. Tạo 4-6 nhân vật phù hợp với thế giới và ý tưởng. Trả lời bằng Tiếng Việt.`,
       globalInstruction,
     ),
-    prompt: `Ý tưởng: ${options.idea}\n\nThế giới:\n${worldContext}`,
+    prompt: appendUserInstructionToPrompt(basePrompt, options.userInstruction),
     abortSignal: options.abortSignal,
   });
   return object;
@@ -247,8 +259,10 @@ export async function generatePlotArcs(
   options: GenerateFrameworkOptions,
   context: string,
 ): Promise<PlotArcResult> {
-  const model = await getModel(options.novelId);
+  const model = await getModelForRole(options.novelId, "outline");
   const globalInstruction = await getGlobalInstruction();
+
+  const basePrompt = `Ý tưởng: ${options.idea}\n\n${context}`;
 
   const { object } = await generateStructured<PlotArcResult>({
     model,
@@ -257,7 +271,7 @@ export async function generatePlotArcs(
       options.systemPrompt ?? `Bạn là nhà biên kịch chuyên nghiệp. Tạo mạch truyện chính và phụ với các điểm mốc cụ thể. Trả lời bằng Tiếng Việt.`,
       globalInstruction,
     ),
-    prompt: `Ý tưởng: ${options.idea}\n\n${context}`,
+    prompt: appendUserInstructionToPrompt(basePrompt, options.userInstruction),
     abortSignal: options.abortSignal,
   });
   return object;
@@ -271,8 +285,10 @@ export async function generateChapterPlans(
   context: string,
   chapterCount: number = 8,
 ): Promise<ChapterPlanResult> {
-  const model = await getModel(options.novelId);
+  const model = await getModelForRole(options.novelId, "writer");
   const globalInstruction = await getGlobalInstruction();
+
+  const basePrompt = `Ý tưởng: ${options.idea}\n\n${context}`;
 
   const { object } = await generateStructured<ChapterPlanResult>({
     model,
@@ -281,7 +297,7 @@ export async function generateChapterPlans(
       options.systemPrompt ?? `Bạn là nhà văn chuyên lập kế hoạch tiểu thuyết. Tạo kế hoạch cho ${chapterCount} chương đầu tiên. Mỗi chương cần tiêu đề và 2-3 hướng đi chính. Trả lời bằng Tiếng Việt.`,
       globalInstruction,
     ),
-    prompt: `Ý tưởng: ${options.idea}\n\n${context}`,
+    prompt: appendUserInstructionToPrompt(basePrompt, options.userInstruction),
     abortSignal: options.abortSignal,
   });
   return object;
@@ -314,6 +330,7 @@ export async function saveCharacters(
   novelId: string,
   result: CharacterResult,
 ) {
+  await db.characters.where("novelId").equals(novelId).delete();
   const now = new Date();
   const entries = result.characters.map((char) => ({
     id: crypto.randomUUID(),
@@ -338,7 +355,12 @@ export async function saveCharacters(
 export async function savePlotArcs(
   novelId: string,
   result: PlotArcResult,
+  options?: { replaceAll?: boolean },
 ) {
+  const replaceAll = options?.replaceAll ?? true;
+  if (replaceAll) {
+    await db.plotArcs.where("novelId").equals(novelId).delete();
+  }
   const now = new Date();
   const entries = result.arcs.map((arc) => ({
     id: crypto.randomUUID(),
@@ -365,7 +387,12 @@ export async function savePlotArcs(
 export async function saveChapterPlans(
   novelId: string,
   result: ChapterPlanResult,
+  options?: { replaceAll?: boolean },
 ) {
+  const replaceAll = options?.replaceAll ?? true;
+  if (replaceAll) {
+    await db.chapterPlans.where("novelId").equals(novelId).delete();
+  }
   const now = new Date();
   const entries = result.plans.map((plan) => ({
     id: crypto.randomUUID(),
@@ -383,15 +410,22 @@ export async function saveChapterPlans(
   return entries.map((e) => e.id);
 }
 
+export interface GenerateFromExistingOptions {
+  abortSignal?: AbortSignal;
+  onPhase?: (phase: "arcs" | "plans") => void;
+  userInstruction?: string;
+}
+
 /**
  * Generate plot arcs and chapter plans from existing novel data.
  * Used for continuation mode (State B).
  */
 export async function generateFromExisting(
   novelId: string,
-  abortSignal?: AbortSignal,
-  onPhase?: (phase: "arcs" | "plans") => void,
+  options: GenerateFromExistingOptions = {},
 ) {
+  const { abortSignal, onPhase, userInstruction } = options;
+
   const [novel, chapters, characters] = await Promise.all([
     db.novels.get(novelId),
     db.chapters.where("novelId").equals(novelId).sortBy("order"),
@@ -416,30 +450,27 @@ export async function generateFromExisting(
   const idea = novel.synopsis || novel.description || novel.title;
   const nextChapter = chapters.length + 1;
 
-  // Generate arcs
   onPhase?.("arcs");
   const arcsResult = await generatePlotArcs(
-    { novelId, idea, abortSignal },
+    { novelId, idea, abortSignal, userInstruction },
     context,
   );
-  await savePlotArcs(novelId, arcsResult);
+  await savePlotArcs(novelId, arcsResult, { replaceAll: false });
 
-  // Generate plans for next 5 chapters
   onPhase?.("plans");
   const arcContext =
     context +
     `\n\nMạch truyện:\n${arcsResult.arcs.map((a) => `- ${a.title} (${a.type}): ${a.description}`).join("\n")}`;
   const plansResult = await generateChapterPlans(
-    { novelId, idea, abortSignal },
+    { novelId, idea, abortSignal, userInstruction },
     arcContext,
     5,
   );
-  // Offset chapter orders to continue from where we left off
   plansResult.plans = plansResult.plans.map((p, i) => ({
     ...p,
     chapterOrder: nextChapter + i,
   }));
-  await saveChapterPlans(novelId, plansResult);
+  await saveChapterPlans(novelId, plansResult, { replaceAll: false });
 
   return { arcs: arcsResult, plans: plansResult };
 }

@@ -1,5 +1,6 @@
 import { generateStructured } from "@/lib/ai/structured";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
+import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
 import { outlineOutputSchema } from "../schemas";
 import type {
   AgentConfig,
@@ -23,11 +24,7 @@ export async function runOutlineAgent(
     .map((d, i) => `${i + 1}. ${d}`)
     .join("\n");
 
-  const { object } = await generateStructured<OutlineAgentOutput>({
-    model: config.model,
-    schema: outlineOutputSchema,
-    system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
-    prompt: `Dựa trên bối cảnh và hướng đi đã chọn, hãy tạo giàn ý chi tiết cho chương mới.
+  const basePrompt = `Dựa trên bối cảnh và hướng đi đã chọn, hãy tạo giàn ý chi tiết cho chương mới.
 
 ## Bối cảnh
 ${contextSummary}
@@ -37,7 +34,13 @@ ${directionText}
 
 ## Yêu cầu
 - Tổng số từ mục tiêu: ${chapterLength} từ
-- Phân bổ số từ hợp lý cho mỗi phân cảnh`,
+- Phân bổ số từ hợp lý cho mỗi phân cảnh`;
+
+  const { object } = await generateStructured<OutlineAgentOutput>({
+    model: config.model,
+    schema: outlineOutputSchema,
+    system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
+    prompt: appendUserInstructionToPrompt(basePrompt, config.userInstruction),
     abortSignal: config.abortSignal,
   });
 

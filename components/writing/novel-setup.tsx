@@ -91,9 +91,11 @@ export function NovelSetup({
     abortRef.current = controller;
 
     try {
-      await generateFromExisting(novelId, controller.signal, (phase) =>
-        setGenPhase(phase === "arcs" ? "mạch truyện" : "kế hoạch chương"),
-      );
+      await generateFromExisting(novelId, {
+        abortSignal: controller.signal,
+        onPhase: (phase) =>
+          setGenPhase(phase === "arcs" ? "mạch truyện" : "kế hoạch chương"),
+      });
       toast.success("Đã tạo mạch truyện và kế hoạch chương");
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;

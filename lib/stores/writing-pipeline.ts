@@ -1,3 +1,4 @@
+import type { WritingAgentRole } from "@/lib/db";
 import { create } from "zustand";
 
 interface WritingPipelineState {
@@ -6,6 +7,10 @@ interface WritingPipelineState {
   abortController: AbortController | null;
   activePanel: "pipeline" | "outline" | "content" | "review";
   streamingContent: string;
+  /** Ephemeral per-step user instructions (not persisted). Keys: wizard steps, agent roles, or "generate-more-plans". */
+  stepUserInstructions: Record<string, string>;
+  /** When set, show pipeline step config UI before running this role (after re-run). */
+  pipelinePreRunRole: WritingAgentRole | null;
 
   // Actions
   startPipeline: (sessionId: string) => AbortController;
@@ -16,6 +21,8 @@ interface WritingPipelineState {
   ) => void;
   appendStreamingContent: (chunk: string) => void;
   clearStreamingContent: () => void;
+  setStepUserInstruction: (key: string, value: string) => void;
+  setPipelinePreRunRole: (role: WritingAgentRole | null) => void;
   reset: () => void;
 }
 
@@ -26,6 +33,8 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
     abortController: null,
     activePanel: "pipeline",
     streamingContent: "",
+    stepUserInstructions: {},
+    pipelinePreRunRole: null,
 
     startPipeline: (sessionId) => {
       const controller = new AbortController();
@@ -64,6 +73,13 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
 
     clearStreamingContent: () => set({ streamingContent: "" }),
 
+    setStepUserInstruction: (key, value) =>
+      set((state) => ({
+        stepUserInstructions: { ...state.stepUserInstructions, [key]: value },
+      })),
+
+    setPipelinePreRunRole: (role) => set({ pipelinePreRunRole: role }),
+
     reset: () =>
       set({
         activeSessionId: null,
@@ -71,6 +87,8 @@ export const useWritingPipelineStore = create<WritingPipelineState>(
         abortController: null,
         activePanel: "pipeline",
         streamingContent: "",
+        stepUserInstructions: {},
+        pipelinePreRunRole: null,
       }),
   }),
 );

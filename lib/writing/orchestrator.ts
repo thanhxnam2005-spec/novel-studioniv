@@ -6,10 +6,18 @@ import { buildWritingContext } from "./context-builder";
 import { runContextAgent } from "./agents/context-agent";
 import { runDirectionAgent } from "./agents/direction-agent";
 import { runOutlineAgent } from "./agents/outline-agent";
+import { runSmartWriterAgent } from "./agents/smart-writer-agent";
 import { runWriterAgent } from "./agents/writer-agent";
 import { runReviewAgent } from "./agents/review-agent";
+import { buildSyntheticContextOutput } from "./synthetic-context";
 import { runRewriteAgent } from "./agents/rewrite-agent";
-import type { AgentConfig, ContextAgentOutput, OutlineAgentOutput, ReviewAgentOutput } from "./types";
+import type {
+  AgentConfig,
+  ContextAgentOutput,
+  OutlineAgentOutput,
+  ReviewAgentOutput,
+  WritingContext,
+} from "./types";
 import type { LanguageModel } from "ai";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -27,6 +35,8 @@ export interface WritingPipelineOptions {
   onStepStart?: (role: WritingAgentRole) => void;
   onStepComplete?: (role: WritingAgentRole) => void;
   onWriterChunk?: (text: string) => void;
+  /** Ephemeral user instructions per pipeline step (not persisted). */
+  stepUserInstructions?: Partial<Record<WritingAgentRole, string>>;
 }
 
 const STEP_ORDER: WritingAgentRole[] = [
@@ -136,6 +146,23 @@ async function writeStepResult(
   }
 }
 
+async function persistCompletedContextStep(
+  sessionId: string,
+  output: ContextAgentOutput,
+  writingContext: WritingContext,
+) {
+  await writeStepResult(
+    sessionId,
+    "context",
+    "completed",
+    JSON.stringify(output),
+  );
+  await db.writingSessions.update(sessionId, {
+    contextHash: writingContext.hash,
+    updatedAt: new Date(),
+  });
+}
+
 // ─── Main Pipeline Function ─────────────────────────────────
 
 /**
@@ -146,8 +173,15 @@ async function writeStepResult(
 export async function runWritingPipeline(
   options: WritingPipelineOptions,
 ): Promise<PipelineResult> {
-  const { novelId, sessionId, abortSignal, onStepStart, onStepComplete, onWriterChunk } =
-    options;
+  const {
+    novelId,
+    sessionId,
+    abortSignal,
+    onStepStart,
+    onStepComplete,
+    onWriterChunk,
+    stepUserInstructions,
+  } = options;
 
   const session = await db.writingSessions.get(sessionId);
   if (!session) throw new Error("Writing session not found");
@@ -157,6 +191,7 @@ export async function runWritingPipeline(
 
   const settings = await db.writingSettings.get(novelId);
   const chapterLength = settings?.chapterLength ?? 3000;
+  const smartMode = session.pipelineMode === "smart";
 
   // ── Stale context check on resume ─────────────────────────
   if (session.contextHash && session.currentStep !== "context") {
@@ -214,26 +249,42 @@ export async function runWritingPipeline(
 
     try {
       onStepStart?.(currentStep);
+
+      if (currentStep === "context" && smartMode) {
+        await writeStepResult(sessionId, "context", "running");
+        const { output, writingContext } = await buildSyntheticContextOutput(
+          novelId,
+          chapterPlan.chapterOrder,
+        );
+        await persistCompletedContextStep(sessionId, output, writingContext);
+        onStepComplete?.("context");
+        const nextAfterCtx = nextStep("context");
+        if (!nextAfterCtx) break;
+        currentStep = nextAfterCtx;
+        await db.writingSessions.update(sessionId, {
+          currentStep,
+          updatedAt: new Date(),
+        });
+        continue;
+      }
+
       const config = await getAgentConfig(novelId, currentStep, abortSignal);
+      const userInstruction = stepUserInstructions?.[currentStep];
+      const configWithUser: AgentConfig = {
+        ...config,
+        ...(userInstruction?.trim()
+          ? { userInstruction: userInstruction.trim() }
+          : {}),
+      };
       await writeStepResult(sessionId, currentStep, "running");
 
       switch (currentStep) {
         case "context": {
           const { output, writingContext } = await runContextAgent(
             { novelId, chapterOrder: chapterPlan.chapterOrder },
-            config,
+            configWithUser,
           );
-          await writeStepResult(
-            sessionId,
-            "context",
-            "completed",
-            JSON.stringify(output),
-          );
-          // Save context hash for stale detection
-          await db.writingSessions.update(sessionId, {
-            contextHash: writingContext.hash,
-            updatedAt: new Date(),
-          });
+          await persistCompletedContextStep(sessionId, output, writingContext);
           break;
         }
 
@@ -249,7 +300,7 @@ export async function runWritingPipeline(
           const directionOutput = await runDirectionAgent(
             contextOutput,
             plotArcs,
-            config,
+            configWithUser,
           );
           await writeStepResult(
             sessionId,
@@ -271,7 +322,7 @@ export async function runWritingPipeline(
             contextOutput,
             chapterPlan.directions,
             chapterLength,
-            config,
+            configWithUser,
           );
           await writeStepResult(
             sessionId,
@@ -306,28 +357,40 @@ export async function runWritingPipeline(
           const contextOutput: ContextAgentOutput = JSON.parse(contextJson);
           const outlineOutput: OutlineAgentOutput = JSON.parse(outlineJson);
 
-          // Replace {chapterLength} in writer prompt
-          config.systemPrompt = config.systemPrompt.replace(
+          configWithUser.systemPrompt = configWithUser.systemPrompt.replace(
             "{chapterLength}",
             String(chapterLength),
           );
 
-          let content: string;
-          try {
-            content = await runWriterAgent(
-              contextOutput,
-              outlineOutput,
-              config,
-              onWriterChunk,
-            );
-          } catch (err) {
-            // Save partial content on error (abort or API failure)
-            if (onWriterChunk) {
-              // Partial content was already streamed via chunks
-              // The store has the accumulated text
-            }
-            throw err;
-          }
+          const chatSettings = await db.chatSettings.get("default");
+          const smartWriterMaxSteps =
+            settings?.smartWriterMaxToolSteps ??
+            chatSettings?.maxToolSteps ??
+            15;
+
+          const content = smartMode
+            ? await runSmartWriterAgent(
+                {
+                  novelId,
+                  chapterOrder: chapterPlan.chapterOrder,
+                  contextOutput,
+                  outline: outlineOutput,
+                },
+                configWithUser,
+                chapterLength,
+                smartWriterMaxSteps,
+                onWriterChunk,
+              )
+            : await runWriterAgent(
+                {
+                  novelId,
+                  chapterOrder: chapterPlan.chapterOrder,
+                  contextOutput,
+                  outline: outlineOutput,
+                },
+                configWithUser,
+                onWriterChunk,
+              );
 
           await writeStepResult(sessionId, "writer", "completed", content);
           await db.chapterPlans.update(chapterPlan.id, {
@@ -347,7 +410,7 @@ export async function runWritingPipeline(
           const reviewOutput = await runReviewAgent(
             contextOutput,
             writerOutput,
-            config,
+            configWithUser,
           );
           await writeStepResult(
             sessionId,
@@ -408,6 +471,7 @@ export interface RewriteOptions {
   sessionId: string;
   abortSignal?: AbortSignal;
   onChunk?: (text: string) => void;
+  userInstruction?: string;
 }
 
 /**
@@ -418,7 +482,7 @@ export interface RewriteOptions {
 export async function runRewriteStep(
   options: RewriteOptions,
 ): Promise<"completed" | "error"> {
-  const { novelId, sessionId, abortSignal, onChunk } = options;
+  const { novelId, sessionId, abortSignal, onChunk, userInstruction } = options;
 
   const writerOutput = await getStepOutput(sessionId, "writer");
   const reviewJson = await getStepOutput(sessionId, "review");
@@ -440,11 +504,17 @@ export async function runRewriteStep(
 
   try {
     const config = await getAgentConfig(novelId, "rewrite", abortSignal);
+    const configWithUser: AgentConfig = {
+      ...config,
+      ...(userInstruction?.trim()
+        ? { userInstruction: userInstruction.trim() }
+        : {}),
+    };
 
     const rewrittenContent = await runRewriteAgent(
       writerOutput,
       review,
-      config,
+      configWithUser,
       onChunk,
     );
 

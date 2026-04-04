@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EditableText } from "@/components/novel/editable-text";
 import {
   Empty,
@@ -11,26 +10,16 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Label } from "@/components/ui/label";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
   getOrCreateWritingSettings,
-  updateWritingSettings,
   updateNovel,
-  useAIModels,
-  useAIProviders,
   useChapterPlans,
   useCharacters,
   useNovel,
   usePlotArcs,
-  useWritingSettings,
 } from "@/lib/hooks";
+import type { WritingAgentRole } from "@/lib/db";
 import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
@@ -48,62 +37,20 @@ import {
   CheckCircle2Icon,
   ChevronRightIcon,
   GlobeIcon,
-  Loader2Icon,
   MapIcon,
   MapPinIcon,
   RefreshCwIcon,
-  SettingsIcon,
   ShieldIcon,
   SparklesIcon,
   UsersIcon,
   XIcon,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { PipelineStepConfig } from "./pipeline-step-config";
 import type { IdeaFormData } from "./idea-form";
-
-const STEP_DEFAULT_PROMPTS: Record<WizardStep, string> = {
-  world: `Bạn là nhà xây dựng thế giới chuyên nghiệp cho tiểu thuyết. Tạo thế giới quan chi tiết dựa trên ý tưởng.
-
-Bao gồm:
-- Tổng quan thế giới (worldOverview)
-- Hệ thống sức mạnh/phép thuật (nếu có)
-- Bối cảnh chính (storySetting)
-- Thời kỳ/niên đại
-- Quy tắc đặc biệt của thế giới
-- 2-4 thế lực/phe phái quan trọng
-- 3-5 địa danh quan trọng
-
-Trả lời bằng Tiếng Việt.`,
-  characters: `Bạn là nhà văn chuyên tạo nhân vật cho tiểu thuyết. Tạo 4-6 nhân vật phù hợp với thế giới và ý tưởng.
-
-Cho mỗi nhân vật:
-- Tên và vai trò (chính/phản diện/phụ/mentor)
-- Mô tả ngắn gọn
-- Tính cách nổi bật
-- Động lực và mục tiêu
-
-Đảm bảo nhân vật đa dạng và có mối quan hệ thú vị với nhau.
-Trả lời bằng Tiếng Việt.`,
-  arcs: `Bạn là nhà biên kịch chuyên nghiệp. Tạo mạch truyện chính và phụ với các điểm mốc cụ thể.
-
-Bao gồm:
-- 1 mạch truyện chính (main) với 4-6 điểm mốc
-- 1-2 mạch phụ (subplot) với 2-3 điểm mốc mỗi mạch
-- 1 mạch nhân vật (character) cho nhân vật chính
-
-Mỗi điểm mốc cần tiêu đề và mô tả ngắn.
-Trả lời bằng Tiếng Việt.`,
-  plans: `Bạn là nhà văn chuyên lập kế hoạch tiểu thuyết. Tạo kế hoạch cho các chương đầu tiên.
-
-Mỗi chương cần:
-- Số thứ tự
-- Tiêu đề hấp dẫn
-- 2-3 hướng đi chính (mô tả ngắn gọn nội dung sẽ xảy ra)
-
-Đảm bảo các chương có nhịp điệu tốt: xen kẽ hành động và phát triển nhân vật.
-Trả lời bằng Tiếng Việt.`,
-};
+import { useWritingPipelineStore } from "@/lib/stores/writing-pipeline";
+import { getDefaultPrompt } from "@/lib/writing/prompts";
 
 type WizardStep = "world" | "characters" | "arcs" | "plans";
 
@@ -144,73 +91,6 @@ const STEPS: {
   },
 ];
 
-// ─── Model Picker (inline) ──────────────────────────────────
-
-function InlineModelPicker({
-  novelId,
-  role,
-}: {
-  novelId: string;
-  role: WritingAgentRole;
-}) {
-  const settings = useWritingSettings(novelId);
-  const modelKey = `${role}Model` as const;
-  const value = settings?.[modelKey] as StepModelConfig | undefined;
-  const providers = useAIProviders();
-  const selectedProviderId = value?.providerId ?? "";
-  const models = useAIModels(selectedProviderId || undefined);
-
-  const ensureAndUpdate = async (data: Record<string, unknown>) => {
-    await getOrCreateWritingSettings(novelId);
-    await updateWritingSettings(novelId, data);
-  };
-
-  return (
-    <div className="grid gap-2 grid-cols-2">
-      <NativeSelect
-        className="w-full text-xs"
-        value={selectedProviderId}
-        onChange={(e) => {
-          const pid = e.target.value;
-          ensureAndUpdate({
-            [modelKey]: pid ? { providerId: pid, modelId: "" } : undefined,
-          });
-        }}
-      >
-        <NativeSelectOption value="">Mặc định</NativeSelectOption>
-        {providers?.map((p) => (
-          <NativeSelectOption key={p.id} value={p.id}>
-            {p.name}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-      <NativeSelect
-        className="w-full text-xs"
-        value={value?.modelId ?? ""}
-        disabled={!selectedProviderId}
-        onChange={(e) => {
-          if (!selectedProviderId) return;
-          ensureAndUpdate({
-            [modelKey]: {
-              providerId: selectedProviderId,
-              modelId: e.target.value,
-            },
-          });
-        }}
-      >
-        <NativeSelectOption value="">
-          {selectedProviderId ? "Chọn model" : "—"}
-        </NativeSelectOption>
-        {models?.map((m) => (
-          <NativeSelectOption key={m.id} value={m.modelId}>
-            {m.name}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-    </div>
-  );
-}
-
 // ─── Main Component ─────────────────────────────────────────
 
 export function SetupWizard({
@@ -228,10 +108,11 @@ export function SetupWizard({
     startAtStep ?? "world",
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [customPrompt, setCustomPrompt] = useState("");
-  const [showConfig, setShowConfig] = useState(false);
   const [wantsRegenerate, setWantsRegenerate] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const setStepUserInstruction = useWritingPipelineStore(
+    (s) => s.setStepUserInstruction,
+  );
 
   const novel = useNovel(novelId);
   const characters = useCharacters(novelId);
@@ -240,6 +121,12 @@ export function SetupWizard({
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep);
   const stepDef = STEPS[currentStepIndex];
+
+  useEffect(() => {
+    void getOrCreateWritingSettings(novelId);
+  }, [novelId]);
+
+  const wizardInstructionKey = `wizard:${currentStep}`;
 
   const isStepDone = useCallback(
     (step: WizardStep) => {
@@ -280,17 +167,24 @@ export function SetupWizard({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const defaultPrompt = STEP_DEFAULT_PROMPTS[currentStep];
+    const ws = await getOrCreateWritingSettings(novelId);
+    const role = stepDef.agentRole;
+    const promptKey = `${role}Prompt` as const;
+    const systemPrompt =
+      (ws[promptKey] as string | undefined) ?? getDefaultPrompt(role);
+    const userInstruction =
+      useWritingPipelineStore.getState().stepUserInstructions[
+        wizardInstructionKey
+      ] ?? "";
+
     const options = {
       novelId,
       genre: ideaData.genre,
       setting: ideaData.setting,
       idea: ideaData.idea,
       style: ideaData.style,
-      systemPrompt:
-        customPrompt && customPrompt !== defaultPrompt
-          ? customPrompt
-          : undefined,
+      systemPrompt,
+      userInstruction: userInstruction.trim() || undefined,
       abortSignal: controller.signal,
     };
 
@@ -317,7 +211,7 @@ export function SetupWizard({
           break;
         }
       }
-      setCustomPrompt("");
+      setStepUserInstruction(wizardInstructionKey, "");
       setWantsRegenerate(false);
       toast.success(`Đã tạo ${stepDef.label}`);
     } catch (err) {
@@ -326,13 +220,19 @@ export function SetupWizard({
     } finally {
       setIsGenerating(false);
     }
-  }, [currentStep, novelId, ideaData, customPrompt, buildContext, stepDef]);
+  }, [
+    currentStep,
+    novelId,
+    ideaData,
+    buildContext,
+    stepDef,
+    wizardInstructionKey,
+    setStepUserInstruction,
+  ]);
 
   const handleNext = useCallback(() => {
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStep(STEPS[currentStepIndex + 1].key);
-      setCustomPrompt("");
-      setShowConfig(false);
       setWantsRegenerate(false);
     } else {
       onCompleteAction();
@@ -539,7 +439,7 @@ export function SetupWizard({
   const renderEmptyState = () => {
     const Icon = stepDef.icon;
     return (
-      <div className="flex flex-col items-center max-w-md mx-auto gap-4">
+      <div className="flex flex-col items-center max-w-lg mx-auto gap-4 w-full">
         <Empty className="border-0">
           <EmptyMedia variant="icon">
             <Icon />
@@ -550,57 +450,20 @@ export function SetupWizard({
           </EmptyHeader>
         </Empty>
 
-        {/* Inline config panel */}
-        <div className="w-full space-y-4">
-          {/* Model config */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Mô hình AI</Label>
-            <InlineModelPicker novelId={novelId} role={stepDef.agentRole} />
-          </div>
-
-          {/* Full prompt editor */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">System Prompt</Label>
-              {customPrompt !== STEP_DEFAULT_PROMPTS[currentStep] && (
-                <button
-                  onClick={() =>
-                    setCustomPrompt(STEP_DEFAULT_PROMPTS[currentStep])
-                  }
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <RefreshCwIcon className="h-3 w-3" />
-                  Khôi phục mặc định
-                </button>
-              )}
-            </div>
-            <Textarea
-              value={customPrompt || STEP_DEFAULT_PROMPTS[currentStep]}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-              rows={8}
-              className="text-xs font-mono leading-relaxed resize-y"
-            />
-          </div>
-        </div>
-
-        <Button
-          onClick={handleGenerate}
+        <PipelineStepConfig
+          novelId={novelId}
+          role={stepDef.agentRole}
+          instructionKey={wizardInstructionKey}
+          title={`Cấu hình: ${stepDef.label}`}
+          description="Điều chỉnh mô hình, yêu cầu của bạn và system prompt (mở rộng) trước khi tạo."
+          runLabel={
+            isGenerating
+              ? `Đang tạo ${stepDef.label.toLowerCase()}...`
+              : `Tạo ${stepDef.label.toLowerCase()}`
+          }
+          onRun={handleGenerate}
           disabled={isGenerating}
-          size="lg"
-          className="w-full"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
-              Đang tạo {stepDef.label.toLowerCase()}...
-            </>
-          ) : (
-            <>
-              <SparklesIcon className="h-4 w-4 mr-2" />
-              Tạo {stepDef.label.toLowerCase()}
-            </>
-          )}
-        </Button>
+        />
 
         {isGenerating && (
           <Button
@@ -643,8 +506,6 @@ export function SetupWizard({
                   key={step.key}
                   onClick={() => {
                     setCurrentStep(step.key);
-                    setCustomPrompt("");
-                    setShowConfig(false);
                     setWantsRegenerate(false);
                   }}
                   className={cn(
@@ -697,23 +558,9 @@ export function SetupWizard({
                 <RefreshCwIcon className="h-3.5 w-3.5 mr-1" />
                 Tạo lại
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowConfig(!showConfig)}
-              >
-                <SettingsIcon className="h-3.5 w-3.5 mr-1" />
-                Cài đặt
-              </Button>
             </div>
 
-            {showConfig && (
-              <div className="flex-1">
-                <InlineModelPicker novelId={novelId} role={stepDef.agentRole} />
-              </div>
-            )}
-
-            {!showConfig && <div className="flex-1" />}
+            <div className="flex-1" />
 
             <Button onClick={handleNext}>
               {currentStepIndex < STEPS.length - 1 ? (

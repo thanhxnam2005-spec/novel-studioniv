@@ -1,5 +1,6 @@
 import { generateStructured } from "@/lib/ai/structured";
 import { withGlobalInstruction } from "@/lib/ai/system-prompt";
+import { appendUserInstructionToPrompt } from "@/lib/writing/append-user-instruction";
 import { directionOutputSchema } from "../schemas";
 import type {
   AgentConfig,
@@ -26,11 +27,13 @@ export async function runDirectionAgent(
       ? `\n\nMạch truyện:\n${plotArcs.map((a) => `- ${a.title} (${a.type}, ${a.status}): ${a.description}`).join("\n")}`
       : "";
 
+  const basePrompt = `Dựa trên bối cảnh sau, hãy đề xuất 3-5 hướng đi cho chương tiếp theo:\n\n${contextSummary}${arcSummary}`;
+
   const { object } = await generateStructured<DirectionAgentOutput>({
     model: config.model,
     schema: directionOutputSchema,
     system: withGlobalInstruction(config.systemPrompt, config.globalInstruction),
-    prompt: `Dựa trên bối cảnh sau, hãy đề xuất 3-5 hướng đi cho chương tiếp theo:\n\n${contextSummary}${arcSummary}`,
+    prompt: appendUserInstructionToPrompt(basePrompt, config.userInstruction),
     abortSignal: config.abortSignal,
   });
 

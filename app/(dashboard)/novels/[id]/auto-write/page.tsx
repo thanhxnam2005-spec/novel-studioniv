@@ -30,6 +30,7 @@ import type { WritingAgentRole } from "@/lib/db";
 import { db } from "@/lib/db";
 import {
   createWritingSession,
+  getOrCreateWritingSettings,
   updateChapterPlan,
   updateWritingSession,
   useActiveSession,
@@ -49,9 +50,9 @@ import type {
 import {
   ArrowLeftIcon,
   CompassIcon,
-  ListTreeIcon,
   Loader2Icon,
   PauseIcon,
+  PencilIcon,
   PlayIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -65,9 +66,12 @@ import { DirectionSelector } from "@/components/writing/direction-selector";
 import { IdeaForm, type IdeaFormData } from "@/components/writing/idea-form";
 import { NovelSetup } from "@/components/writing/novel-setup";
 import { OutlineEditor } from "@/components/writing/outline-editor";
+import { PipelineStepConfig } from "@/components/writing/pipeline-step-config";
 import { PipelineProgress } from "@/components/writing/pipeline-progress";
 import { ReviewPanel } from "@/components/writing/review-panel";
 import { SetupWizard } from "@/components/writing/setup-wizard";
+import { EditChapterPlanDialog } from "@/components/writing/edit-chapter-plan-dialog";
+import { GenerateMorePlansDialog } from "@/components/writing/generate-more-plans-dialog";
 import { WritingSettingsDialog } from "@/components/writing/writing-settings-dialog";
 
 // ─── State Detection ────────────────────────────────────────
@@ -116,6 +120,8 @@ export default function AutoWritePage() {
     cancelPipeline,
     appendStreamingContent,
     clearStreamingContent,
+    pipelinePreRunRole,
+    setPipelinePreRunRole,
   } = useWritingPipelineStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -123,6 +129,8 @@ export default function AutoWritePage() {
   const [ideaData, setIdeaData] = useState<IdeaFormData | null>(null);
   const [modeOverride, setModeOverride] = useState<PageMode | null>(null);
   const [isGeneratingPlans, setIsGeneratingPlans] = useState(false);
+  const [generateMorePlansOpen, setGenerateMorePlansOpen] = useState(false);
+  const [editPlanId, setEditPlanId] = useState<string | null>(null);
 
   // ── 3-State Routing ───────────────────────────────────────
 
@@ -191,37 +199,53 @@ export default function AutoWritePage() {
 
   const handleStartPipeline = useCallback(
     async (planId?: string) => {
+      setPipelinePreRunRole(null);
       const targetPlanId = planId ?? effectivePlanId ?? nextPlan?.id;
       if (!targetPlanId) return;
 
       let sessionId = activeSession?.id;
       if (!sessionId) {
+        const ws = await getOrCreateWritingSettings(novelId);
         sessionId = await createWritingSession({
           novelId,
           chapterPlanId: targetPlanId,
           currentStep: "context",
           status: "active",
+          pipelineMode: ws.smartWritingMode ? "smart" : "classic",
         });
       }
 
       const controller = startPipeline(sessionId);
       clearStreamingContent();
 
+      const ins = useWritingPipelineStore.getState().stepUserInstructions;
+      const pipelineInstructionKeys: WritingAgentRole[] = [
+        "context",
+        "direction",
+        "outline",
+        "writer",
+        "review",
+        "rewrite",
+      ];
+      const stepUserInstructions: Partial<Record<WritingAgentRole, string>> =
+        {};
+      for (const role of pipelineInstructionKeys) {
+        const v = ins[role]?.trim();
+        if (v) stepUserInstructions[role] = v;
+      }
+
       const result = await runWritingPipeline({
         novelId,
         sessionId,
         abortSignal: controller.signal,
+        stepUserInstructions,
         onStepStart: (role) => {
           if (role === "writer") setActivePanel("content");
         },
         onStepComplete: (role) => {
           switch (role) {
             case "context":
-              // context done → direction is next, stay on pipeline tab
-              setActivePanel("pipeline");
-              break;
             case "direction":
-              // direction done → show direction selector on pipeline tab
               setActivePanel("pipeline");
               break;
             case "outline":
@@ -265,6 +289,7 @@ export default function AutoWritePage() {
       clearStreamingContent,
       appendStreamingContent,
       setActivePanel,
+      setPipelinePreRunRole,
     ],
   );
 
@@ -316,32 +341,37 @@ export default function AutoWritePage() {
     }
   }, [chapterPlans, effectivePlanId, setActivePanel]);
 
-  const handleGenerateMorePlans = useCallback(async () => {
-    if (!chapterPlans) return;
-    const total = chapterPlans.length;
-    const saved = chapterPlans.filter((p) => p.status === "saved").length;
-    const completionPct = total > 0 ? (saved / total) * 100 : 0;
+  const runGenerateMorePlans = useCallback(
+    async (userInstruction?: string) => {
+      if (!chapterPlans) return;
+      const total = chapterPlans.length;
+      const saved = chapterPlans.filter((p) => p.status === "saved").length;
+      const completionPct = total > 0 ? (saved / total) * 100 : 0;
 
-    if (completionPct < 70) {
-      toast.warning(
-        `Mới lưu ${saved}/${total} chương (${Math.round(completionPct)}%). Nên lưu ít nhất 70% trước khi tạo thêm.`,
-      );
-      return;
-    }
+      if (completionPct < 70) {
+        toast.warning(
+          `Mới lưu ${saved}/${total} chương (${Math.round(completionPct)}%). Nên lưu ít nhất 70% trước khi tạo thêm.`,
+        );
+        return;
+      }
 
-    setIsGeneratingPlans(true);
-    try {
-      const { generateFromExisting } =
-        await import("@/lib/writing/auto-generate");
-      await generateFromExisting(novelId);
-      toast.success("Đã tạo thêm kế hoạch chương mới");
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      toast.error(err instanceof Error ? err.message : "Lỗi không xác định");
-    } finally {
-      setIsGeneratingPlans(false);
-    }
-  }, [chapterPlans, novelId]);
+      setIsGeneratingPlans(true);
+      try {
+        const { generateFromExisting } =
+          await import("@/lib/writing/auto-generate");
+        await generateFromExisting(novelId, {
+          userInstruction: userInstruction?.trim() || undefined,
+        });
+        toast.success("Đã tạo thêm kế hoạch chương mới");
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        toast.error(err instanceof Error ? err.message : "Lỗi không xác định");
+      } finally {
+        setIsGeneratingPlans(false);
+      }
+    },
+    [chapterPlans, novelId],
+  );
 
   const [isRewriting, setIsRewriting] = useState(false);
 
@@ -351,10 +381,14 @@ export default function AutoWritePage() {
     clearStreamingContent();
     try {
       const { runRewriteStep } = await import("@/lib/writing/orchestrator");
+      const rewriteHint = useWritingPipelineStore
+        .getState()
+        .stepUserInstructions.rewrite?.trim();
       await runRewriteStep({
         novelId,
         sessionId: activeSession.id,
         onChunk: (chunk) => appendStreamingContent(chunk),
+        ...(rewriteHint ? { userInstruction: rewriteHint } : {}),
       });
       toast.success("Đã viết lại chương");
     } catch (err) {
@@ -377,7 +411,8 @@ export default function AutoWritePage() {
       return;
     }
     try {
-      const { saveGeneratedChapter } = await import("@/lib/writing/save-chapter");
+      const { saveGeneratedChapter } =
+        await import("@/lib/writing/save-chapter");
       const outline = JSON.parse(outlineJson.output);
       await saveGeneratedChapter({
         novelId,
@@ -404,8 +439,7 @@ export default function AutoWritePage() {
 
   // ── Step Re-run Handlers ───────────────────────────────────
 
-  /** Delete step results from `fromStep` onwards and re-run pipeline from that step */
-  const resetAndRerun = useCallback(
+  const resetStepsFromOnly = useCallback(
     async (
       fromStep: WritingAgentRole,
       opts?: { clearDirections?: boolean; clearOutline?: boolean },
@@ -437,30 +471,36 @@ export default function AutoWritePage() {
       }
       await updateWritingSession(activeSession.id, { currentStep: fromStep });
       if (fromStep === "writer") clearStreamingContent();
-      handleStartPipeline();
     },
-    [activeSession, clearStreamingContent, handleStartPipeline],
+    [activeSession, clearStreamingContent],
   );
 
-  const handleRerunDirection = useCallback(
-    () => resetAndRerun("direction", { clearDirections: true, clearOutline: true }),
-    [resetAndRerun],
-  );
+  const handleRerunDirection = useCallback(async () => {
+    await resetStepsFromOnly("direction", {
+      clearDirections: true,
+      clearOutline: true,
+    });
+    setPipelinePreRunRole("direction");
+    setActivePanel("pipeline");
+  }, [resetStepsFromOnly, setPipelinePreRunRole, setActivePanel]);
 
-  const handleRerunOutline = useCallback(
-    () => resetAndRerun("outline", { clearOutline: true }),
-    [resetAndRerun],
-  );
+  const handleRerunOutline = useCallback(async () => {
+    await resetStepsFromOnly("outline", { clearOutline: true });
+    setPipelinePreRunRole("outline");
+    setActivePanel("outline");
+  }, [resetStepsFromOnly, setPipelinePreRunRole, setActivePanel]);
 
-  const handleRerunWriter = useCallback(
-    () => resetAndRerun("writer"),
-    [resetAndRerun],
-  );
+  const handleRerunWriter = useCallback(async () => {
+    await resetStepsFromOnly("writer");
+    setPipelinePreRunRole("writer");
+    setActivePanel("content");
+  }, [resetStepsFromOnly, setPipelinePreRunRole, setActivePanel]);
 
-  const handleRerunReview = useCallback(
-    () => resetAndRerun("review"),
-    [resetAndRerun],
-  );
+  const handleRerunReview = useCallback(async () => {
+    await resetStepsFromOnly("review");
+    setPipelinePreRunRole("review");
+    setActivePanel("review");
+  }, [resetStepsFromOnly, setPipelinePreRunRole, setActivePanel]);
 
   // ── Dashboard Actions ─────────────────────────────────────
 
@@ -619,58 +659,65 @@ export default function AutoWritePage() {
                   </h3>
                   {chapterPlans && chapterPlans.length > 0 && (
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {
-                        chapterPlans.filter((p) => p.status === "saved")
-                          .length
-                      }
-                      /{chapterPlans.length}
+                      {chapterPlans.filter((p) => p.status === "saved").length}/
+                      {chapterPlans.length}
                     </span>
                   )}
                 </div>
                 <div className="space-y-1">
                   {chapterPlans?.map((plan, idx) => {
                     const prevPlan = idx > 0 ? chapterPlans[idx - 1] : null;
-                    const prevDone =
-                      !prevPlan ||
-                      prevPlan.status === "saved";
+                    const prevDone = !prevPlan || prevPlan.status === "saved";
                     const isLocked = !prevDone && plan.status === "planned";
                     return (
-                      <button
-                        key={plan.id}
-                        onClick={() => !isLocked && setSelectedPlanId(plan.id)}
-                        disabled={isLocked}
-                        className={`w-full text-left rounded-md px-3 py-1 text-xs transition-colors flex ${
-                          isLocked
-                            ? "opacity-40 cursor-not-allowed"
-                            : effectivePlanId === plan.id
-                              ? "bg-accent"
-                              : "hover:bg-accent/50"
-                        }`}
-                      >
-                        <span className="font-medium">
-                          {plan.chapterOrder}.
-                        </span>
-                        {plan.title && (
-                          <span className="text-muted-foreground ml-1 line-clamp-1 flex-1">
-                            {plan.title}
-                          </span>
-                        )}
-                        <span
-                          className={`ml-2 inline-block rounded-full px-1.5 py-0.5 text-[10px] ${
-                            plan.status === "saved"
-                              ? "bg-green-500/10 text-green-600"
-                              : plan.status === "reviewed"
-                                ? "bg-orange-500/10 text-orange-600"
-                                : plan.status === "written"
-                                  ? "bg-amber-500/10 text-amber-600"
-                                  : plan.status === "writing"
-                                    ? "bg-blue-500/10 text-blue-600"
-                                    : "bg-secondary text-muted-foreground"
+                      <div key={plan.id} className="group/plan-item relative">
+                        <button
+                          onClick={() => !isLocked && setSelectedPlanId(plan.id)}
+                          disabled={isLocked}
+                          className={`w-full text-left rounded-md px-3 py-1 pr-7 text-xs transition-colors flex ${
+                            isLocked
+                              ? "opacity-40 cursor-not-allowed"
+                              : effectivePlanId === plan.id
+                                ? "bg-accent"
+                                : "hover:bg-accent/50"
                           }`}
                         >
-                          {StatusLabelMap[plan.status]?.text}
-                        </span>
-                      </button>
+                          <span className="font-medium">
+                            {plan.chapterOrder}.
+                          </span>
+                          {plan.title && (
+                            <span className="text-muted-foreground ml-1 line-clamp-1 flex-1">
+                              {plan.title}
+                            </span>
+                          )}
+                          <span
+                            className={`ml-2 shrink-0 inline-block rounded-full px-1.5 py-0.5 text-[10px] ${
+                              plan.status === "saved"
+                                ? "bg-green-500/10 text-green-600"
+                                : plan.status === "reviewed"
+                                  ? "bg-orange-500/10 text-orange-600"
+                                  : plan.status === "written"
+                                    ? "bg-amber-500/10 text-amber-600"
+                                    : plan.status === "writing"
+                                      ? "bg-blue-500/10 text-blue-600"
+                                      : "bg-secondary text-muted-foreground"
+                            }`}
+                          >
+                            {StatusLabelMap[plan.status]?.text}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditPlanId(plan.id);
+                          }}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/plan-item:opacity-100 hover:bg-muted transition-opacity"
+                          title="Chỉnh sửa kế hoạch chương"
+                        >
+                          <PencilIcon className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -678,7 +725,8 @@ export default function AutoWritePage() {
               </ScrollArea>
               {chapterPlans && chapterPlans.length > 0 && (
                 <button
-                  onClick={handleGenerateMorePlans}
+                  type="button"
+                  onClick={() => setGenerateMorePlansOpen(true)}
                   disabled={isGeneratingPlans}
                   className="my-2 mx-2 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors disabled:opacity-50"
                 >
@@ -706,7 +754,18 @@ export default function AutoWritePage() {
               </TabsList>
               <ScrollArea className="h-[calc(100dvh-144px)]">
                 <TabsContent value="pipeline" className="p-4">
-                  {directionOutput ? (
+                  {pipelinePreRunRole === "direction" ? (
+                    <PipelineStepConfig
+                      novelId={novelId}
+                      role="direction"
+                      instructionKey="direction"
+                      title="Tạo lại hướng đi"
+                      description="Chỉnh mô hình, yêu cầu và system prompt, sau đó chạy AI."
+                      runLabel="Chạy AI"
+                      onRun={() => void handleStartPipeline()}
+                      disabled={isRunning}
+                    />
+                  ) : directionOutput ? (
                     <DirectionSelector
                       options={directionOutput.options}
                       onConfirm={handleDirectionConfirm}
@@ -733,6 +792,17 @@ export default function AutoWritePage() {
                         </EmptyDescription>
                       </EmptyHeader>
                     </Empty>
+                  ) : !activeSession && effectivePlanId ? (
+                    <PipelineStepConfig
+                      novelId={novelId}
+                      role="context"
+                      instructionKey="context"
+                      title="Bắt đầu viết chương"
+                      description="Chọn kế hoạch chương bên trái nếu cần, cấu hình bước bối cảnh rồi chạy pipeline."
+                      runLabel="Chạy pipeline"
+                      onRun={() => void handleStartPipeline()}
+                      disabled={isRunning}
+                    />
                   ) : (
                     <Empty className="h-[60vh]">
                       <EmptyMedia variant="icon">
@@ -742,7 +812,8 @@ export default function AutoWritePage() {
                         <EmptyTitle>Chọn hướng đi</EmptyTitle>
                         <EmptyDescription>
                           Chọn một kế hoạch chương ở sidebar bên trái, sau đó
-                          nhấn &quot;Viết chương&quot; để bắt đầu pipeline.
+                          cấu hình và nhấn &quot;Chạy pipeline&quot; (hoặc nút
+                          Viết chương trên thanh công cụ).
                         </EmptyDescription>
                       </EmptyHeader>
                     </Empty>
@@ -750,7 +821,18 @@ export default function AutoWritePage() {
                 </TabsContent>
 
                 <TabsContent value="outline" className="p-4">
-                  {outlineOutput ? (
+                  {pipelinePreRunRole === "outline" ? (
+                    <PipelineStepConfig
+                      novelId={novelId}
+                      role="outline"
+                      instructionKey="outline"
+                      title="Tạo lại giàn ý"
+                      description="Chỉnh cấu hình rồi chạy lại bước giàn ý."
+                      runLabel="Chạy AI"
+                      onRun={() => void handleStartPipeline()}
+                      disabled={isRunning}
+                    />
+                  ) : outlineOutput ? (
                     <OutlineEditor
                       chapterTitle={outlineOutput.chapterTitle}
                       synopsis={outlineOutput.synopsis}
@@ -772,44 +854,68 @@ export default function AutoWritePage() {
                       </EmptyHeader>
                     </Empty>
                   ) : (
-                    <Empty className="h-[60vh]">
-                      <EmptyMedia variant="icon">
-                        <ListTreeIcon />
-                      </EmptyMedia>
-                      <EmptyHeader>
-                        <EmptyTitle>Giàn ý chương</EmptyTitle>
-                        <EmptyDescription>
-                          Giàn ý sẽ hiển thị sau khi bạn chọn hướng đi ở bước
-                          trước.
-                        </EmptyDescription>
-                      </EmptyHeader>
-                    </Empty>
+                    <PipelineStepConfig
+                      novelId={novelId}
+                      role="outline"
+                      instructionKey="outline"
+                      title="Giàn ý chương"
+                      description="Giàn ý xuất hiện sau khi bạn chọn hướng đi. Bạn có thể cấu hình sẵn prompt và yêu cầu cho bước này."
+                      runLabel="Chạy pipeline (tiếp tục)"
+                      onRun={() => void handleStartPipeline()}
+                      disabled={isRunning || !activeSession}
+                    />
                   )}
                 </TabsContent>
 
-                <TabsContent value="content">
-                  <ChapterPreview
-                    sessionId={activeSession?.id}
-                    onRegenerateAction={
-                      activeSession && !isRunning
-                        ? handleRerunWriter
-                        : undefined
-                    }
-                  />
+                <TabsContent value="content" className="p-4">
+                  {pipelinePreRunRole === "writer" ? (
+                    <PipelineStepConfig
+                      novelId={novelId}
+                      role="writer"
+                      instructionKey="writer"
+                      title="Tạo lại nội dung"
+                      description="Chỉnh cấu hình rồi chạy lại bước viết chương."
+                      runLabel="Chạy AI"
+                      onRun={() => void handleStartPipeline()}
+                      disabled={isRunning}
+                    />
+                  ) : (
+                    <ChapterPreview
+                      sessionId={activeSession?.id}
+                      onRegenerateAction={
+                        activeSession && !isRunning
+                          ? handleRerunWriter
+                          : undefined
+                      }
+                    />
+                  )}
                 </TabsContent>
 
-                <TabsContent value="review">
-                  <ReviewPanel
-                    sessionId={activeSession?.id}
-                    onRewriteAction={handleRewrite}
-                    onSaveAction={handleSaveChapter}
-                    onRegenerateReviewAction={
-                      activeSession && !isRunning
-                        ? handleRerunReview
-                        : undefined
-                    }
-                    isRewriting={isRewriting}
-                  />
+                <TabsContent value="review" className="p-4">
+                  {pipelinePreRunRole === "review" ? (
+                    <PipelineStepConfig
+                      novelId={novelId}
+                      role="review"
+                      instructionKey="review"
+                      title="Tạo lại đánh giá"
+                      description="Chỉnh cấu hình rồi chạy lại bước đánh giá."
+                      runLabel="Chạy AI"
+                      onRun={() => void handleStartPipeline()}
+                      disabled={isRunning}
+                    />
+                  ) : (
+                    <ReviewPanel
+                      sessionId={activeSession?.id}
+                      onRewriteAction={handleRewrite}
+                      onSaveAction={handleSaveChapter}
+                      onRegenerateReviewAction={
+                        activeSession && !isRunning
+                          ? handleRerunReview
+                          : undefined
+                      }
+                      isRewriting={isRewriting}
+                    />
+                  )}
                 </TabsContent>
               </ScrollArea>
             </Tabs>
@@ -822,6 +928,24 @@ export default function AutoWritePage() {
         novelId={novelId}
         open={settingsOpen}
         onOpenChangeAction={setSettingsOpen}
+      />
+
+      <GenerateMorePlansDialog
+        novelId={novelId}
+        open={generateMorePlansOpen}
+        onOpenChangeAction={setGenerateMorePlansOpen}
+        onConfirmAction={async (userInstruction: string) => {
+          setGenerateMorePlansOpen(false);
+          await runGenerateMorePlans(userInstruction);
+        }}
+        isLoading={isGeneratingPlans}
+      />
+
+      {/* Edit Chapter Plan Dialog */}
+      <EditChapterPlanDialog
+        plan={chapterPlans?.find((p) => p.id === editPlanId) ?? null}
+        open={editPlanId !== null}
+        onOpenChangeAction={(open) => { if (!open) setEditPlanId(null); }}
       />
 
       {/* Stale Context Warning */}
