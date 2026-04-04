@@ -165,15 +165,24 @@ function CharacterCard({
       <Collapsible open={open} onOpenChange={setOpen}>
         <CardHeader className="pb-2">
           <div className="flex items-start gap-2.5">
-            {/* Avatar placeholder with initial */}
-            <span
-              className={cn(
-                "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
-                roleColor,
-              )}
-            >
-              {char.name.charAt(0)}
-            </span>
+            {/* Avatar */}
+            {char.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={char.imageUrl}
+                alt={char.name}
+                className="size-9 shrink-0 rounded-lg object-cover"
+              />
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
+                  roleColor,
+                )}
+              >
+                {char.name.charAt(0)}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm">{char.name}</CardTitle>

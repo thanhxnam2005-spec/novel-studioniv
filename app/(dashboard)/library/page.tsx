@@ -1,6 +1,7 @@
 "use client";
 
 import { CreateNovelDialog } from "@/components/create-novel-dialog";
+import { EditNovelDialog } from "@/components/edit-novel-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,7 @@ import {
   DownloadIcon,
   GridIcon,
   ListIcon,
+  PencilIcon,
   PlusIcon,
   SearchIcon,
   Trash2Icon,
@@ -125,6 +127,7 @@ export default function LibraryPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Novel | null>(null);
+  const [editTarget, setEditTarget] = useState<Novel | null>(null);
 
   const genres = useMemo(() => {
     if (!novels) return [];
@@ -232,17 +235,15 @@ export default function LibraryPage() {
           <Skeleton className="h-8 w-36" />
           <Skeleton className="h-8 w-44" />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 w-2/3 rounded bg-muted" />
-                <div className="h-3 w-1/2 rounded bg-muted" />
-              </CardHeader>
-              <CardContent>
-                <div className="h-3 w-full rounded bg-muted" />
-              </CardContent>
-            </Card>
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="aspect-2/3 w-full rounded-lg bg-muted" />
+              <div className="mt-2 space-y-1.5 px-0.5">
+                <div className="h-3 w-4/5 rounded bg-muted" />
+                <div className="h-2.5 w-3/5 rounded bg-muted" />
+              </div>
+            </div>
           ))}
         </div>
       </main>
@@ -387,105 +388,164 @@ export default function LibraryPage() {
         <>
           {/* Grid view */}
           {view === "grid" && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {paginated.map((novel) => (
-                <Card
+                <div
                   key={novel.id}
-                  className="relative group cursor-pointer h-full overflow-hidden transition-colors hover:bg-muted/30"
+                  className="group cursor-pointer"
                   onClick={() => router.push(`/novels/${novel.id}`)}
                 >
-                  {novel.color && (
+                  {/* Book cover — 2:3 ratio */}
+                  <div className="relative aspect-2/3 w-full overflow-hidden rounded-lg bg-muted shadow-sm transition-shadow group-hover:shadow-md">
+                    {novel.coverImage ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={novel.coverImage}
+                          alt={novel.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        />
+                        {novel.color && (
+                          <div
+                            className="absolute inset-x-0 bottom-0 h-1"
+                            style={{ backgroundColor: novel.color }}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      /* Placeholder with accent color + title */
+                      <div
+                        className="flex h-full flex-col justify-center items-center p-3 font-serif"
+                        style={{
+                          background: novel.color
+                            ? `linear-gradient(160deg, ${novel.color}20 0%, ${novel.color}99 100%)`
+                            : undefined,
+                        }}
+                      >
+                        <p className="line-clamp-3 text-sm font-semibold leading-snug text-foreground/80">
+                          {novel.title}
+                        </p>
+                        {novel.author && (
+                          <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                            {novel.author}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {/* Genre badges overlay */}
+                    {novel.genres && novel.genres.length > 0 && (
+                      <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-linear-to-t from-black/60 to-transparent p-2 pt-4">
+                        {novel.genres.slice(0, 2).map((g) => (
+                          <span
+                            key={g}
+                            className="rounded-sm bg-black/40 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white/90 backdrop-blur-sm"
+                          >
+                            {g}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Hover actions */}
                     <div
-                      className="absolute top-0 left-0 right-0 h-1.5"
-                      style={{ backgroundColor: novel.color }}
-                    />
-                  )}
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="line-clamp-1">
-                        {novel.title}
-                      </CardTitle>
+                      className="absolute right-1.5 top-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <NovelActions
                         novel={novel}
+                        onEdit={setEditTarget}
                         onExport={handleExport}
                         onDelete={setDeleteTarget}
                       />
                     </div>
+                  </div>
+
+                  {/* Info below cover */}
+                  <div className="mt-2 px-0.5">
+                    <p className="line-clamp-2 text-xs font-medium leading-snug">
+                      {novel.title}
+                    </p>
                     {novel.author && (
-                      <CardDescription>{novel.author}</CardDescription>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {novel.author}
+                      </p>
                     )}
-                  </CardHeader>
-                  <CardContent>
-                    {novel.genres && novel.genres.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-1">
-                        {novel.genres.slice(0, 3).map((g) => (
-                          <Badge
-                            key={g}
-                            variant="secondary"
-                            className="text-[11px]"
-                          >
-                            {g}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                      {novel.description || "Chưa có mô tả."}
+                    <p className="mt-1 text-[10px] text-muted-foreground/50">
+                      {formatDate(novel.updatedAt)}
                     </p>
-                    <p className="mt-3 text-xs text-muted-foreground/60">
-                      Cập nhật {formatDate(novel.updatedAt)}
-                    </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}
 
           {/* List view */}
           {view === "list" && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               {paginated.map((novel) => (
                 <Card
                   key={novel.id}
-                  className="group cursor-pointer transition-colors hover:bg-muted/30"
+                  className="group cursor-pointer transition-colors hover:bg-muted/30 py-0"
                   onClick={() => router.push(`/novels/${novel.id}`)}
                 >
-                  <CardContent className="flex items-center gap-4 py-3">
-                    {novel.color && (
-                      <div
-                        className="size-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: novel.color }}
-                      />
-                    )}
+                  <CardContent className="flex items-center gap-3 py-2.5 px-3">
+                    {/* Thumbnail — 2:3 ratio, h-12 */}
+                    <div className="relative h-12 w-8 shrink-0 overflow-hidden rounded-sm bg-muted">
+                      {novel.coverImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={novel.coverImage}
+                          alt={novel.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="h-full w-full"
+                          style={{
+                            background: novel.color
+                              ? `linear-gradient(160deg, ${novel.color}44 0%, ${novel.color}bb 100%)`
+                              : undefined,
+                          }}
+                        />
+                      )}
+                    </div>
+
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
+                      <p className="truncate text-sm font-medium leading-tight">
                         {novel.title}
                       </p>
-                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                        {novel.description || "Chưa có mô tả."}
-                      </p>
+                      {novel.author && (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {novel.author}
+                        </p>
+                      )}
                     </div>
+
                     {novel.genres && novel.genres.length > 0 && (
-                      <div className="flex shrink-0 gap-1">
-                        {novel.genres.slice(0, 3).map((g) => (
+                      <div className="hidden shrink-0 gap-1 sm:flex">
+                        {novel.genres.slice(0, 2).map((g) => (
                           <Badge
                             key={g}
                             variant="secondary"
-                            className="text-[11px]"
+                            className="text-[10px]"
                           >
                             {g}
                           </Badge>
                         ))}
                       </div>
                     )}
-                    <span className="shrink-0 text-xs text-muted-foreground/60">
+
+                    <span className="shrink-0 text-[11px] text-muted-foreground/50">
                       {formatDate(novel.updatedAt)}
                     </span>
-                    <NovelActions
-                      novel={novel}
-                      onExport={handleExport}
-                      onDelete={setDeleteTarget}
-                    />
+
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <NovelActions
+                        novel={novel}
+                        onEdit={setEditTarget}
+                        onExport={handleExport}
+                        onDelete={setDeleteTarget}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -576,6 +636,14 @@ export default function LibraryPage() {
       </AlertDialog>
 
       <CreateNovelDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      {editTarget && (
+        <EditNovelDialog
+          open={!!editTarget}
+          onOpenChange={(open) => !open && setEditTarget(null)}
+          novel={editTarget}
+        />
+      )}
     </main>
   );
 }
@@ -584,18 +652,33 @@ export default function LibraryPage() {
 
 function NovelActions({
   novel,
+  onEdit,
   onExport,
   onDelete,
 }: {
   novel: Novel;
+  onEdit: (novel: Novel) => void;
   onExport: (novel: Novel) => void;
   onDelete: (novel: Novel) => void;
 }) {
   return (
     <div
-      className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+      className="flex shrink-0 items-center gap-0.5"
       onClick={(e) => e.stopPropagation()}
     >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={() => onEdit(novel)}
+          >
+            <PencilIcon className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Chỉnh sửa</TooltipContent>
+      </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

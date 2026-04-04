@@ -16,8 +16,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import type { Character } from "@/lib/db";
 import { createCharacter, updateCharacter } from "@/lib/hooks";
+import { ImagePicker } from "@/components/ui/image-picker";
 
-type CharacterFields = Omit<Character, "id" | "novelId" | "createdAt" | "updatedAt">;
+type CharacterFields = Omit<
+  Character,
+  "id" | "novelId" | "createdAt" | "updatedAt"
+>;
 
 const EMPTY: CharacterFields = {
   name: "",
@@ -43,7 +47,13 @@ export function CharacterEditDialog({
   useEffect(() => {
     if (open) {
       if (character) {
-        const { id: _, novelId: __, createdAt: ___, updatedAt: ____, ...rest } = character;
+        const {
+          id: _,
+          novelId: __,
+          createdAt: ___,
+          updatedAt: ____,
+          ...rest
+        } = character;
         setFields(rest);
       } else {
         setFields(EMPTY);
@@ -76,21 +86,25 @@ export function CharacterEditDialog({
     }
   };
 
-  const textField = (key: keyof CharacterFields, label: string, multi = false) => (
-    <div key={key}>
+  const textField = (
+    key: keyof CharacterFields,
+    label: string,
+    multi = false,
+  ) => (
+    <div key={key} className="w-full">
       <Label className="text-xs">{label}</Label>
       {multi ? (
         <Textarea
           value={(fields[key] as string) ?? ""}
           onChange={(e) => set(key, e.target.value)}
-          className="mt-1 text-sm"
+          className="mt-1 text-sm w-full"
           rows={2}
         />
       ) : (
         <Input
           value={(fields[key] as string) ?? ""}
           onChange={(e) => set(key, e.target.value)}
-          className="mt-1 text-sm"
+          className="mt-1 text-sm w-full"
         />
       )}
     </div>
@@ -104,10 +118,28 @@ export function CharacterEditDialog({
             {isEditing ? `Sửa ${character.name}` : "Thêm nhân vật"}
           </DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh]">
+        <ScrollArea className="max-h-[60vh] -mr-4">
           <div className="space-y-3 pr-4">
-            {textField("name", "Tên *")}
-            {textField("role", "Vai trò (nhân vật chính, phản diện, phụ...)")}
+            <div className="flex gap-2">
+              <div>
+                <Label className="text-xs">Ảnh đại diện</Label>
+                <ImagePicker
+                  value={fields.imageUrl ?? undefined}
+                  onChange={(v) => set("imageUrl", v ?? "")}
+                  aspectRatio="aspect-square"
+                  maxSize={256}
+                  className="mt-1 w-24"
+                  placeholder="Avatar"
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                {textField("name", "Tên *")}
+                {textField(
+                  "role",
+                  "Vai trò (nhân vật chính, phản diện, phụ...)",
+                )}
+              </div>
+            </div>
             {textField("description", "Mô tả", true)}
             <div className="grid grid-cols-2 gap-3">
               {textField("age", "Tuổi")}

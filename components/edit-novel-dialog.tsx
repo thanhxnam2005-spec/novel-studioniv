@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { updateNovel } from "@/lib/hooks";
 import { type Novel } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { ImagePicker } from "@/components/ui/image-picker";
 import { PlusIcon, XIcon } from "lucide-react";
 
 const PRESET_COLORS = [
@@ -48,6 +49,7 @@ export function EditNovelDialog({
   const [color, setColor] = useState(novel.color ?? PRESET_COLORS[5]);
   const [genres, setGenres] = useState<string[]>(novel.genres ?? []);
   const [tags, setTags] = useState<string[]>(novel.tags ?? []);
+  const [coverImage, setCoverImage] = useState<string | undefined>(novel.coverImage);
   const [saving, setSaving] = useState(false);
 
   // Sync state when dialog opens
@@ -60,6 +62,7 @@ export function EditNovelDialog({
       setColor(novel.color ?? PRESET_COLORS[5]);
       setGenres(novel.genres ?? []);
       setTags(novel.tags ?? []);
+      setCoverImage(novel.coverImage);
     }
   }, [open, novel]);
 
@@ -77,6 +80,7 @@ export function EditNovelDialog({
         sourceUrl: sourceUrl.trim() || undefined,
         genres,
         tags,
+        coverImage: coverImage || undefined,
       });
 
       toast.success("Đã cập nhật tiểu thuyết");
@@ -99,19 +103,42 @@ export function EditNovelDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-novel-title">
-                Tiêu đề <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="edit-novel-title"
-                placeholder="Tên tiểu thuyết"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1.5"
-                autoFocus
-                required
+            <div className="flex gap-4">
+              <ImagePicker
+                value={coverImage}
+                onChange={setCoverImage}
+                aspectRatio="aspect-[2/3]"
+                maxSize={600}
+                className="w-24 shrink-0"
+                placeholder="Ảnh bìa"
               />
+              <div className="min-w-0 flex-1 space-y-3">
+                <div>
+                  <Label htmlFor="edit-novel-title">
+                    Tiêu đề <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="edit-novel-title"
+                    placeholder="Tên tiểu thuyết"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="mt-1.5"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-novel-author">Tác giả</Label>
+                  <Input
+                    id="edit-novel-author"
+                    placeholder="Tên tác giả"
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    className="mt-1.5"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -122,17 +149,6 @@ export function EditNovelDialog({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="mt-1.5 min-h-[80px]"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="edit-novel-author">Tác giả</Label>
-              <Input
-                id="edit-novel-author"
-                placeholder="Tên tác giả"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                className="mt-1.5"
               />
             </div>
 
