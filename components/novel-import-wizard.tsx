@@ -262,7 +262,7 @@ export function NovelImportWizard() {
       );
 
       toast.success(`Đã nhập "${novelTitle}" với ${chapters.length} chương`);
-      router.push("/");
+      router.push("/dashboard");
     } catch (error) {
       toast.error(
         `Nhập thất bại: ${error instanceof Error ? error.message : "Lỗi không xác định"}`,

@@ -290,7 +290,7 @@ export function GlobalSearchDialog() {
                         <Icon className="size-3.5" />
                       </span>
                       <span className="text-sm">{item.title}</span>
-                      {item.href === "/" && (
+                      {item.href === "/dashboard" && (
                         <CommandShortcut>Trang chủ</CommandShortcut>
                       )}
                     </CommandItem>

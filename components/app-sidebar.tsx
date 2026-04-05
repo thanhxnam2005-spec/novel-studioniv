@@ -36,7 +36,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export const navConfig = [
-  { title: "Trang chủ", href: "/", icon: HomeIcon },
+  { title: "Trang chủ", href: "/dashboard", icon: HomeIcon },
   { title: "Thư viện", href: "/library", icon: LibraryIcon },
   { title: "Nhập sách", href: "/import", icon: UploadIcon },
   { title: "Convert nhanh", href: "/convert", icon: GitCompareArrowsIcon },
@@ -78,7 +78,10 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar">
       <SidebarHeader className="px-3 py-4">
-        <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2.5 overflow-hidden"
+        >
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent">
             <PenLineIcon className="size-4 text-sidebar-accent-foreground" />
           </div>

@@ -36,7 +36,7 @@ import { navConfig, miscNav } from "@/components/app-sidebar";
 
 /** Extra search keywords per route for better discoverability */
 const PAGE_KEYWORDS: Record<string, string> = {
-  "/": "home dashboard",
+  "/dashboard": "home dashboard trang chủ bảng điều khiển",
   "/library": "library novels tiểu thuyết",
   "/import": "import nhập sách",
   "/convert": "convert translate dịch chuyển đổi",
@@ -46,11 +46,20 @@ const PAGE_KEYWORDS: Record<string, string> = {
   "/changelog": "changelog updates cập nhật",
 };
 
-const PAGES = [...navConfig, ...miscNav].map((item) => ({
-  title: item.title,
-  route: item.href,
-  keywords: PAGE_KEYWORDS[item.href] ?? "",
-}));
+const LANDING_PAGE = {
+  title: "Giới thiệu Novel Studio",
+  route: "/",
+  keywords: "landing trang công khai giới thiệu novel studio",
+};
+
+const PAGES = [
+  LANDING_PAGE,
+  ...[...navConfig, ...miscNav].map((item) => ({
+    title: item.title,
+    route: item.href,
+    keywords: PAGE_KEYWORDS[item.href] ?? "",
+  })),
+];
 
 // ─── Index singleton ────────────────────────────────────────
 
