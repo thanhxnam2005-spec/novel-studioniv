@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Novel Studio
+
+A local-first creative writing workspace built for Vietnamese writers and translators. All data lives in the browser — no account required, no server-side storage.
+
+## Features
+
+- **Local-first data** — Novels, chapters, characters, and notes stored in IndexedDB. Optional backup/restore with encryption and cross-device sync.
+- **Multi-provider AI chat** — OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter, or any OpenAI-compatible API. Context-aware chat that understands the open novel, with file attachments and tool-based data editing.
+- **Analysis & Auto-Write** — Three-phase analysis pipeline (chapter → novel → character). Six-step writing pipeline (context → direction → outline → writer → review → rewrite) with smart mode and hands-free execution.
+- **Chinese → Vietnamese translation** — Quick Translator with QT dictionaries, name dictionaries, live preview, and name detection. Advanced find & replace (regex, rules, bulk) with diff view.
+- **Text-to-Speech reader** — Multiple TTS providers, adjustable speed, sentence highlighting, OS media controls.
+- **Web scraper** — Import chapters from novel sites via URL, with a companion browser extension for CORS bypass.
+- **WebGPU inference** — Run small models directly on the browser GPU — no API key needed for local chat.
+- **Vietnamese UI** — All labels, prompts, and instructions in Vietnamese with optimized font rendering.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) + React 19 |
+| Language | TypeScript 5 (strict) |
+| Styling | Tailwind CSS 4 + shadcn/ui |
+| Database | Dexie 4 (IndexedDB) |
+| AI | Vercel AI SDK v6 + provider SDKs |
+| State | Zustand 5 |
+| Package manager | pnpm |
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js >= 20
+- pnpm >= 9
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/ldblckrs-258/novel-studio.git
+cd novel-studio
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000). The app runs entirely in the browser — no backend services to configure.
 
-## Learn More
+### Build
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm build
+pnpm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Lint
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm lint
+```
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+app/
+├── (landing)/              # Marketing landing page (/)
+├── (dashboard)/            # App shell (sidebar + chat + panels)
+│   ├── dashboard/          # Home / stats
+│   ├── library/            # Novel library
+│   ├── import/             # Book import (TXT, EPUB, DOCX, PDF)
+│   ├── convert/            # Standalone QT convert tool
+│   ├── scraper/            # Web scraper
+│   ├── settings/           # Providers, instructions, data, changelog
+│   └── novels/[id]/        # Novel detail, chapter editor, reader, auto-write
+├── api/                    # Feedback & sync endpoints
+components/
+├── ui/                     # shadcn/ui primitives
+├── chat/                   # Chat panel components
+├── writing/                # Writing pipeline UI
+├── reader/                 # TTS reader
+├── name-dict/              # Name dictionary panel
+lib/
+├── ai/                     # AI provider dispatch, tools, system prompts
+├── analysis/               # Three-phase analysis pipeline
+├── writing/                # Six-step writing orchestrator + agents
+├── chapter-tools/          # Bulk convert, translate, name extraction
+├── hooks/                  # Dexie entity hooks (use-*.ts)
+├── stores/                 # Zustand stores (ephemeral UI state)
+├── workers/                # Web Workers (QT engine, replace engine)
+├── scraper/                # Site adapters + extension bridge
+├── search/                 # MiniSearch global search
+├── tts/                    # TTS providers + player
+├── import/                 # Book import + chapter splitting
+├── db.ts                   # Dexie database + entity types
+└── db-migrations.ts        # Schema versions (v1–v11)
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## AI Configuration
+
+Novel Studio requires you to bring your own API keys. Go to **Settings → AI Providers** to add providers:
+
+| Provider | Type |
+|---|---|
+| OpenAI | `openai` |
+| Anthropic | `anthropic` |
+| Google Gemini | `google` |
+| Groq | `groq` |
+| Mistral | `mistral` |
+| xAI (Grok) | `xai` |
+| OpenRouter | `openrouter` |
+| Any OpenAI-compatible | `openai-compatible` |
+| Browser GPU | `webgpu` (chat only) |
+
+## Browser Extension
+
+A companion Chrome extension (`public/novel-studio-connector.zip`) provides CORS bypass for the web scraper. Install it from the public directory or build with:
+
+```bash
+pnpm zip:ext
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
+
+## License
+
+[MIT](LICENSE) - Le Duc Bao
