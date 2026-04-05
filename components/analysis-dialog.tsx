@@ -5,7 +5,9 @@ import {
   AnalysisStepConfig,
   type StepDef,
 } from "@/components/analysis-step-config";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ConfirmInterruptDialog } from "@/components/ui/confirm-interrupt-dialog";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ConfirmInterruptDialog } from "@/components/ui/confirm-interrupt-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   WEBGPU_BLOCKED_FOR_API_INFERENCE_VI,
@@ -22,24 +23,25 @@ import {
 import { getModel } from "@/lib/ai/provider";
 import { resolveStep as resolveConfiguredStepModel } from "@/lib/ai/resolve-step";
 import {
+  DEFAULT_CHAPTER_ANALYSIS_SYSTEM,
+  DEFAULT_CHARACTER_PROFILING_SYSTEM,
+  DEFAULT_NOVEL_AGGREGATION_SYSTEM,
   analyzeNovel,
   analyzeNovelIncremental,
   type AnalysisDepth,
   type AnalysisProgress as AnalysisProgressData,
   type SkipPhases,
-  DEFAULT_CHAPTER_ANALYSIS_SYSTEM,
-  DEFAULT_NOVEL_AGGREGATION_SYSTEM,
-  DEFAULT_CHARACTER_PROFILING_SYSTEM,
 } from "@/lib/analysis";
 import {
   useAIProvider,
   useAnalysisSettings,
-  useConfirmInterrupt,
   useChatSettings,
+  useConfirmInterrupt,
   useHasAnalyzedChapters,
 } from "@/lib/hooks";
 import { useAnalysisStore } from "@/lib/stores/analysis";
 import {
+  AlertTriangleIcon,
   BookOpenIcon,
   GaugeIcon,
   GlobeIcon,
@@ -118,6 +120,7 @@ export function AnalysisDialog({
   novelId,
   mode,
   selectedChapterIds,
+  incrementalChaptersCount,
   totalChapters,
 }: {
   open: boolean;
@@ -125,6 +128,7 @@ export function AnalysisDialog({
   novelId: string;
   mode: AnalysisMode;
   selectedChapterIds?: string[];
+  incrementalChaptersCount?: number;
   totalChapters: number;
 }) {
   const chatSettings = useChatSettings();
@@ -176,7 +180,7 @@ export function AnalysisDialog({
     mode === "full"
       ? "Phân tích toàn bộ"
       : mode === "incremental"
-        ? "Phân tích còn lại"
+        ? `Phân tích còn lại (${incrementalChaptersCount ?? 0})`
         : `Phân tích đã chọn (${selectedChapterIds?.length ?? 0})`;
 
   const runPipeline = useCallback(
@@ -251,8 +255,7 @@ export function AnalysisDialog({
           toast.info("Đã hủy phân tích.");
           reset();
         } else {
-          const msg =
-            error instanceof Error ? error.message : "Unknown error";
+          const msg = error instanceof Error ? error.message : "Unknown error";
           setError(msg);
           toast.error(`Phân tích thất bại: ${msg}`);
         }
@@ -290,7 +293,9 @@ export function AnalysisDialog({
     const count =
       mode === "selected"
         ? (selectedChapterIds?.length ?? 0)
-        : totalChapters;
+        : mode === "incremental"
+          ? (incrementalChaptersCount ?? 0)
+          : totalChapters;
     start(novelId, count);
     setShowConfigOnError(false);
 
@@ -307,6 +312,7 @@ export function AnalysisDialog({
     novelId,
     mode,
     selectedChapterIds,
+    incrementalChaptersCount,
     totalChapters,
     enabledSteps,
     start,
@@ -364,7 +370,10 @@ export function AnalysisDialog({
   );
 
   const showConfig = !isAnalyzing && !effectiveDone;
-  const showErrorConfig = effectiveDone && errors.length > 0 && showConfigOnError;
+  const showErrorConfig =
+    effectiveDone && errors.length > 0 && showConfigOnError;
+  const selectedCount = selectedChapterIds?.length ?? 0;
+  const showUsageAlert = mode === "selected" && selectedCount >= 100;
 
   return (
     <Dialog
@@ -393,7 +402,7 @@ export function AnalysisDialog({
             {mode === "full"
               ? "Phân tích tất cả chương từ đầu."
               : mode === "incremental"
-                ? "Chỉ phân tích các chương mới hoặc đã sửa đổi."
+                ? `Chỉ phân tích ${incrementalChaptersCount ?? 0} chương mới hoặc đã sửa đổi.`
                 : `Phân tích ${selectedChapterIds?.length ?? 0} chương đã chọn.`}
           </DialogDescription>
         </DialogHeader>
@@ -411,8 +420,20 @@ export function AnalysisDialog({
               <div className="space-y-4">
                 {showErrorConfig && (
                   <p className="text-xs text-muted-foreground">
-                    Điều chỉnh cấu hình bên dưới rồi nhấn &ldquo;Chạy lại&rdquo;.
+                    Điều chỉnh cấu hình bên dưới rồi nhấn &ldquo;Chạy
+                    lại&rdquo;.
                   </p>
+                )}
+
+                {showUsageAlert && (
+                  <Alert className="border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400">
+                    <AlertTriangleIcon className="size-4" />
+                    <AlertTitle>Lưu ý mức sử dụng</AlertTitle>
+                    <AlertDescription>
+                      Bạn đang chọn {selectedCount} chương để phân tích. Tác vụ
+                      này có thể tiêu tốn nhiều token và tăng chi phí API.
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {/* Depth selector */}

@@ -429,6 +429,7 @@ export default function NovelDetailPage() {
         selectedChapterIds={
           analysisMode === "selected" ? selectedChapterIds : undefined
         }
+        incrementalChaptersCount={needsAnalysisCount}
         totalChapters={chapters?.length ?? 0}
       />
 

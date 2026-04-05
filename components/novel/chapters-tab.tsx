@@ -215,52 +215,58 @@ export function ChaptersTab({
           <span className="hidden sm:inline">Thêm nhiều</span>
         </Button>
         <div className="ml-auto flex gap-1.5 sm:gap-2">
-          {selected.size > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <WrenchIcon className="size-3.5 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Xử lý</span>(
-                  {selected.size})
-                  <ChevronDownIcon className="ml-1 size-3" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-48 p-1">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selected.size === 0}
+                title={
+                  selected.size === 0
+                    ? "Chọn ít nhất một chương để xử lý"
+                    : `Xử lý (${selected.size})`
+                }
+              >
+                <WrenchIcon className="size-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Xử lý</span>({selected.size})
+                <ChevronDownIcon className="ml-1 size-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-48 p-1">
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                onClick={() => onAnalyze("selected", Array.from(selected))}
+              >
+                <SearchIcon className="size-3.5" />
+                Phân tích đã chọn
+              </button>
+              <button
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                onClick={() => onTranslate(Array.from(selected))}
+              >
+                <LanguagesIcon className="size-3.5" />
+                Dịch đã chọn
+              </button>
+              {onReplace && (
                 <button
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                  onClick={() => onAnalyze("selected", Array.from(selected))}
+                  onClick={() => onReplace(Array.from(selected))}
                 >
-                  <SearchIcon className="size-3.5" />
-                  Phân tích đã chọn
+                  <ReplaceAllIcon className="size-3.5" />
+                  Thay thế đã chọn
                 </button>
+              )}
+              {onConvert && (
                 <button
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                  onClick={() => onTranslate(Array.from(selected))}
+                  onClick={() => onConvert(Array.from(selected))}
                 >
-                  <LanguagesIcon className="size-3.5" />
-                  Dịch đã chọn
+                  <GitCompareArrowsIcon className="size-3.5" />
+                  Convert đã chọn
                 </button>
-                {onReplace && (
-                  <button
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                    onClick={() => onReplace(Array.from(selected))}
-                  >
-                    <ReplaceAllIcon className="size-3.5" />
-                    Thay thế đã chọn
-                  </button>
-                )}
-                {onConvert && (
-                  <button
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                    onClick={() => onConvert(Array.from(selected))}
-                  >
-                    <GitCompareArrowsIcon className="size-3.5" />
-                    Convert đã chọn
-                  </button>
-                )}
-              </PopoverContent>
-            </Popover>
-          )}
+              )}
+            </PopoverContent>
+          </Popover>
           {needsAnalysisCount > 0 && (
             <Button
               variant="outline"
