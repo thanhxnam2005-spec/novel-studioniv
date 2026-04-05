@@ -20,8 +20,6 @@ import {
   WEBGPU_BLOCKED_FOR_API_INFERENCE_VI,
   isWebGpuInferenceProvider,
 } from "@/lib/ai/api-inference";
-import { getModel } from "@/lib/ai/provider";
-import { resolveStep as resolveConfiguredStepModel } from "@/lib/ai/resolve-step";
 import {
   DEFAULT_CHAPTER_ANALYSIS_SYSTEM,
   DEFAULT_CHARACTER_PROFILING_SYSTEM,
@@ -32,6 +30,7 @@ import {
   type AnalysisProgress as AnalysisProgressData,
   type SkipPhases,
 } from "@/lib/analysis";
+import { resolveAnalysisModels } from "@/lib/analysis/resolve-analysis-models";
 import {
   useAIProvider,
   useAnalysisSettings,
@@ -40,6 +39,7 @@ import {
   useHasAnalyzedChapters,
 } from "@/lib/hooks";
 import { useAnalysisStore } from "@/lib/stores/analysis";
+import type { LanguageModel } from "ai";
 import {
   AlertTriangleIcon,
   BookOpenIcon,
@@ -132,7 +132,7 @@ export function AnalysisDialog({
   totalChapters: number;
 }) {
   const chatSettings = useChatSettings();
-  const provider = useAIProvider(chatSettings?.providerId);
+  const chatProvider = useAIProvider(chatSettings?.providerId);
   const analysisSettings = useAnalysisSettings();
   const hasAnalyzedChapters = useHasAnalyzedChapters(novelId);
   const {
@@ -176,6 +176,94 @@ export function AnalysisDialog({
   const [depth, setDepth] = useState<AnalysisDepth>("standard");
   const [showConfigOnError, setShowConfigOnError] = useState(false);
 
+  const chatDefaultEligible =
+    !!chatProvider &&
+    !!chatSettings?.modelId &&
+    !isWebGpuInferenceProvider(chatProvider);
+
+  const hasConfiguredStepModel = (
+    cfg:
+      | {
+          providerId?: string;
+          modelId?: string;
+        }
+      | null
+      | undefined,
+  ) => {
+    return !!cfg?.providerId && !!cfg?.modelId;
+  };
+
+  const allEnabledStepsHaveDedicatedModels =
+    (!enabledSteps.chapters ||
+      hasConfiguredStepModel(analysisSettings.chapterModel)) &&
+    (!enabledSteps.aggregation ||
+      hasConfiguredStepModel(analysisSettings.aggregationModel)) &&
+    (!enabledSteps.characters ||
+      hasConfiguredStepModel(analysisSettings.characterModel));
+
+  const canStartAnalysis =
+    chatDefaultEligible || allEnabledStepsHaveDedicatedModels;
+
+  const retrySkipPhases: SkipPhases = {
+    chapters:
+      phaseResults.chapters === "done" || phaseResults.chapters === "skipped",
+    aggregation:
+      phaseResults.aggregation === "done" ||
+      phaseResults.aggregation === "skipped",
+    characters:
+      phaseResults.characters === "done" ||
+      phaseResults.characters === "skipped",
+  };
+
+  const canRetry =
+    chatDefaultEligible ||
+    ((!retrySkipPhases.chapters ||
+      hasConfiguredStepModel(analysisSettings.chapterModel)) &&
+      (!retrySkipPhases.aggregation ||
+        hasConfiguredStepModel(analysisSettings.aggregationModel)) &&
+      (!retrySkipPhases.characters ||
+        hasConfiguredStepModel(analysisSettings.characterModel)));
+
+  const prepareModels = useCallback(
+    async (
+      skipPhases?: SkipPhases,
+    ): Promise<{
+      defaultModel: LanguageModel;
+      stepModels: {
+        chapters?: LanguageModel;
+        aggregation?: LanguageModel;
+        characters?: LanguageModel;
+      };
+    } | null> => {
+      const res = await resolveAnalysisModels({
+        analysisSettings,
+        chatSettings,
+        skipPhases,
+      });
+
+      if (res.models) return res.models;
+
+      if (res.missingPhases.length > 0) {
+        const label = (p: (typeof res.missingPhases)[number]) =>
+          p === "chapters"
+            ? "Phân tích chương"
+            : p === "aggregation"
+              ? "Tổng hợp tiểu thuyết"
+              : "Hồ sơ nhân vật";
+        const missing = res.missingPhases.map(label);
+        const baseMsg = res.chatIsWebGpu
+          ? WEBGPU_BLOCKED_FOR_API_INFERENCE_VI
+          : "Chưa đủ cấu hình model để chạy phân tích";
+        toast.error(`${baseMsg} (Thiếu mô hình cho: ${missing.join(", ")}).`);
+        return null;
+      }
+
+      toast.error("Cần bật ít nhất một bước phân tích.");
+      return null;
+    },
+    [analysisSettings, chatSettings],
+  );
+
   const modeLabel =
     mode === "full"
       ? "Phân tích toàn bộ"
@@ -184,15 +272,19 @@ export function AnalysisDialog({
         : `Phân tích đã chọn (${selectedChapterIds?.length ?? 0})`;
 
   const runPipeline = useCallback(
-    async (skipPhases?: SkipPhases, retryChapterIds?: string[]) => {
-      if (!provider || !chatSettings?.modelId) return;
-
-      const [chapterStepModel, aggregationStepModel, characterStepModel] =
-        await Promise.all([
-          resolveConfiguredStepModel(analysisSettings.chapterModel),
-          resolveConfiguredStepModel(analysisSettings.aggregationModel),
-          resolveConfiguredStepModel(analysisSettings.characterModel),
-        ]);
+    async (
+      models: {
+        defaultModel: LanguageModel;
+        stepModels: {
+          chapters?: LanguageModel;
+          aggregation?: LanguageModel;
+          characters?: LanguageModel;
+        };
+      },
+      skipPhases?: SkipPhases,
+      retryChapterIds?: string[],
+    ) => {
+      const { defaultModel, stepModels } = models;
 
       const onProgress = (progress: AnalysisProgressData) => {
         updateProgress(progress.chaptersCompleted, progress.totalChapters);
@@ -216,7 +308,7 @@ export function AnalysisDialog({
 
       const commonOpts = {
         novelId,
-        defaultModel: await getModel(provider, chatSettings.modelId),
+        defaultModel,
         signal: useAnalysisStore.getState().abortController?.signal,
         depth,
         customPrompts: {
@@ -225,11 +317,11 @@ export function AnalysisDialog({
           characterProfiling: analysisSettings.characterProfilingPrompt,
         },
         stepModels: {
-          chapters: chapterStepModel,
-          aggregation: aggregationStepModel,
-          characters: characterStepModel,
+          chapters: stepModels.chapters,
+          aggregation: stepModels.aggregation,
+          characters: stepModels.characters,
         },
-        globalSystemInstruction: chatSettings.globalSystemInstruction,
+        globalSystemInstruction: chatSettings?.globalSystemInstruction,
         skipPhases,
         selectedChapterIds:
           retryChapterIds ??
@@ -262,7 +354,6 @@ export function AnalysisDialog({
       }
     },
     [
-      provider,
       chatSettings,
       novelId,
       mode,
@@ -281,12 +372,12 @@ export function AnalysisDialog({
   );
 
   const handleRun = useCallback(async () => {
-    if (!provider || !chatSettings?.modelId) {
-      toast.error("Vui lòng cấu hình nhà cung cấp AI trong Cài đặt trước.");
-      return;
-    }
-    if (isWebGpuInferenceProvider(provider)) {
-      toast.error(WEBGPU_BLOCKED_FOR_API_INFERENCE_VI);
+    if (!canStartAnalysis) {
+      toast.error(
+        chatProvider && isWebGpuInferenceProvider(chatProvider)
+          ? WEBGPU_BLOCKED_FOR_API_INFERENCE_VI
+          : "Vui lòng cấu hình model cho phân tích trước.",
+      );
       return;
     }
 
@@ -296,8 +387,6 @@ export function AnalysisDialog({
         : mode === "incremental"
           ? (incrementalChaptersCount ?? 0)
           : totalChapters;
-    start(novelId, count);
-    setShowConfigOnError(false);
 
     const skipPhases: SkipPhases = {
       chapters: !enabledSteps.chapters,
@@ -305,10 +394,15 @@ export function AnalysisDialog({
       characters: !enabledSteps.characters,
     };
 
-    await runPipeline(skipPhases);
+    const models = await prepareModels(skipPhases);
+    if (!models) return;
+
+    start(novelId, count);
+    setShowConfigOnError(false);
+    await runPipeline(models, skipPhases);
   }, [
-    provider,
-    chatSettings,
+    canStartAnalysis,
+    chatProvider,
     novelId,
     mode,
     selectedChapterIds,
@@ -316,16 +410,11 @@ export function AnalysisDialog({
     totalChapters,
     enabledSteps,
     start,
+    prepareModels,
     runPipeline,
   ]);
 
   const handleRetry = useCallback(async () => {
-    if (!provider || !chatSettings?.modelId) return;
-    if (isWebGpuInferenceProvider(provider)) {
-      toast.error(WEBGPU_BLOCKED_FOR_API_INFERENCE_VI);
-      return;
-    }
-
     const currentPhaseResults = useAnalysisStore.getState().phaseResults;
     const currentFailedIds = useAnalysisStore.getState().failedChapterIds;
 
@@ -346,10 +435,13 @@ export function AnalysisDialog({
         ? [...new Set(currentFailedIds)]
         : undefined;
 
+    const models = await prepareModels(skipPhases);
+    if (!models) return;
+
     setShowConfigOnError(false);
     resetForRetry();
-    await runPipeline(skipPhases, retryChapterIds);
-  }, [provider, chatSettings, resetForRetry, runPipeline]);
+    await runPipeline(models, skipPhases, retryChapterIds);
+  }, [prepareModels, resetForRetry, runPipeline]);
 
   const handleStepToggle = useCallback(
     (step: "chapters" | "aggregation" | "characters", checked: boolean) => {
@@ -481,11 +573,13 @@ export function AnalysisDialog({
                   </div>
                 </div>
 
-                {!provider && (
+                {!canStartAnalysis && (
                   <p className="text-xs text-amber-500">
-                    Chưa cấu hình nhà cung cấp AI.{" "}
+                    {chatProvider && isWebGpuInferenceProvider(chatProvider)
+                      ? "Chat đang dùng WebGPU. Hãy chọn model API cho các bước phân tích (hoặc đổi model chat)."
+                      : "Chưa đủ cấu hình để chạy phân tích."}{" "}
                     <a href="/settings/providers" className="underline">
-                      Thêm ngay
+                      Cấu hình nhà cung cấp
                     </a>
                   </p>
                 )}
@@ -500,7 +594,7 @@ export function AnalysisDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Hủy
             </Button>
-            <Button onClick={handleRun} disabled={!provider}>
+            <Button onClick={handleRun} disabled={!canStartAnalysis}>
               Bắt đầu phân tích
             </Button>
           </div>
@@ -522,7 +616,7 @@ export function AnalysisDialog({
               <Button
                 variant="outline"
                 onClick={handleRetry}
-                disabled={!provider}
+                disabled={!canRetry}
               >
                 Chạy lại phần thất bại
               </Button>
