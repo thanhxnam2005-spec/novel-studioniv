@@ -1,12 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  RotateCcwIcon,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { LineEditor } from "@/components/ui/line-editor";
@@ -14,15 +7,18 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import { toast } from "sonner";
+import type { AnalysisSettings, StepModelConfig } from "@/lib/db";
 import {
-  useAnalysisSettings,
   updateAnalysisSettings,
   useAIModels,
+  useAnalysisSettings,
   useApiInferenceProviders,
   useClearWebGpuStepModel,
 } from "@/lib/hooks";
-import type { StepModelConfig, AnalysisSettings } from "@/lib/db";
+import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
+import { ChevronDownIcon, ChevronRightIcon, RotateCcwIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type ModelKey = "translateModel" | "reviewModel" | "editModel";
 type PromptKey = "translatePrompt" | "reviewPrompt" | "editPrompt";
@@ -204,15 +200,14 @@ export function ToolConfig({
                 </Button>
               )}
             </div>
-            <div className="h-[80px]">
-              <LineEditor
-                value={promptText}
-                onChange={(v) => handlePromptChange(v)}
-                contentFont="text-xs leading-5"
-                gutterFont="text-xs leading-5"
-                xmlColors
-              />
-            </div>
+            <LineEditor
+              value={promptText}
+              onChange={(v) => handlePromptChange(v)}
+              className="h-[200px]"
+              contentFont="text-xs leading-5"
+              gutterFont="text-xs leading-5"
+              xmlColors
+            />
           </div>
 
           <p className="text-xs text-muted-foreground">

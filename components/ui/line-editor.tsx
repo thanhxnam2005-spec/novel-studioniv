@@ -469,7 +469,10 @@ export function LineEditor({
     return (
       <div
         ref={readOnlyContainerRef}
-        className={cn("overflow-y-auto rounded-md border", className)}
+        className={cn(
+          "overflow-y-auto rounded-md border min-h-[120px]",
+          className,
+        )}
       >
         <RenderedLines
           value={value}

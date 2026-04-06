@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -18,7 +19,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineEditor } from "@/components/ui/line-editor";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
   getOrCreateWritingSettings,
@@ -200,15 +200,17 @@ function PromptEditorField({
           </Button>
         )}
       </div>
-      <div className="h-[15rem]">
-        <LineEditor
-          value={text}
-          onChange={(v) => { setText(v); onSave(v); }}
-          contentFont="text-xs leading-5"
-          gutterFont="text-xs leading-5"
-          xmlColors
-        />
-      </div>
+      <LineEditor
+        value={text}
+        onChange={(v) => {
+          setText(v);
+          onSave(v);
+        }}
+        className="h-[300px]"
+        contentFont="text-xs leading-5"
+        gutterFont="text-xs leading-5"
+        xmlColors
+      />
       {!isCustom && (
         <p className="text-xs text-muted-foreground">
           Đây là prompt mặc định. Chỉnh sửa trực tiếp để tùy biến.
@@ -378,8 +380,8 @@ export function WritingSettingsDialog({
                       </Label>
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         Tra cứu tiểu thuyết bằng công cụ, không gọi LLM bước bối
-                        cảnh. Áp dụng theo cài đặt hiện tại mỗi lần chạy hoặc tiếp
-                        tục pipeline.
+                        cảnh. Áp dụng theo cài đặt hiện tại mỗi lần chạy hoặc
+                        tiếp tục pipeline.
                       </p>
                     </div>
                   </div>

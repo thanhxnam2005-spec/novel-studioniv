@@ -7,11 +7,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import { LineEditor } from "@/components/ui/line-editor";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
   getOrCreateWritingSettings,
@@ -124,15 +124,12 @@ export function PipelineStepConfig({
   const defaultPrompt = getDefaultPrompt(role);
   const isCustom = !!(settings?.[promptKey] as string | undefined);
 
-  const debouncedPromptChange = useDebouncedCallback(
-    async (value: string) => {
-      await getOrCreateWritingSettings(novelId);
-      await updateWritingSettings(novelId, {
-        [promptKey]: value === defaultPrompt ? undefined : value,
-      });
-    },
-    500,
-  );
+  const debouncedPromptChange = useDebouncedCallback(async (value: string) => {
+    await getOrCreateWritingSettings(novelId);
+    await updateWritingSettings(novelId, {
+      [promptKey]: value === defaultPrompt ? undefined : value,
+    });
+  }, 500);
 
   const instruction = useWritingPipelineStore(
     (s) => s.stepUserInstructions[instructionKey] ?? "",
@@ -167,15 +164,14 @@ export function PipelineStepConfig({
 
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">Yêu cầu của bạn</Label>
-        <div className="h-[5rem]">
-          <LineEditor
-            value={instruction}
-            onChange={(v) => setStepUserInstruction(instructionKey, v)}
-            placeholder="Ghi chú ý tưởng, hạn chế, hoặc yêu cầu cụ thể cho AI (không lưu vào DB)..."
-            contentFont="text-sm leading-5"
-            gutterFont="text-xs leading-5"
-          />
-        </div>
+        <LineEditor
+          className="h-[200px]"
+          value={instruction}
+          onChange={(v) => setStepUserInstruction(instructionKey, v)}
+          placeholder="Ghi chú ý tưởng, hạn chế, hoặc yêu cầu cụ thể cho AI (không lưu vào DB)..."
+          contentFont="text-sm leading-5"
+          gutterFont="text-xs leading-5"
+        />
       </div>
 
       <Collapsible open={systemOpen} onOpenChange={setSystemOpen}>
@@ -202,15 +198,17 @@ export function PipelineStepConfig({
               </Button>
             )}
           </div>
-          <div className="h-[12.5rem]">
-            <LineEditor
-              value={promptText}
-              onChange={(v) => { setPromptText(v); debouncedPromptChange.run(v); }}
-              contentFont="text-xs leading-5"
-              gutterFont="text-xs leading-5"
-              xmlColors
-            />
-          </div>
+          <LineEditor
+            value={promptText}
+            onChange={(v) => {
+              setPromptText(v);
+              debouncedPromptChange.run(v);
+            }}
+            className="h-[200px]"
+            contentFont="text-xs leading-5"
+            gutterFont="text-xs leading-5"
+            xmlColors
+          />
           <p className="text-[10px] text-muted-foreground">
             Lưu tự động sau khi ngừng gõ (debounce).
           </p>

@@ -23,8 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { LineEditor } from "@/components/ui/line-editor";
-import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import {
   Tooltip,
   TooltipContent,

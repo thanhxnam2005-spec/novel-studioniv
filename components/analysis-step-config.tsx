@@ -1,33 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  RotateCcwIcon,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-import { LineEditor } from "@/components/ui/line-editor";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
-  useAnalysisSettings,
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Switch } from "@/components/ui/switch";
+import type { StepModelConfig } from "@/lib/db";
+import {
   updateAnalysisSettings,
   useAIModels,
+  useAnalysisSettings,
   useApiInferenceProviders,
   useClearWebGpuStepModel,
 } from "@/lib/hooks";
 import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
-import type { StepModelConfig } from "@/lib/db";
+import { ChevronDownIcon, ChevronRightIcon, RotateCcwIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export interface StepDef {
@@ -44,11 +40,7 @@ export interface StepDef {
   icon: React.ElementType;
 }
 
-function InlineModelPicker({
-  modelKey,
-}: {
-  modelKey: StepDef["modelKey"];
-}) {
+function InlineModelPicker({ modelKey }: { modelKey: StepDef["modelKey"] }) {
   const settings = useAnalysisSettings();
   const value = settings[modelKey] as StepModelConfig | undefined;
   const providers = useApiInferenceProviders();
@@ -158,15 +150,17 @@ function InlinePromptEditor({
           </Button>
         )}
       </div>
-      <div className="h-[100px]">
-        <LineEditor
-          value={text}
-          onChange={(v) => { setText(v); debouncedSave.run(v); }}
-          contentFont="text-xs leading-5"
-          gutterFont="text-xs leading-5"
-          xmlColors
-        />
-      </div>
+      <LineEditor
+        value={text}
+        onChange={(v) => {
+          setText(v);
+          debouncedSave.run(v);
+        }}
+        className="h-[200px]"
+        contentFont="text-xs leading-5"
+        gutterFont="text-xs leading-5"
+        xmlColors
+      />
     </div>
   );
 }
@@ -188,14 +182,14 @@ export function AnalysisStepConfig({
   const Icon = step.icon;
   const settings = useAnalysisSettings();
   const hasCustomModel = !!settings[step.modelKey];
-  const hasCustomPrompt = !!(settings[step.promptKey] as string | undefined)?.trim();
+  const hasCustomPrompt = !!(
+    settings[step.promptKey] as string | undefined
+  )?.trim();
 
   return (
     <div
       className={`rounded-lg border transition-colors ${
-        enabled
-          ? "border-border bg-card"
-          : "border-border/50 bg-muted/30"
+        enabled ? "border-border bg-card" : "border-border/50 bg-muted/30"
       }`}
     >
       {/* Step header */}
