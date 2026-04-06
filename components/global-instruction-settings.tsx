@@ -1,6 +1,6 @@
 "use client";
 
-import { Textarea } from "@/components/ui/textarea";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
   Card,
   CardContent,
@@ -32,12 +32,6 @@ export function GlobalInstructionSettings() {
     });
   }, 600);
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    initialized.current = true;
-    setValue(e.target.value);
-    save.run(e.target.value);
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -49,12 +43,20 @@ export function GlobalInstructionSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Textarea
-          placeholder="VD: Luôn trả lời bằng Tiếng Việt. Sử dụng giọng văn trang trọng."
-          value={value}
-          onChange={handleChange}
-          className="min-h-[100px] font-mono text-sm"
-        />
+        <div className="h-[100px]">
+          <LineEditor
+            value={value}
+            onChange={(v) => {
+              initialized.current = true;
+              setValue(v);
+              save.run(v);
+            }}
+            placeholder="VD: Luôn trả lời bằng Tiếng Việt. Sử dụng giọng văn trang trọng."
+            contentFont="text-sm leading-5"
+            gutterFont="text-xs leading-5"
+            xmlColors
+          />
+        </div>
       </CardContent>
     </Card>
   );

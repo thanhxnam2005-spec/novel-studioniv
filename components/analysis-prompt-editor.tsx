@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import {
   ChevronDownIcon,
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
   Card,
   CardContent,
@@ -68,6 +68,12 @@ function DebouncedTextarea({
   onReset: (field: PromptField) => void;
 }) {
   const isCustomized = value.trim() !== "";
+  const [text, setText] = useState(value || field.defaultValue);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setText(value || field.defaultValue);
+  }, [value, field.defaultValue]);
 
   const debouncedSave = useDebouncedCallback(
     (val: string) => onSave(field.key, val),
@@ -93,13 +99,15 @@ function DebouncedTextarea({
           </Button>
         )}
       </div>
-      <Textarea
-        key={value} // Reset textarea when value changes externally (e.g. reset)
-        defaultValue={value}
-        onChange={(e) => debouncedSave.run(e.target.value)}
-        placeholder={field.defaultValue}
-        className="min-h-[120px] font-mono text-xs leading-relaxed"
-      />
+      <div className="h-[120px]">
+        <LineEditor
+          value={text}
+          onChange={(v) => { setText(v); debouncedSave.run(v); }}
+          contentFont="text-xs leading-5"
+          gutterFont="text-xs leading-5"
+          xmlColors
+        />
+      </div>
     </div>
   );
 }

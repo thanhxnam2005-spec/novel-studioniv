@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -204,11 +204,15 @@ export function ToolConfig({
                 </Button>
               )}
             </div>
-            <Textarea
-              value={promptText}
-              onChange={(e) => handlePromptChange(e.target.value)}
-              className="min-h-[80px] font-mono text-xs leading-relaxed"
-            />
+            <div className="h-[80px]">
+              <LineEditor
+                value={promptText}
+                onChange={(v) => handlePromptChange(v)}
+                contentFont="text-xs leading-5"
+                gutterFont="text-xs leading-5"
+                xmlColors
+              />
+            </div>
           </div>
 
           <p className="text-xs text-muted-foreground">

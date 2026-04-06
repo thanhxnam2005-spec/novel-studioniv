@@ -18,7 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { LineEditor } from "@/components/ui/line-editor";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
   getOrCreateWritingSettings,
@@ -168,6 +168,52 @@ function StepModelPicker({
           ))}
         </NativeSelect>
       </div>
+    </div>
+  );
+}
+
+function PromptEditorField({
+  value,
+  isCustom,
+  onSave,
+  onReset,
+}: {
+  value: string;
+  isCustom: boolean;
+  onSave: (v: string) => void;
+  onReset: () => void;
+}) {
+  const [text, setText] = useState(value);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium">System Prompt</Label>
+        {isCustom && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs text-muted-foreground"
+            onClick={onReset}
+          >
+            <RotateCcwIcon className="h-3 w-3 mr-1" />
+            Khôi phục mặc định
+          </Button>
+        )}
+      </div>
+      <div className="h-[15rem]">
+        <LineEditor
+          value={text}
+          onChange={(v) => { setText(v); onSave(v); }}
+          contentFont="text-xs leading-5"
+          gutterFont="text-xs leading-5"
+          xmlColors
+        />
+      </div>
+      {!isCustom && (
+        <p className="text-xs text-muted-foreground">
+          Đây là prompt mặc định. Chỉnh sửa trực tiếp để tùy biến.
+        </p>
+      )}
     </div>
   );
 }
@@ -452,38 +498,13 @@ export function WritingSettingsDialog({
                     <StepModelPicker novelId={novelId} role={activeRole} />
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-medium">
-                        System Prompt
-                      </Label>
-                      {isCustomPrompt(activeRole) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs text-muted-foreground"
-                          onClick={() => handleResetPrompt(activeRole)}
-                        >
-                          <RotateCcwIcon className="h-3 w-3 mr-1" />
-                          Khôi phục mặc định
-                        </Button>
-                      )}
-                    </div>
-                    <Textarea
-                      key={activeRole}
-                      defaultValue={getPromptValue(activeRole)}
-                      onChange={(e) =>
-                        debouncedPromptChange.run(activeRole, e.target.value)
-                      }
-                      rows={12}
-                      className="text-xs font-mono leading-relaxed resize-y"
-                    />
-                    {!isCustomPrompt(activeRole) && (
-                      <p className="text-xs text-muted-foreground">
-                        Đây là prompt mặc định. Chỉnh sửa trực tiếp để tùy biến.
-                      </p>
-                    )}
-                  </div>
+                  <PromptEditorField
+                    key={activeRole}
+                    value={getPromptValue(activeRole)}
+                    isCustom={isCustomPrompt(activeRole)}
+                    onSave={(v) => debouncedPromptChange.run(activeRole, v)}
+                    onReset={() => void handleResetPrompt(activeRole)}
+                  />
                 </div>
               </ScrollArea>
             </div>

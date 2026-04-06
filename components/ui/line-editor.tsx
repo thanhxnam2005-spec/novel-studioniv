@@ -1,7 +1,7 @@
 "use client";
 
-import { stringToColor, tokenizeXml } from "@/lib/utils/string-to-color";
 import { cn } from "@/lib/utils";
+import { stringToColor, tokenizeXml } from "@/lib/utils/string-to-color";
 import {
   memo,
   useCallback,
@@ -13,6 +13,24 @@ import {
   useState,
 } from "react";
 import { ScrollbarMarks } from "./scrollbar-marks";
+
+interface HighlightRegistry {
+  set(name: string, hl: InstanceType<typeof globalThis.Highlight>): void;
+  delete(name: string): boolean;
+  clear(): void;
+  has(name: string): boolean;
+}
+
+const supportsHighlightAPI =
+  typeof CSS !== "undefined" &&
+  "highlights" in CSS &&
+  typeof globalThis.Highlight === "function";
+
+function getRegistry(): HighlightRegistry | null {
+  return supportsHighlightAPI
+    ? (CSS.highlights as unknown as HighlightRegistry)
+    : null;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -55,11 +73,10 @@ const CONTENT_BASE =
   "min-w-0 flex-1 whitespace-pre-wrap break-words px-3 font-mono";
 
 /* ------------------------------------------------------------------ */
-/*  Rendered lines                                                     */
+/*  Legacy fallbacks (browsers without CSS Highlight API)              */
 /* ------------------------------------------------------------------ */
 
-/** Render a line with XML tag coloring. */
-function renderXmlLine(line: string, isDark: boolean): React.ReactNode {
+function renderXmlLineFallback(line: string, isDark: boolean): React.ReactNode {
   if (!line) return "\u00A0";
   const tokens = tokenizeXml(line);
   if (tokens.every((t) => t.type === "text")) return line || "\u00A0";
@@ -67,20 +84,24 @@ function renderXmlLine(line: string, isDark: boolean): React.ReactNode {
   return tokens.map((token, i) => {
     if (token.type === "text") return token.value || null;
     return (
-      <span key={i} style={{ color: stringToColor(token.tagName, colorOpts) }}>
+      <span
+        key={i}
+        style={{
+          display: "contents",
+          color: stringToColor(token.tagName, colorOpts),
+        }}
+      >
         {token.value}
       </span>
     );
   });
 }
 
-/** Build highlighted content fragments for a single line. */
-function renderHighlightedLine(
+function renderHighlightedLineFallback(
   line: string,
   lineStart: number,
   highlights: FindHighlight[],
 ): React.ReactNode {
-  // Filter highlights that overlap this line
   const lineEnd = lineStart + line.length;
   const relevant = highlights.filter(
     (h) => h.index < lineEnd && h.index + h.length > lineStart,
@@ -93,9 +114,7 @@ function renderHighlightedLine(
   for (const h of relevant) {
     const start = Math.max(0, h.index - lineStart);
     const end = Math.min(line.length, h.index + h.length - lineStart);
-    if (start > cursor) {
-      fragments.push(line.slice(cursor, start));
-    }
+    if (start > cursor) fragments.push(line.slice(cursor, start));
     fragments.push(
       <mark
         key={`${h.index}-${h.length}`}
@@ -107,9 +126,7 @@ function renderHighlightedLine(
     );
     cursor = end;
   }
-  if (cursor < line.length) {
-    fragments.push(line.slice(cursor));
-  }
+  if (cursor < line.length) fragments.push(line.slice(cursor));
   return fragments.length > 0 ? fragments : "\u00A0";
 }
 
@@ -120,6 +137,7 @@ const RenderedLines = memo(function RenderedLines({
   highlights,
   xmlColors,
   isDark,
+  useHighlightApi,
 }: {
   value: string;
   gutterCls: string;
@@ -127,38 +145,245 @@ const RenderedLines = memo(function RenderedLines({
   highlights?: FindHighlight[] | null;
   xmlColors?: boolean;
   isDark?: boolean;
+  useHighlightApi: boolean;
 }) {
   const lines = useMemo(() => value.split("\n"), [value]);
 
-  // Pre-compute line start offsets if highlights are present
+  // Line start offsets – needed for fallback rendering AND data-mark
   const lineOffsets = useMemo(() => {
     if (!highlights || highlights.length === 0) return null;
     const offsets: number[] = [];
     let offset = 0;
     for (const line of lines) {
       offsets.push(offset);
-      offset += line.length + 1; // +1 for \n
+      offset += line.length + 1;
     }
     return offsets;
   }, [lines, highlights]);
 
+  // Lines that contain a find highlight – for data-mark on the line <div>,
+  // used by ScrollbarMarks to compute scrollbar tick positions.
+  const markedLines = useMemo(() => {
+    if (!highlights || highlights.length === 0 || !lineOffsets) return null;
+    const set = new Set<number>();
+    for (const h of highlights) {
+      const hEnd = h.index + h.length;
+      for (let i = 0; i < lines.length; i++) {
+        const ls = lineOffsets[i];
+        const le = ls + lines[i].length;
+        if (h.index < le && hEnd > ls) set.add(i);
+      }
+    }
+    return set;
+  }, [highlights, lines, lineOffsets]);
+
   return (
     <>
-      {lines.map((line, i) => (
-        <div key={i} className={LINE_CLS}>
-          <span className={gutterCls}>{i + 1}</span>
-          <span className={contentCls}>
-            {highlights && highlights.length > 0 && lineOffsets
-              ? renderHighlightedLine(line, lineOffsets[i], highlights)
-              : xmlColors
-                ? renderXmlLine(line, isDark ?? false)
-                : line || "\u00A0"}
-          </span>
-        </div>
-      ))}
+      {lines.map((line, i) => {
+        const hasSearch = highlights && highlights.length > 0 && lineOffsets;
+
+        let content: React.ReactNode;
+
+        if (useHighlightApi) {
+          // Pure text – CSS Highlight API handles all coloring
+          content = line || "\u00A0";
+        } else if (hasSearch) {
+          content = renderHighlightedLineFallback(
+            line,
+            lineOffsets[i],
+            highlights,
+          );
+        } else if (xmlColors) {
+          content = renderXmlLineFallback(line, isDark ?? false);
+        } else {
+          content = line || "\u00A0";
+        }
+
+        return (
+          <div
+            key={i}
+            className={LINE_CLS}
+            {...(markedLines?.has(i) ? { "data-mark": "" } : undefined)}
+          >
+            <span className={gutterCls}>{i + 1}</span>
+            <span className={contentCls} data-line-content>
+              {content}
+            </span>
+          </div>
+        );
+      })}
     </>
   );
 });
+
+function useCSSHighlights(
+  containerRef: React.RefObject<HTMLElement | null>,
+  value: string,
+  opts: {
+    xmlColors?: boolean;
+    isDark?: boolean;
+    findHighlights?: FindHighlight[] | null;
+  },
+) {
+  const { xmlColors, isDark, findHighlights } = opts;
+  const registeredRef = useRef<string[]>([]);
+  const styleRef = useRef<HTMLStyleElement | null>(null);
+
+  useLayoutEffect(() => {
+    const registry = getRegistry();
+    if (!registry || !containerRef.current) return;
+
+    // ---- clean previous registrations ----
+    for (const name of registeredRef.current) {
+      registry.delete(name);
+    }
+    registeredRef.current = [];
+
+    const lines = value.split("\n");
+    const contentSpans = containerRef.current.querySelectorAll(
+      "[data-line-content]",
+    );
+
+    const names: string[] = [];
+    const rules: string[] = [];
+
+    // Helper: retrieve the single plain text node of a content span
+    function getTextNode(span: Element, lineIdx: number): Text | null {
+      const node = span.firstChild;
+      if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+      if ((node.textContent?.length ?? 0) !== lines[lineIdx].length)
+        return null;
+      return node as Text;
+    }
+
+    // ---- 1. XML tag coloring ----
+    if (xmlColors) {
+      const tagRanges = new Map<string, Range[]>();
+
+      contentSpans.forEach((span, i) => {
+        const line = lines[i];
+        if (!line) return;
+        const textNode = getTextNode(span, i);
+        if (!textNode) return;
+
+        const tokens = tokenizeXml(line);
+        let offset = 0;
+
+        for (const token of tokens) {
+          if (token.type !== "text" && token.tagName) {
+            try {
+              const range = new Range();
+              range.setStart(textNode, offset);
+              range.setEnd(textNode, offset + token.value.length);
+              let arr = tagRanges.get(token.tagName);
+              if (!arr) {
+                arr = [];
+                tagRanges.set(token.tagName, arr);
+              }
+              arr.push(range);
+            } catch {
+              // offset out of bounds – skip
+            }
+          }
+          offset += token.value.length;
+        }
+      });
+
+      const colorOpts = isDark ? { s: 80, l: 72 } : { s: 70, l: 42 };
+
+      for (const [tagName, ranges] of tagRanges) {
+        const safeName = `xml-${tagName.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        try {
+          registry.set(safeName, new globalThis.Highlight(...ranges));
+          names.push(safeName);
+          rules.push(
+            `::highlight(${safeName}) { color: ${stringToColor(tagName, colorOpts)}; }`,
+          );
+        } catch {
+          // skip
+        }
+      }
+    }
+
+    // ---- 2. Find-match highlighting ----
+    if (findHighlights && findHighlights.length > 0) {
+      const lineStarts: number[] = [];
+      let off = 0;
+      for (const line of lines) {
+        lineStarts.push(off);
+        off += line.length + 1;
+      }
+
+      const findRanges: Range[] = [];
+
+      for (const h of findHighlights) {
+        const hEnd = h.index + h.length;
+
+        for (let i = 0; i < lines.length; i++) {
+          const ls = lineStarts[i];
+          const le = ls + lines[i].length;
+          if (h.index >= le || hEnd <= ls) continue;
+
+          const textNode = getTextNode(contentSpans[i], i);
+          if (!textNode) continue;
+
+          const start = Math.max(0, h.index - ls);
+          const end = Math.min(lines[i].length, hEnd - ls);
+
+          try {
+            const range = new Range();
+            range.setStart(textNode, start);
+            range.setEnd(textNode, end);
+            findRanges.push(range);
+          } catch {
+            // skip
+          }
+        }
+      }
+
+      if (findRanges.length > 0) {
+        try {
+          registry.set("find-match", new globalThis.Highlight(...findRanges));
+          names.push("find-match");
+
+          const bg = isDark
+            ? "rgba(234, 179, 8, 0.4)"
+            : "rgba(250, 204, 21, 0.8)";
+          rules.push(`::highlight(find-match) { background-color: ${bg}; }`);
+        } catch {
+          // skip
+        }
+      }
+    }
+
+    registeredRef.current = names;
+
+    // ---- inject / update <style> for ::highlight() rules ----
+    if (!styleRef.current) {
+      styleRef.current = document.createElement("style");
+      styleRef.current.setAttribute("data-line-editor-highlights", "");
+      document.head.appendChild(styleRef.current);
+    }
+    styleRef.current.textContent = rules.join("\n");
+  }, [containerRef, value, xmlColors, isDark, findHighlights]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const registry = getRegistry();
+      if (registry) {
+        for (const name of registeredRef.current) {
+          registry.delete(name);
+        }
+      }
+      registeredRef.current = [];
+      if (styleRef.current) {
+        styleRef.current.remove();
+        styleRef.current = null;
+      }
+    };
+  }, []);
+}
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -177,8 +402,10 @@ export function LineEditor({
 }: LineEditorProps) {
   const mirrorRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const readOnlyContainerRef = useRef<HTMLDivElement | null>(null);
   const deferredValue = useDeferredValue(value);
 
+  /* ---- dark mode detection ---- */
   const [isDark, setIsDark] = useState(() =>
     typeof document !== "undefined"
       ? document.documentElement.classList.contains("dark")
@@ -195,10 +422,21 @@ export function LineEditor({
     return () => observer.disconnect();
   }, []);
 
+  /* ---- derived values ---- */
   const gutterCls = cn(GUTTER_BASE, gutterFont);
   const contentCls = cn(CONTENT_BASE, contentFont);
 
-  /* sync mirror padding with textarea scrollbar width */
+  /* ---- CSS Custom Highlight API (XML + find) ---- */
+  const highlightContainerRef = readOnly ? readOnlyContainerRef : mirrorRef;
+  const highlightValue = readOnly ? value : deferredValue;
+
+  useCSSHighlights(highlightContainerRef, highlightValue, {
+    xmlColors,
+    isDark,
+    findHighlights: highlights,
+  });
+
+  /* ---- sync mirror padding with textarea scrollbar width ---- */
   useEffect(() => {
     const textarea = textareaRef.current;
     const mirror = mirrorRef.current;
@@ -215,32 +453,38 @@ export function LineEditor({
     return () => ro.disconnect();
   }, [readOnly]);
 
+  /* ---- scroll sync ---- */
   const handleScroll = useCallback((e: React.UIEvent<HTMLElement>) => {
     if (mirrorRef.current)
       mirrorRef.current.style.transform = `translateY(${-e.currentTarget.scrollTop}px)`;
   }, []);
 
-  // Keep mirror in sync after every render — browser may adjust scrollTop
-  // without firing scroll events (content change, paste, programmatic set).
   useLayoutEffect(() => {
     if (mirrorRef.current && textareaRef.current && !readOnly)
       mirrorRef.current.style.transform = `translateY(${-textareaRef.current.scrollTop}px)`;
   });
 
+  /* ---- read-only mode ---- */
   if (readOnly) {
     return (
-      <div className={cn("overflow-y-auto rounded-md border", className)}>
+      <div
+        ref={readOnlyContainerRef}
+        className={cn("overflow-y-auto rounded-md border", className)}
+      >
         <RenderedLines
           value={value}
           gutterCls={gutterCls}
           contentCls={contentCls}
+          highlights={highlights}
           xmlColors={xmlColors}
           isDark={isDark}
+          useHighlightApi={supportsHighlightAPI}
         />
       </div>
     );
   }
 
+  /* ---- editable mode ---- */
   return (
     <div
       className={cn("relative overflow-hidden rounded-md border", className)}
@@ -255,6 +499,7 @@ export function LineEditor({
             highlights={highlights}
             xmlColors={xmlColors}
             isDark={isDark}
+            useHighlightApi={supportsHighlightAPI}
           />
         </div>
       </div>
@@ -274,6 +519,7 @@ export function LineEditor({
         readOnly={readOnly}
       />
 
+      {/* ScrollbarMarks uses data-mark on line divs (not inline <mark>) */}
       {highlights && highlights.length > 0 && (
         <ScrollbarMarks
           scrollRef={textareaRef}

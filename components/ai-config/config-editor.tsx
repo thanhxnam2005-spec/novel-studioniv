@@ -21,6 +21,7 @@ import {
 } from "@/lib/chapter-tools/prompts";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
+  getOrCreateWritingSettings,
   updateAnalysisSettings,
   updateChatSettings,
   updateWritingSettings,
@@ -34,12 +35,19 @@ import {
 import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { getDefaultPrompt } from "@/lib/writing/prompts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PromptEditor } from "./prompt-editor";
 import { StepModelPicker } from "./step-model-picker";
 import type { ConfigItemId } from "./types";
 
 const GLOBAL_DEFAULT_ID = "global-default";
+
+async function upsertGlobalWritingSettings(
+  data: Parameters<typeof updateWritingSettings>[1],
+) {
+  await getOrCreateWritingSettings(GLOBAL_DEFAULT_ID);
+  await updateWritingSettings(GLOBAL_DEFAULT_ID, data);
+}
 
 // ─── Save indicator ──────────────────────────────────────────
 
@@ -141,21 +149,26 @@ function ChatModelPicker() {
 function GlobalInstructionEditor() {
   const settings = useChatSettings();
   const { saved, show } = useSaveIndicator();
-  const [value, setValue] = useState("");
-  const initialized = useRef(false);
+  const [value, setValue] = useState(settings.globalSystemInstruction ?? "");
 
   useEffect(() => {
-    if (!initialized.current && settings.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setValue(settings.globalSystemInstruction ?? "");
-      initialized.current = true;
-    }
-  }, [settings.globalSystemInstruction, settings.id]);
+    const next = settings.globalSystemInstruction ?? "";
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setValue(next);
+  }, [settings.globalSystemInstruction]);
 
   const save = useDebouncedCallback((v: string) => {
-    void updateChatSettings({ globalSystemInstruction: v.trim() || undefined });
-    show();
+    const next = v.trim() || undefined;
+    void updateChatSettings({ globalSystemInstruction: next })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   }, 600);
+
+  useEffect(() => {
+    return () => save.flush();
+  }, [save]);
 
   return (
     <div className="space-y-5">
@@ -165,9 +178,9 @@ function GlobalInstructionEditor() {
         saved={saved}
       />
       <PromptEditor
+        className="h-[max(calc(100svh-320px),500px)]"
         value={value}
         onChange={(v) => {
-          initialized.current = true;
           setValue(v);
           save.run(v);
         }}
@@ -187,10 +200,23 @@ function ChatPanelEditor() {
     settings.systemPrompt || DEFAULT_CHAT_SYSTEM_PROMPT,
   );
 
+  useEffect(() => {
+    const next = settings.systemPrompt || DEFAULT_CHAT_SYSTEM_PROMPT;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPromptValue(next);
+  }, [settings.systemPrompt]);
+
   const savePrompt = useDebouncedCallback((v: string) => {
-    void updateChatSettings({ systemPrompt: v });
-    show();
+    void updateChatSettings({ systemPrompt: v })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   }, 600);
+
+  useEffect(() => {
+    return () => savePrompt.flush();
+  }, [savePrompt]);
 
   const isCustom =
     settings.systemPrompt !== DEFAULT_CHAT_SYSTEM_PROMPT &&
@@ -198,8 +224,11 @@ function ChatPanelEditor() {
 
   const handleResetPrompt = () => {
     setPromptValue(DEFAULT_CHAT_SYSTEM_PROMPT);
-    void updateChatSettings({ systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT });
-    show();
+    void updateChatSettings({ systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   return (
@@ -245,6 +274,7 @@ function ChatPanelEditor() {
           }}
           onReset={handleResetPrompt}
           isCustom={isCustom}
+          className="h-[max(calc(100svh-460px),240px)]"
         />
       </div>
     </div>
@@ -334,27 +364,46 @@ function AnalysisPhaseEditor({ item }: { item: ConfigItemId }) {
     customPrompt?.trim() || defaultPrompt,
   );
 
+  useEffect(() => {
+    const next = customPrompt?.trim() || defaultPrompt;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalPrompt(next);
+  }, [customPrompt, defaultPrompt, item]);
+
   const savePrompt = useDebouncedCallback((v: string) => {
     if (!config) return;
     const trimmed = v.trim();
+    const next = trimmed === defaultPrompt ? undefined : trimmed || undefined;
     void updateAnalysisSettings({
-      [config.promptKey]:
-        trimmed === defaultPrompt ? undefined : trimmed || undefined,
-    });
-    show();
+      [config.promptKey]: next,
+    })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   }, 600);
+
+  useEffect(() => {
+    return () => savePrompt.flush();
+  }, [savePrompt]);
 
   if (!config) return null;
 
   const handleModelChange = (value: StepModelConfig | undefined) => {
-    void updateAnalysisSettings({ [config.modelKey]: value });
-    show();
+    void updateAnalysisSettings({ [config.modelKey]: value })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   const handleResetPrompt = () => {
     setLocalPrompt(defaultPrompt);
-    void updateAnalysisSettings({ [config.promptKey]: undefined });
-    show();
+    void updateAnalysisSettings({ [config.promptKey]: undefined })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   return (
@@ -405,27 +454,46 @@ function ChapterToolEditor({ item }: { item: ConfigItemId }) {
     customPrompt?.trim() || defaultPrompt,
   );
 
+  useEffect(() => {
+    const next = customPrompt?.trim() || defaultPrompt;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalPrompt(next);
+  }, [customPrompt, defaultPrompt, item]);
+
   const savePrompt = useDebouncedCallback((v: string) => {
     if (!config) return;
     const trimmed = v.trim();
+    const next = trimmed === defaultPrompt ? undefined : trimmed || undefined;
     void updateAnalysisSettings({
-      [config.promptKey]:
-        trimmed === defaultPrompt ? undefined : trimmed || undefined,
-    });
-    show();
+      [config.promptKey]: next,
+    })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   }, 600);
+
+  useEffect(() => {
+    return () => savePrompt.flush();
+  }, [savePrompt]);
 
   if (!config) return null;
 
   const handleModelChange = (value: StepModelConfig | undefined) => {
-    void updateAnalysisSettings({ [config.modelKey]: value });
-    show();
+    void updateAnalysisSettings({ [config.modelKey]: value })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   const handleResetPrompt = () => {
     setLocalPrompt(defaultPrompt);
-    void updateAnalysisSettings({ [config.promptKey]: undefined });
-    show();
+    void updateAnalysisSettings({ [config.promptKey]: undefined })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   return (
@@ -472,7 +540,7 @@ function AutowriteSetupEditor() {
   const maxAutoRetries = settings?.maxAutoRetries ?? 2;
 
   const update = (data: Parameters<typeof updateWritingSettings>[1]) => {
-    void updateWritingSettings(GLOBAL_DEFAULT_ID, data);
+    void upsertGlobalWritingSettings(data);
     show();
   };
 
@@ -675,14 +743,28 @@ function AutowriteAgentEditor({ item }: { item: ConfigItemId }) {
     customPrompt?.trim() || defaultPrompt,
   );
 
+  useEffect(() => {
+    const next = customPrompt?.trim() || defaultPrompt;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalPrompt(next);
+  }, [customPrompt, defaultPrompt, item, role]);
+
   const savePrompt = useDebouncedCallback((v: string) => {
     if (!promptKey) return;
     const trimmed = v.trim();
-    void updateWritingSettings(GLOBAL_DEFAULT_ID, {
-      [promptKey]: trimmed === defaultPrompt ? undefined : trimmed || undefined,
-    });
-    show();
+    const next = trimmed === defaultPrompt ? undefined : trimmed || undefined;
+    void upsertGlobalWritingSettings({
+      [promptKey]: next,
+    })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   }, 600);
+
+  useEffect(() => {
+    return () => savePrompt.flush();
+  }, [savePrompt]);
 
   if (!role) return null;
 
@@ -690,15 +772,21 @@ function AutowriteAgentEditor({ item }: { item: ConfigItemId }) {
 
   const handleModelChange = (value: StepModelConfig | undefined) => {
     if (!modelKey) return;
-    void updateWritingSettings(GLOBAL_DEFAULT_ID, { [modelKey]: value });
-    show();
+    void upsertGlobalWritingSettings({ [modelKey]: value })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   const handleResetPrompt = () => {
     if (!promptKey) return;
     setLocalPrompt(defaultPrompt);
-    void updateWritingSettings(GLOBAL_DEFAULT_ID, { [promptKey]: undefined });
-    show();
+    void upsertGlobalWritingSettings({ [promptKey]: undefined })
+      .then(() => {
+        show();
+      })
+      .catch(() => undefined);
   };
 
   return (

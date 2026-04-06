@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -13,7 +13,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
+import { LineEditor } from "@/components/ui/line-editor";
 import {
   Collapsible,
   CollapsibleContent,
@@ -124,6 +124,12 @@ function InlinePromptEditor({
   const settings = useAnalysisSettings();
   const value = settings[promptKey] ?? "";
   const isCustomized = value.trim() !== "";
+  const [text, setText] = useState(value || defaultPrompt);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setText(value || defaultPrompt);
+  }, [value, defaultPrompt]);
 
   const debouncedSave = useDebouncedCallback(
     (val: string) =>
@@ -152,12 +158,15 @@ function InlinePromptEditor({
           </Button>
         )}
       </div>
-      <Textarea
-        key={value || defaultPrompt}
-        defaultValue={value || defaultPrompt}
-        onChange={(e) => debouncedSave.run(e.target.value)}
-        className="min-h-[100px] font-mono text-xs leading-relaxed"
-      />
+      <div className="h-[100px]">
+        <LineEditor
+          value={text}
+          onChange={(v) => { setText(v); debouncedSave.run(v); }}
+          contentFont="text-xs leading-5"
+          gutterFont="text-xs leading-5"
+          xmlColors
+        />
+      </div>
     </div>
   );
 }

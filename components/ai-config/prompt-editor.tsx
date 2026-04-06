@@ -20,7 +20,7 @@ export function PromptEditor({
   onReset,
   isCustom = false,
   placeholder,
-  className,
+  className = "h-[max(calc(100svh-420px),300px)] bg-background",
 }: PromptEditorProps) {
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -47,7 +47,7 @@ export function PromptEditor({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="h-[max(calc(100svh-420px),300px)] bg-background"
+        className={className}
         contentFont="text-xs leading-5"
         gutterFont="text-xs leading-5"
         xmlColors

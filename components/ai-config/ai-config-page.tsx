@@ -31,7 +31,7 @@ export function AIConfigPage() {
   return (
     <div className="flex h-full min-h-0">
       {/* Left tree panel */}
-      <aside className="w-64 shrink-0 overflow-y-auto border-r bg-muted/20">
+      <aside className="w-56 shrink-0 overflow-y-auto border-r bg-muted/20 sticky top-0">
         <div className="sticky top-0 border-b bg-background/80 px-3 py-2.5 backdrop-blur">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Cấu hình

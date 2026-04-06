@@ -11,7 +11,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
+import { LineEditor } from "@/components/ui/line-editor";
 import type { StepModelConfig, WritingAgentRole } from "@/lib/db";
 import {
   getOrCreateWritingSettings,
@@ -25,7 +25,7 @@ import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import { useWritingPipelineStore } from "@/lib/stores/writing-pipeline";
 import { getDefaultPrompt } from "@/lib/writing/prompts";
 import { ChevronDownIcon, RotateCcwIcon } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 function PipelineStepModelPicker({
   novelId,
@@ -146,6 +146,11 @@ export function PipelineStepConfig({
   const displayPrompt =
     (settings?.[promptKey] as string | undefined) ?? defaultPrompt;
 
+  const [promptText, setPromptText] = useState(displayPrompt);
+  useEffect(() => {
+    setPromptText(displayPrompt);
+  }, [displayPrompt]);
+
   return (
     <div className="mx-auto max-w-lg space-y-4 rounded-xl border bg-card p-4">
       <div>
@@ -162,15 +167,15 @@ export function PipelineStepConfig({
 
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">Yêu cầu của bạn</Label>
-        <Textarea
-          value={instruction}
-          onChange={(e) =>
-            setStepUserInstruction(instructionKey, e.target.value)
-          }
-          placeholder="Ghi chú ý tưởng, hạn chế, hoặc yêu cầu cụ thể cho AI (không lưu vào DB)..."
-          rows={3}
-          className="text-sm resize-y"
-        />
+        <div className="h-[5rem]">
+          <LineEditor
+            value={instruction}
+            onChange={(v) => setStepUserInstruction(instructionKey, v)}
+            placeholder="Ghi chú ý tưởng, hạn chế, hoặc yêu cầu cụ thể cho AI (không lưu vào DB)..."
+            contentFont="text-sm leading-5"
+            gutterFont="text-xs leading-5"
+          />
+        </div>
       </div>
 
       <Collapsible open={systemOpen} onOpenChange={setSystemOpen}>
@@ -197,13 +202,15 @@ export function PipelineStepConfig({
               </Button>
             )}
           </div>
-          <Textarea
-            key={`${novelId}-${role}-${isCustom ? "c" : "d"}`}
-            defaultValue={displayPrompt}
-            onChange={(e) => debouncedPromptChange.run(e.target.value)}
-            rows={10}
-            className="text-xs font-mono leading-relaxed resize-y"
-          />
+          <div className="h-[12.5rem]">
+            <LineEditor
+              value={promptText}
+              onChange={(v) => { setPromptText(v); debouncedPromptChange.run(v); }}
+              contentFont="text-xs leading-5"
+              gutterFont="text-xs leading-5"
+              xmlColors
+            />
+          </div>
           <p className="text-[10px] text-muted-foreground">
             Lưu tự động sau khi ngừng gõ (debounce).
           </p>

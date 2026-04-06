@@ -19,16 +19,16 @@ import { useNovels } from "@/lib/hooks";
 import { useQTEngineStatus } from "@/lib/hooks/use-qt-engine";
 import {
   BookOpenIcon,
+  BrainIcon,
   DatabaseIcon,
   GitCompareArrowsIcon,
   GlobeIcon,
   HistoryIcon,
   HomeIcon,
   LibraryIcon,
-  MessageSquareWarningIcon,
   LoaderIcon,
+  MessageSquareWarningIcon,
   PenLineIcon,
-  ScrollTextIcon,
   ServerIcon,
   UploadIcon,
 } from "lucide-react";
@@ -43,9 +43,9 @@ export const navConfig = [
   { title: "Scraper", href: "/scraper", icon: GlobeIcon },
   { title: "Nhà cung cấp AI", href: "/settings/providers", icon: ServerIcon },
   {
-    title: "Chỉ thị chung",
-    href: "/settings/instructions",
-    icon: ScrollTextIcon,
+    title: "Cài đặt AI",
+    href: "/settings/ai-settings",
+    icon: BrainIcon,
   },
   {
     title: "Quản lý dữ liệu",
