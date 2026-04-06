@@ -190,18 +190,13 @@ function GlobalInstructionEditor() {
   );
 }
 
-const DEFAULT_CHAT_SYSTEM_PROMPT =
-  "You are a helpful writing assistant for Novel Studio, a creative writing workspace. Be concise and helpful.";
-
 function ChatPanelEditor() {
   const settings = useChatSettings();
   const { saved, show } = useSaveIndicator();
-  const [promptValue, setPromptValue] = useState(
-    settings.systemPrompt || DEFAULT_CHAT_SYSTEM_PROMPT,
-  );
+  const [promptValue, setPromptValue] = useState(settings.systemPrompt);
 
   useEffect(() => {
-    const next = settings.systemPrompt || DEFAULT_CHAT_SYSTEM_PROMPT;
+    const next = settings.systemPrompt;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPromptValue(next);
   }, [settings.systemPrompt]);
@@ -218,13 +213,11 @@ function ChatPanelEditor() {
     return () => savePrompt.flush();
   }, [savePrompt]);
 
-  const isCustom =
-    settings.systemPrompt !== DEFAULT_CHAT_SYSTEM_PROMPT &&
-    settings.systemPrompt !== "";
+  const isCustom = settings.systemPrompt !== "";
 
   const handleResetPrompt = () => {
-    setPromptValue(DEFAULT_CHAT_SYSTEM_PROMPT);
-    void updateChatSettings({ systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT })
+    setPromptValue("");
+    void updateChatSettings({ systemPrompt: "" })
       .then(() => {
         show();
       })
