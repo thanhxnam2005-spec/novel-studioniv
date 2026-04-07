@@ -3,7 +3,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Character, PlotArc } from "@/lib/db";
 import { useCharacters, usePlotArcs } from "@/lib/hooks";
 import { useWritingPipelineStore } from "@/lib/stores/writing-pipeline";
@@ -45,7 +44,7 @@ export function DirectionPreFilter({ novelId }: { novelId: string }) {
   };
 
   return (
-    <div className="space-y-4 rounded-xl border bg-card p-4">
+    <div className="space-y-4 rounded-xl border bg-card p-4 overflow-hidden">
       <div>
         <h3 className="text-sm font-semibold">Lọc nội dung cho chương</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -62,19 +61,17 @@ export function DirectionPreFilter({ novelId }: { novelId: string }) {
               Mạch truyện ({selectedArcIds.length || "tất cả"})
             </Label>
           </div>
-          <ScrollArea className="h-[160px]">
-            <div className="space-y-1 pr-3">
-              {activeArcs.map((arc) => (
-                <ArcItem
-                  key={arc.id}
-                  arc={arc}
-                  checked={selectedArcIds.includes(arc.id)}
-                  onToggle={() => toggleArc(arc.id)}
-                  typeColor={ARC_TYPE_COLOR[arc.type] ?? ""}
-                />
-              ))}
-            </div>
-          </ScrollArea>
+          <div className="max-h-[240px] overflow-y-auto overflow-x-hidden space-y-1">
+            {activeArcs.map((arc) => (
+              <ArcItem
+                key={arc.id}
+                arc={arc}
+                checked={selectedArcIds.includes(arc.id)}
+                onToggle={() => toggleArc(arc.id)}
+                typeColor={ARC_TYPE_COLOR[arc.type] ?? ""}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -87,8 +84,8 @@ export function DirectionPreFilter({ novelId }: { novelId: string }) {
               Nhân vật ({selectedCharIds.length || "tất cả"})
             </Label>
           </div>
-          <ScrollArea className="h-[120px]">
-            <div className="flex flex-wrap gap-1.5 pr-3">
+          <div className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+            <div className="flex flex-wrap gap-1.5">
               {characters.map((c) => (
                 <CharacterChip
                   key={c.id}
@@ -98,7 +95,7 @@ export function DirectionPreFilter({ novelId }: { novelId: string }) {
                 />
               ))}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
     </div>
@@ -119,7 +116,7 @@ function ArcItem({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors overflow-hidden",
+        "flex w-full min-w-0 cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors",
         checked ? "border-primary bg-primary/5" : "hover:bg-muted/50",
       )}
     >
@@ -128,10 +125,13 @@ function ArcItem({
         onCheckedChange={onToggle}
         className="mt-0.5 shrink-0"
       />
-      <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium truncate min-w-0">{arc.title}</span>
-          <Badge variant="secondary" className={cn("text-[10px] shrink-0", typeColor)}>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs font-medium truncate">{arc.title}</span>
+          <Badge
+            variant="secondary"
+            className={cn("text-[10px] shrink-0 whitespace-nowrap", typeColor)}
+          >
             {arc.type}
           </Badge>
         </div>
@@ -170,7 +170,9 @@ function CharacterChip({
         )}
       />
       <span className="truncate">{character.name}</span>
-      <span className="text-[10px] opacity-60 shrink-0">({character.role})</span>
+      <span className="text-[10px] opacity-60 truncate">
+        ({character.role})
+      </span>
     </button>
   );
 }

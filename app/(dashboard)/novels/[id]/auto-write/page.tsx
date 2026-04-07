@@ -961,7 +961,7 @@ export default function AutoWritePage() {
                   className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
                 >
                   <ScrollArea className={writingTabsScrollClass}>
-                    <div className="p-4">
+                    <div className="p-4 min-w-0">
                       {pipelinePreRunRole === "direction" ||
                       (sessionNeedsResume &&
                         activeSession?.currentStep === "direction" &&
@@ -1043,7 +1043,8 @@ export default function AutoWritePage() {
                           </EmptyHeader>
                         </Empty>
                       ) : activeSession && effectivePlanId && !isRunning ? (
-                        <div className="space-y-6">
+                        <div className="space-y-4 mx-auto max-w-lg">
+                          <DirectionPreFilter novelId={novelId} />
                           <PipelineStepConfig
                             novelId={novelId}
                             role="direction"
