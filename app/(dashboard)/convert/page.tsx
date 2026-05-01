@@ -57,27 +57,35 @@ import {
   Volume2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTrainingStore } from "@/lib/stores/training-store";
+import { useBackgroundTraining } from "@/lib/hooks/use-background-training";
 import { toast } from "sonner";
 
 export default function ConvertPage() {
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState("");
+  const store = useTrainingStore();
+  const { handleTrain, stopTraining } = useBackgroundTraining();
+  
+  const { 
+    input, setInput, 
+    output, setOutput, 
+    segments, setSegments,
+    isTraining,
+    trainingSuggestions, setTrainingSuggestions,
+    newlyAddedToDict, setNewlyAddedToDict,
+    batchProgress,
+    lastProcessedIndex, setLastProcessedIndex,
+    isAutoNext, setIsAutoNext
+  } = store;
+
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [liveMode, setLiveMode] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [detectedNames, setDetectedNames] = useState<DictPair[]>([]);
-  const [segments, setSegments] = useState<ConvertSegment[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
   const [extractedNames, setExtractedNames] = useState<any[]>([]);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
-  const [isTraining, setIsTraining] = useState(false);
-  const [trainingSuggestions, setTrainingSuggestions] = useState<TrainingSuggestion[]>([]);
-  const [newlyAddedToDict, setNewlyAddedToDict] = useState<any[]>([]);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
-  const [lastProcessedIndex, setLastProcessedIndex] = useState(0);
-  const [isAutoNext, setIsAutoNext] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -194,112 +202,6 @@ export default function ConvertPage() {
     }
   };
 
-  const handleTrain = async (startIndex: number = 0) => {
-    if (!input.trim()) return;
-    
-    const providerId = convertOptions.trainingProviderId;
-    const modelId = convertOptions.trainingModelId;
-    
-    if (!providerId || !modelId) {
-      toast.error("Vui lòng chọn Nhà cung cấp và Model AI trong phần Cài đặt để huấn luyện.");
-      return;
-    }
-
-    const provider = providers?.find(p => p.id === providerId);
-    if (!provider) {
-      toast.error("Không tìm thấy cấu hình nhà cung cấp AI.");
-      return;
-    }
-
-    setIsTraining(true);
-    setTrainingSuggestions([]);
-    
-    const BATCH_SIZE = 10000;
-    const totalChars = input.length;
-    const numBatches = Math.ceil((totalChars - startIndex) / BATCH_SIZE);
-    
-    try {
-      const model = await getModel(provider, modelId);
-      const { generateText } = await import("ai");
-
-      const systemPrompt = `
-<role>
-Bạn là dịch giả văn học chuyên nghiệp, chuyên dịch tiểu thuyết Trung Quốc sang Tiếng Việt. Nhiệm vụ của bạn là tạo bản dịch tự nhiên, trung thành và nhất quán.
-</role>
-
-<task>
-Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự tự nhiên và mượt mà của ngôn ngữ đích trong khi giữ trung thành với nội dung gốc.
-</task>
-
-<translation_rules>
-  <rule id="structure">Giữ nguyên cấu trúc đoạn văn, định dạng và dấu ngắt dòng của bản gốc.</rule>
-  <rule id="proper_names">Tên riêng: sử dụng âm Hán-Việt (ví dụ: Vương Lâm, không phải Rừng Vương). Nhất quán cách dịch xuyên suốt chương.</rule>
-  <rule id="style">Sử dụng văn phong tiểu thuyết mạng Trung Quốc (Tiên Hiệp/Ngôn Tình), ưu tiên các từ Hán-Việt trang trọng cho bối cảnh tu tiên/cổ đại. Tránh dùng từ ngữ quá hiện đại hoặc bình dân thuần Việt.</rule>
-  <rule id="naturalness">Văn phong mượt mà nhưng vẫn giữ được "chất" truyện dịch, tránh dịch word-by-word.</rule>
-  <rule id="dialogue_register">Giữ đúng ngữ điệu: lời thoại trang trọng (ví dụ: "Tiền bối", "Vãn bối") giữ đúng sắc thái.</rule>
-  <rule id="terminology">Thuật ngữ tu tiên (Linh khí, Trúc Cơ, Đan dược) phải dùng đúng từ Hán-Việt tiêu chuẩn.</rule>
-  <rule id="fidelity">Không thêm, bớt, giải thích, hoặc chú thích nội dung gốc.</rule>
-  <rule id="special_chars">Giữ nguyên các ký hiệu đặc biệt (★, ※, ─, v.v.).</rule>
-</translation_rules>
-
-<context_usage>Nếu được cung cấp ngữ cảnh về tên nhân vật, địa danh: sử dụng nhất quán theo ngữ cảnh đó.</context_usage>
-
-<output_format>Chỉ trả về bản dịch hoàn chỉnh. Không kèm giải thích, ghi chú, hoặc bình luận.</output_format>`;
-
-      for (let i = 0; i < numBatches; i++) {
-        const currentStart = startIndex + i * BATCH_SIZE;
-        const currentEnd = Math.min(currentStart + BATCH_SIZE, totalChars);
-        setBatchProgress({ current: i + 1, total: numBatches });
-        setLastProcessedIndex(currentEnd);
-        
-        const chunk = input.slice(currentStart, currentEnd);
-        
-        // Auto-scroll to current position
-        if (scrollContainerRef.current) {
-          const leftPanel = scrollContainerRef.current.querySelector('.overflow-y-auto, textarea');
-          if (leftPanel) {
-            const ratio = currentStart / totalChars;
-            leftPanel.scrollTop = (leftPanel.scrollHeight - leftPanel.clientHeight) * ratio;
-          }
-        }
-        
-        // 1. Get QT result for this chunk
-        const qtResult = await convertText(chunk, { options: mergedOptions });
-        
-        // 2. Get AI translation for this chunk
-        const { text: aiTranslated } = await generateText({
-          model,
-          system: systemPrompt,
-          prompt: `Văn bản gốc cần dịch:\n\n${chunk}`,
-        });
-
-        // 3. Run comparison
-        const suggestions = await runTranslationTraining({
-          model,
-          sourceText: chunk,
-          qtTranslated: qtResult.plainText,
-          aiTranslated,
-        });
-
-        if (suggestions.length > 0) {
-          setTrainingSuggestions(prev => [...prev, ...suggestions]);
-          if (!isAutoNext) {
-            toast.info(`Tìm thấy ${suggestions.length} đề xuất. Vui lòng kiểm tra.`);
-            break; 
-          }
-        }
-      }
-      
-      if (lastProcessedIndex >= totalChars) {
-        toast.success(`Đã hoàn thành huấn luyện toàn bộ văn bản!`);
-      }
-    } catch (err) {
-      toast.error("Huấn luyện thất bại: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsTraining(false);
-      setBatchProgress(null);
-    }
-  };
 
   const handleAddTrainingSuggestion = async (s: TrainingSuggestion) => {
     try {
@@ -474,6 +376,17 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
               )}
               {lastProcessedIndex > 0 ? "Tiếp tục huấn luyện" : "Huấn luyện AI"}
             </Button>
+            
+            {isTraining && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={stopTraining}
+                className="border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              >
+                Dừng
+              </Button>
+            )}
 
             <Button
               variant="outline"
@@ -499,7 +412,7 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
               variant="ghost"
               size="sm"
               onClick={() => {
-                setLastProcessedIndex(0);
+                store.resetTraining();
                 handleTrain(0);
               }}
               className="text-[10px] h-8 px-2"
