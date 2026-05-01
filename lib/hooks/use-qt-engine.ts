@@ -144,7 +144,7 @@ function handleMessage(event: MessageEvent<QTWorkerResponse>) {
 // ─── Public API ──────────────────────────────────────────────
 
 /** Internal: create worker and send dict data */
-function startWorker(
+async function startWorker(
   dictData: Record<string, Array<{ chinese: string; vietnamese: string }>>,
 ): Promise<void> {
   worker = new Worker(

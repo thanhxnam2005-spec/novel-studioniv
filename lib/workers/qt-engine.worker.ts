@@ -36,6 +36,7 @@ import {
   enrichSegmentsWithPOS,
   initPOSTagger,
   isPOSReady,
+  tagText,
 } from "./pos-tagger";
 import { applyGrammarRules } from "./grammar-rules";
 
@@ -179,9 +180,26 @@ function detectNames(
   paMap: Map<string, string>,
   minFrequency: number,
   rejected: Set<string>,
+  preferPhienAm: boolean = false,
 ): Map<string, string> {
   const candidates = new Map<string, number>();
 
+  // 1. Get Jieba tokens if ready
+  const tokens = isPOSReady() ? tagText(text) : [];
+  const jiebaNames = new Set<string>();
+
+  if (tokens.length > 0) {
+    for (const token of tokens) {
+      // nr = person name, ns = place name, nt = organization
+      if (token.tag === "nr" || token.tag === "ns") {
+        if (token.word.length >= 2 && isCJK(token.word[0])) {
+          jiebaNames.add(token.word);
+        }
+      }
+    }
+  }
+
+  // 2. Heuristic scan (Surname based)
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (!isCJK(ch)) continue;
@@ -220,13 +238,40 @@ function detectNames(
       if (existingNames.has(candidate)) continue;
       // Skip if user has rejected this name
       if (rejected.has(candidate)) continue;
-      // Skip if in VP dictionary (likely a common word/phrase)
-      if (vpMap.has(candidate)) continue;
-      // Skip if given-name contains non-name chars (particles, pronouns, etc.)
+      
+      // Validation with Jieba: if Jieba says this candidate is a common word (not a name),
+      // we only accept it if it's also flagged as nr/ns by Jieba or has high frequency.
+      if (tokens.length > 0) {
+        let isCommonWord = false;
+        let tokenFound = false;
+        let offset = 0;
+        for (const t of tokens) {
+          if (offset === i) {
+            tokenFound = true;
+            // If the token matches exactly but it's not a name, it's a common word
+            if (t.word === candidate && t.tag !== "nr" && t.tag !== "ns") {
+              isCommonWord = true;
+            }
+            break;
+          }
+          offset += t.word.length;
+          if (offset > i) break;
+        }
+        // If it's a very common word (v=verb, a=adj, d=adv), skip it
+        if (isCommonWord) continue;
+      }
+
       const givenName = candidate.slice(surnameLen);
       if ([...givenName].some((c) => NON_NAME_CHARS.has(c))) continue;
 
       candidates.set(candidate, (candidates.get(candidate) ?? 0) + 1);
+    }
+  }
+
+  // 3. Merge Jieba names into candidates
+  for (const jName of jiebaNames) {
+    if (!existingNames.has(jName) && !rejected.has(jName)) {
+      candidates.set(jName, (candidates.get(jName) ?? 0) + 1);
     }
   }
 
@@ -238,7 +283,10 @@ function detectNames(
   );
 
   for (const [name, count] of sorted) {
-    if (count < minFrequency) continue;
+    // If it's a Jieba-confirmed name, we can relax the frequency requirement
+    const isJiebaConfirmed = jiebaNames.has(name);
+    if (count < (isJiebaConfirmed ? 1 : minFrequency)) continue;
+
     // Skip if this name is a substring of an already-accepted longer name
     let isSubstring = false;
     for (const accepted of result.keys()) {
@@ -251,7 +299,10 @@ function detectNames(
 
     // Generate Hán-Việt reading from phienAm map
     const reading = [...name]
-      .map((c) => paMap.get(c) ?? c)
+      .map((c) => {
+        if (preferPhienAm) return paMap.get(c) ?? c;
+        return paMap.get(c) ?? vpMap.get(c) ?? c;
+      })
       .join(" ");
     result.set(name, capitalizeWords(reading));
   }
@@ -548,6 +599,7 @@ function convert(
       phienAmMap,
       o.nameDetectMinFrequency,
       rejectedSet,
+      o.preferPhienAmForNames,
     );
     if (autoDetected.size === 0) autoDetected = null;
   }
@@ -629,6 +681,7 @@ function convert(
 
   if (autoDetected?.size) capitalizeDetectedNames(segments, autoDetected);
   capitalizeNameAdjacent(segments);
+  if (o.fixOrdinals) fixOrdinals(segments);
   capitalizeSentences(segments);
   if (o.capitalizeBrackets) capitalizeBracketContent(segments);
 
@@ -770,6 +823,44 @@ function capitalizeSentences(segments: ConvertSegment[]): void {
   }
 }
 
+const ORDINAL_MAP: Record<string, string> = {
+  "một": "1",
+  "hai": "2",
+  "ba": "3",
+  "bốn": "4",
+  "năm": "5",
+  "sáu": "6",
+  "bảy": "7",
+  "tám": "8",
+  "chín": "9",
+  "mười": "10",
+};
+
+function fixOrdinals(segments: ConvertSegment[]): void {
+  for (let i = 0; i < segments.length - 1; i++) {
+    const s1 = segments[i];
+    const s2 = segments[i + 1];
+    
+    // Pattern: "thứ" + "một" -> "1"
+    if (s1.translated.toLowerCase().trim() === "thứ" && ORDINAL_MAP[s2.translated.toLowerCase().trim()]) {
+      const num = ORDINAL_MAP[s2.translated.toLowerCase().trim()];
+      // If it's part of a chapter/volume title, just use the number
+      const prev = i > 0 ? segments[i-1].translated.toLowerCase().trim() : "";
+      if (prev === "chương" || prev === "quyển" || prev === "tập") {
+        segments[i] = { ...s1, translated: "" }; // Remove "thứ"
+        segments[i+1] = { ...s2, translated: num };
+      } else {
+        // Otherwise "thứ nhất" sounds better than "thứ 1" usually, 
+        // but user asked for "đạt chuẩn".
+        // In QT, "thứ một" is definitely wrong.
+        if (s2.translated.toLowerCase().trim() === "một") {
+           segments[i+1] = { ...s2, translated: "nhất" };
+        }
+      }
+    }
+  }
+}
+
 // ─── Plain text assembly ─────────────────────────────────────
 
 function segmentsToPlainText(segments: ConvertSegment[]): string {
@@ -813,11 +904,7 @@ function segmentsToPlainText(segments: ConvertSegment[]): string {
     parts.push(text);
   }
 
-  return parts
-    .join("")
-    .replace(/ {2,}/g, " ")
-    .replace(/\n /g, "\n")
-    .replace(/\.{4,}/g, "...");
+  return parts.join("");
 }
 
 // ─── Message Handler ─────────────────────────────────────────

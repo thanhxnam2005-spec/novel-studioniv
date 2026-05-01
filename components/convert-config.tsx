@@ -9,13 +9,17 @@ import {
   updateConvertSettings,
 } from "@/lib/hooks/use-convert-settings";
 import type {
-  ConvertOptions,
-  NameVsPriority,
-  ScopePriority,
-  VpLengthPriority,
   LuatNhanMode,
   SplitMode,
 } from "@/lib/workers/qt-engine.types";
+import { useAIProviders, useAIModels } from "@/lib/hooks/use-ai-providers";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 // ─── Option Button Group ──────────────────────────────────────
 
@@ -57,6 +61,8 @@ function OptionGroup<T extends string>({
 
 export function ConvertConfig() {
   const settings = useConvertSettings();
+  const providers = useAIProviders();
+  const models = useAIModels(settings.trainingProviderId);
 
   // Memoize slider value arrays to prevent Radix Slider infinite re-render loop
   // (new array reference on every render triggers onValueChange → Dexie write → re-render)
@@ -191,6 +197,71 @@ export function ConvertConfig() {
           checked={settings.posTaggingEnabled}
           onCheckedChange={(v) => update({ posTaggingEnabled: v })}
         />
+      </div>
+      
+      <div className="flex items-center justify-between gap-2 border-t pt-3">
+        <Label htmlFor="prefer-phien-am" className="text-xs font-medium">
+          Ưu tiên Hán Việt cho tên
+        </Label>
+        <Switch
+          id="prefer-phien-am"
+          checked={settings.preferPhienAmForNames}
+          onCheckedChange={(v) => update({ preferPhienAmForNames: v })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="fix-ordinals" className="text-xs font-medium">
+          Sửa số thứ tự (Chương 1...)
+        </Label>
+        <Switch
+          id="fix-ordinals"
+          checked={settings.fixOrdinals}
+          onCheckedChange={(v) => update({ fixOrdinals: v })}
+        />
+      </div>
+
+      <div className="space-y-3 border-t pt-3">
+        <div className="flex items-center gap-2">
+          <div className="h-1 flex-1 bg-primary/20 rounded-full" />
+          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Cài đặt huấn luyện AI</span>
+          <div className="h-1 flex-1 bg-primary/20 rounded-full" />
+        </div>
+        
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Nhà cung cấp AI</Label>
+          <Select 
+            value={settings.trainingProviderId} 
+            onValueChange={(v) => update({ trainingProviderId: v, trainingModelId: undefined })}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Chọn nhà cung cấp" />
+            </SelectTrigger>
+            <SelectContent>
+              {providers?.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Mô hình AI</Label>
+          <Select 
+            value={settings.trainingModelId} 
+            onValueChange={(v) => update({ trainingModelId: v })}
+            disabled={!settings.trainingProviderId}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Chọn mô hình" />
+            </SelectTrigger>
+            <SelectContent>
+              {models?.map(m => (
+                <SelectItem key={m.id} value={m.modelId}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );

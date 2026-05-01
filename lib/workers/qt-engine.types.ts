@@ -61,20 +61,29 @@ export interface ConvertOptions {
   rejectedAutoNames?: string[];
   /** Enable POS tagging via jieba-wasm (default: true) */
   posTaggingEnabled?: boolean;
+  /** Prefer Hán Việt readings for detected names (default: false) */
+  preferPhienAmForNames?: boolean;
+  /** Fix common ordinal patterns like "thứ một" -> "1" (default: true) */
+  fixOrdinals?: boolean;
+  /** Provider ID for AI training/completion services */
+  trainingProviderId?: string;
+  /** Model ID for AI training/completion services */
+  trainingModelId?: string;
 }
 
-export const DEFAULT_CONVERT_OPTIONS: Required<ConvertOptions> = {
+export const DEFAULT_CONVERT_OPTIONS: ConvertOptions = {
   nameVsPriority: "name-first",
   scopePriority: "novel-first",
-  maxPhraseLength: 12,
+  maxPhraseLength: 10,
   vpLengthPriority: "none",
   luatNhanMode: "name-only",
   splitMode: "paragraph",
-  capitalizeBrackets: false,
+  capitalizeBrackets: true,
   autoDetectNames: true,
   nameDetectMinFrequency: 3,
-  rejectedAutoNames: [],
   posTaggingEnabled: true,
+  preferPhienAmForNames: true,
+  fixOrdinals: true,
 };
 
 // Main → Worker

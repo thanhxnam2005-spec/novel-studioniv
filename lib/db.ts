@@ -245,6 +245,17 @@ export type NameEntryCategory =
   | "thuật ngữ"
   | "vật phẩm"
   | "kỹ năng"
+  | "từ đơn"
+  | "từ đôi"
+  | "cụm hành động"
+  | "cụm cảm xúc"
+  | "trạng từ"
+  | "từ nối"
+  | "trợ từ"
+  | "thuật ngữ tu tiên"
+  | "pattern câu"
+  | "context mapping"
+  | "âm thanh"
   | "khác";
 
 export const NAME_ENTRY_CATEGORIES: NameEntryCategory[] = [
@@ -254,6 +265,17 @@ export const NAME_ENTRY_CATEGORIES: NameEntryCategory[] = [
   "thuật ngữ",
   "vật phẩm",
   "kỹ năng",
+  "từ đơn",
+  "từ đôi",
+  "cụm hành động",
+  "cụm cảm xúc",
+  "trạng từ",
+  "từ nối",
+  "trợ từ",
+  "thuật ngữ tu tiên",
+  "pattern câu",
+  "context mapping",
+  "âm thanh",
   "khác",
 ];
 

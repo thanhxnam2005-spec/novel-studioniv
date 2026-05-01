@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { DictionaryChecklist } from "@/components/dictionary-checklist";
 
 const ALL_SOURCES: DictSource[] = [
   "vietphrase",
@@ -357,6 +358,8 @@ export function DictionaryManagement() {
         className="hidden"
         onChange={handleImportFromFile}
       />
+
+      <DictionaryChecklist />
 
       {/* Dict Status — per source breakdown */}
       <Card>
