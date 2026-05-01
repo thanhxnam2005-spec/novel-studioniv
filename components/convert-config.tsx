@@ -232,7 +232,7 @@ export function ConvertConfig() {
           <Label className="text-xs font-medium">Nhà cung cấp AI</Label>
           <Select 
             value={settings.trainingProviderId} 
-            onValueChange={(v) => update({ trainingProviderId: v, trainingModelId: undefined })}
+            onValueChange={(v) => update({ trainingProviderId: v, trainingModelId: "" })}
           >
             <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Chọn nhà cung cấp" />

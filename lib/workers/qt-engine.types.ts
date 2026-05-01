@@ -84,6 +84,8 @@ export const DEFAULT_CONVERT_OPTIONS: ConvertOptions = {
   posTaggingEnabled: true,
   preferPhienAmForNames: true,
   fixOrdinals: true,
+  trainingProviderId: "",
+  trainingModelId: "",
 };
 
 // Main → Worker

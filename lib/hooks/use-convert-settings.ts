@@ -13,13 +13,14 @@ const OPTION_KEYS = Object.keys(
 ) as (keyof ConvertOptions)[];
 
 function mergeConvertSettingsRow(
-  row: Awaited<ReturnType<typeof db.convertSettings.get>>,
+  row: any,
 ): Required<ConvertOptions> {
-  if (!row) return DEFAULT_CONVERT_OPTIONS;
-  const result = {} as Record<string, unknown>;
-  for (const key of OPTION_KEYS) {
-    result[key] =
-      row[key as keyof typeof row] ?? DEFAULT_CONVERT_OPTIONS[key];
+  const result = { ...DEFAULT_CONVERT_OPTIONS } as any;
+  if (row) {
+    for (const key of Object.keys(row)) {
+      if (key === "id") continue;
+      result[key] = row[key];
+    }
   }
   return result as Required<ConvertOptions>;
 }
