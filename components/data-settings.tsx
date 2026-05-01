@@ -228,22 +228,6 @@ export function DataSettings() {
     );
   }, []);
 
-      setSyncFile(null);
-      setSyncPreview(null);
-      setSyncNeedsPassword(false);
-      setSyncImportPassword("");
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setResult({ success: false, message: "Đã huỷ nhập dữ liệu." });
-      } else {
-        setResult({
-          success: false,
-          message: err instanceof Error ? err.message : "Lỗi không xác định.",
-        });
-      }
-    }
-  }, [syncFile, syncConflictMode, syncImportPassword, loadStats]);
-
   // ─── Render ─────────────────────────────────────────────
 
   return (
