@@ -7,6 +7,9 @@ export interface TrainingSuggestion {
   vietnamese: string;
   reason: string;
   category: string;
+  context_zh?: string;
+  context_vi_before?: string;
+  context_vi_after?: string;
 }
 
 const trainingSchema = jsonSchema<{ suggestions: TrainingSuggestion[] }>({
@@ -21,8 +24,11 @@ const trainingSchema = jsonSchema<{ suggestions: TrainingSuggestion[] }>({
           vietnamese: { type: "string" },
           reason: { type: "string" },
           category: { type: "string" },
+          context_zh: { type: "string" },
+          context_vi_before: { type: "string" },
+          context_vi_after: { type: "string" },
         },
-        required: ["chinese", "vietnamese", "reason", "category"],
+        required: ["chinese", "vietnamese", "reason", "category", "context_zh", "context_vi_before", "context_vi_after"],
       },
     },
   },
@@ -62,7 +68,8 @@ ${opts.aiTranslated.slice(0, 3000)}
 2. Phân loại theo các nhóm: nhân vật, thuật ngữ tu tiên, cụm hành động, cụm cảm xúc, từ nối, v.v.
 3. Chú trọng vào việc sử dụng từ Hán-Việt cho các thuật ngữ tu tiên, chiêu thức và tên riêng để giữ đúng phong cách tiên hiệp/huyền huyễn.
 4. Tránh dịch quá "thuần Việt" (quá hiện đại hoặc bình dân) cho các bối cảnh cổ đại/tu tiên.
-5. Mỗi đề xuất phải có { chinese, vietnamese, reason, category }.
+5. Với mỗi đề xuất, hãy trích dẫn câu văn gốc chứa từ đó (context_zh), bản dịch hiện tại của QT cho câu đó (context_vi_before) và bản dịch đề xuất của bạn cho câu đó (context_vi_after) để người dùng đối chiếu.
+6. Mỗi đề xuất phải có { chinese, vietnamese, reason, category, context_zh, context_vi_before, context_vi_after }.
 </requirements>
 
 <output_format>Trả về JSON chứa mảng "suggestions". Không giải thích gì thêm.</output_format>

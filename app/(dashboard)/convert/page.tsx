@@ -604,7 +604,25 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
                     </div>
                     <Badge variant="outline" className="text-[10px] capitalize h-5">{s.category}</Badge>
                   </div>
-                  <p className="text-[11px] text-muted-foreground line-clamp-2 italic">"{s.reason}"</p>
+                  
+                  {s.context_zh && (
+                    <div className="mt-1 space-y-1 rounded border bg-muted/30 p-2 text-[11px]">
+                      <div className="flex gap-2">
+                        <span className="shrink-0 font-bold text-muted-foreground/60">Gốc:</span>
+                        <span className="font-mono">{s.context_zh}</span>
+                      </div>
+                      <div className="flex gap-2 border-t border-muted/50 pt-1">
+                        <span className="shrink-0 font-bold text-red-500/60">Hiện tại:</span>
+                        <span className="text-muted-foreground italic line-through decoration-red-500/30">{s.context_vi_before}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="shrink-0 font-bold text-green-500/60">Đề xuất:</span>
+                        <span className="text-foreground font-medium">{s.context_vi_after}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-muted-foreground line-clamp-2 italic px-1">"{s.reason}"</p>
                   <Button size="xs" className="w-full mt-1" onClick={() => handleAddTrainingSuggestion(s)}>
                     Chấp nhận & Thêm vào từ điển
                   </Button>
