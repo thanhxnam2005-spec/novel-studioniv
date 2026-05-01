@@ -66,15 +66,15 @@ export default function ConvertPage() {
   const { handleTrain, stopTraining } = useBackgroundTraining();
   
   const { 
-    input, setInput, 
-    output, setOutput, 
-    segments, setSegments,
-    isTraining,
-    trainingSuggestions, setTrainingSuggestions,
-    newlyAddedToDict, setNewlyAddedToDict,
-    batchProgress,
-    lastProcessedIndex, setLastProcessedIndex,
-    isAutoNext, setIsAutoNext
+    input = "", setInput, 
+    output = "", setOutput, 
+    segments = [], setSegments,
+    isTraining = false,
+    trainingSuggestions = [], setTrainingSuggestions,
+    newlyAddedToDict = [], setNewlyAddedToDict,
+    batchProgress = null,
+    lastProcessedIndex = 0, setLastProcessedIndex,
+    isAutoNext = false, setIsAutoNext
   } = store;
 
   const [isConverting, setIsConverting] = useState(false);
@@ -525,7 +525,7 @@ export default function ConvertPage() {
             </div>
           </div>
           
-          {trainingSuggestions.length > 0 ? (
+          {Array.isArray(trainingSuggestions) && trainingSuggestions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-2">
               {trainingSuggestions.map((s, idx) => (
                 <div key={idx} className="flex flex-col gap-2 p-3 rounded-lg bg-background border shadow-sm hover:border-primary/50 transition-colors">

@@ -60,6 +60,7 @@ export const useTrainingStore = create<TrainingState>()(
     {
       name: "training-storage",
       storage: createJSONStorage(() => localStorage),
+      version: 1,
       partialize: (state) => ({
         input: state.input,
         output: state.output,
