@@ -310,7 +310,7 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
       
       // Refresh engine dictionary and re-convert
       await refreshQTEngine();
-      setTimeout(() => handleConvert(), 100);
+      await handleConvert();
     } catch {
       toast.error("Lưu thất bại");
     }
@@ -412,6 +412,23 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
             </Label>
           </div>
 
+          <div className="flex items-center gap-1">
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={handleTrain}
+              disabled={isTraining || !input}
+              className="text-[10px] h-7 bg-primary/5 hover:bg-primary/10 border-primary/20"
+            >
+              {isTraining ? (
+                <LoaderIcon className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="mr-1.5 size-3.5" />
+              )}
+              Huấn luyện dịch live
+            </Button>
+          </div>
+
           <div className="flex items-center gap-2 border-l pl-4 mr-2">
             <Switch
               id="edit-mode"
@@ -442,37 +459,40 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
             Bổ sung từ điển
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleTrain(lastProcessedIndex)}
-            disabled={isTraining || !input}
-            className="hidden sm:flex border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
-          >
-            {isTraining ? (
-              <LoaderIcon className="mr-1.5 size-3.5 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="mr-1.5 size-3.5" />
-            )}
-            {lastProcessedIndex > 0 ? "Tiếp tục huấn luyện" : "Huấn luyện AI"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleTrain(lastProcessedIndex)}
+              disabled={isTraining || !input}
+              className="border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+            >
+              {isTraining ? (
+                <LoaderIcon className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="mr-1.5 size-3.5" />
+              )}
+              {lastProcessedIndex > 0 ? "Tiếp tục huấn luyện" : "Huấn luyện AI"}
+            </Button>
 
-          <input
-            type="file"
-            accept=".txt"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            title="Nhập văn bản từ file .txt"
-          >
-            <FileUpIcon className="mr-1.5 size-3.5" />
-            Nhập File
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              title="Nhập văn bản từ file .txt"
+            >
+              <FileUpIcon className="mr-1.5 size-3.5" />
+              Nhập File
+            </Button>
+            
+            <input
+              type="file"
+              accept=".txt"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </div>
 
           {lastProcessedIndex > 0 && (
             <Button

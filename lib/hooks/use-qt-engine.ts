@@ -208,7 +208,19 @@ export async function refreshQTEngine(): Promise<void> {
     return;
   }
   const dictData = await getDictEntriesForWorker();
-  send({ type: "init", dictData });
+  
+  return new Promise<void>((resolve) => {
+    const origHandler = worker!.onmessage;
+    worker!.onmessage = (event: MessageEvent<QTWorkerResponse>) => {
+      if (event.data.type === "ready") {
+        worker!.onmessage = origHandler;
+        resolve();
+      } else {
+        origHandler?.call(worker, event);
+      }
+    };
+    send({ type: "init", dictData });
+  });
 }
 
 export function isQTEngineReady(): boolean {
