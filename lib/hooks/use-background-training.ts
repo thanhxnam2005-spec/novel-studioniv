@@ -110,6 +110,11 @@ Dịch chương truyện được cung cấp sang Tiếng Việt. Ưu tiên sự
         // Move to next chunk
         currentStart = currentEnd;
         store.setLastProcessedIndex(currentStart);
+
+        // Wait a bit to avoid Rate Limit (Free Tier)
+        if (trainingRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
       }
       
       if (currentStart >= totalChars) {
