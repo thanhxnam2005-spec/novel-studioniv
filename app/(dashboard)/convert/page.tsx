@@ -56,6 +56,7 @@ import {
   Trash2Icon,
   Volume2Icon,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTrainingStore } from "@/lib/stores/training-store";
 import { useBackgroundTraining } from "@/lib/hooks/use-background-training";
 import { DictionaryChecklist } from "@/components/dictionary-checklist";
