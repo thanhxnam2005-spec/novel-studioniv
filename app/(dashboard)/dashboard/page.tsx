@@ -69,11 +69,11 @@ export default function DashboardPage() {
   return (
     <main className="mx-auto w-full min-w-0 max-w-5xl overflow-hidden px-6 py-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-heading text-3xl font-bold tracking-tight">
+      <div className="mb-8">
+        <h1 className="font-heading text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground drop-shadow-sm">
           Chào mừng trở lại
         </h1>
-        <p className="mt-1 text-muted-foreground">
+        <p className="mt-2 text-muted-foreground text-sm font-medium">
           Tổng quan không gian sáng tác của bạn.
         </p>
       </div>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
                   <Link
                     key={ch.id}
                     href={`/novels/${ch.novelId}/chapters/${ch.id}`}
-                    className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-2 transition-colors hover:bg-muted/50"
+                    className="group flex items-center gap-3 overflow-hidden rounded-xl px-3 py-3 transition-all duration-200 hover:bg-muted/40 hover:shadow-md hover:-translate-y-0.5 border border-transparent hover:border-border/50"
                   >
                     {ch.novelColor && (
                       <div
@@ -207,7 +207,7 @@ export default function DashboardPage() {
                     <Link
                       key={item.novel.id}
                       href={`/novels/${item.novel.id}`}
-                      className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
+                      className="group flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 transition-all duration-200 hover:bg-muted/40 hover:shadow-md hover:-translate-y-0.5 border border-transparent hover:border-border/50"
                     >
                       <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold">
                         {i + 1}
@@ -265,14 +265,14 @@ function StatCard({
   icon: React.ElementType;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 py-0">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Icon className="size-4 text-primary" />
+    <Card className="transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 bg-gradient-to-br from-card to-muted/20">
+      <CardContent className="flex items-center gap-4 py-5">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 shadow-inner ring-1 ring-primary/10">
+          <Icon className="size-5 text-primary drop-shadow-sm" />
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-xl font-semibold tabular-nums">
+          <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-widest">{label}</p>
+          <p className="text-2xl font-bold tabular-nums tracking-tight mt-0.5 drop-shadow-sm">
             {formatNumber(value)}
           </p>
         </div>

@@ -54,14 +54,7 @@ export const navConfig = [
   },
 ] as const;
 
-export const miscNav = [
-  { title: "Nhật ký thay đổi", href: "/changelog", icon: HistoryIcon },
-  {
-    title: "Phản hồi & Báo lỗi",
-    href: "/feedback",
-    icon: MessageSquareWarningIcon,
-  },
-] as const;
+export const miscNav = [] as const;
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -177,27 +170,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Khác</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {miscNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                    tooltip={item.title}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+
       </SidebarContent>
 
       <DictLoadingFooter />

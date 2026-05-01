@@ -18,9 +18,9 @@ export function setExtensionId(id: string): void {
 }
 
 export function getScrapeTimeout(): number {
-  if (typeof window === "undefined") return 10000;
+  if (typeof window === "undefined") return 15000;
   const val = localStorage.getItem(TIMEOUT_KEY);
-  return val ? parseInt(val, 10) : 10000;
+  return val ? parseInt(val, 10) : 15000;
 }
 
 export function setScrapeTimeout(ms: number): void {
@@ -124,7 +124,7 @@ export async function checkExtensionStatus(): Promise<{
     const response = await Promise.race([
       sendMessage({ type: "PING" }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 1500),
+        setTimeout(() => reject(new Error("Timeout")), 5000),
       ),
     ]);
     return {

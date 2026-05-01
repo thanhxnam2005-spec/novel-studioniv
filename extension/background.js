@@ -1,4 +1,25 @@
 // Novel Studio Connector — Background Service Worker
+// v0.2.0: Anti-bot improvements + Kiwi Browser (mobile) support
+
+// ─── Kiwi Browser Compatibility ──────────────────────────────
+// Kiwi Browser on Android doesn't support chrome.windows API.
+// We detect this and use tab-based approach instead.
+
+let isKiwi = false;
+try {
+  // Kiwi doesn't have chrome.windows.create
+  if (!chrome.windows || typeof chrome.windows.create !== "function") {
+    isKiwi = true;
+  }
+} catch { isKiwi = true; }
+
+// ─── Anti-Bot: Random User Behavior ─────────────────────────
+
+function randomDelay(min, max) {
+  return new Promise((r) => setTimeout(r, min + Math.random() * (max - min)));
+}
+
+// ─── Message Listener ────────────────────────────────────────
 
 chrome.runtime.onMessageExternal.addListener(
   (request, _sender, sendResponse) => {
@@ -12,7 +33,32 @@ chrome.runtime.onMessageExternal.addListener(
         request.url,
         request.waitSelector,
         request.clickSelector,
-        request.timeout || 10000,
+        request.timeout || 15000,
+      )
+        .then((result) => sendResponse({ ok: true, ...result }))
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      return true; // keep channel open for async response
+    }
+
+    sendResponse({ ok: false, error: "Unknown message type" });
+    return false;
+  },
+);
+
+// ─── Also support internal messages (for Kiwi popup/content scripts) ──
+chrome.runtime.onMessage.addListener(
+  (request, _sender, sendResponse) => {
+    if (request.type === "PING") {
+      sendResponse({ ok: true, version: chrome.runtime.getManifest().version });
+      return false;
+    }
+
+    if (request.type === "FETCH") {
+      handleFetch(
+        request.url,
+        request.waitSelector,
+        request.clickSelector,
+        request.timeout || 15000,
       )
         .then((result) => sendResponse({ ok: true, ...result }))
         .catch((err) => sendResponse({ ok: false, error: err.message }));
@@ -24,19 +70,40 @@ chrome.runtime.onMessageExternal.addListener(
   },
 );
 
+// ─── Main Fetch Handler ──────────────────────────────────────
+
 async function handleFetch(url, waitSelector, clickSelector, timeout) {
   const logs = [];
   const log = (msg) => { logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`); };
 
-  const win = await chrome.windows.create({ url, state: "minimized" });
-  const tabId = win.tabs[0].id;
-  const windowId = win.id;
-  log(`tab created (minimized window)`);
+  let tabId, windowId, createdTab;
+
+  if (isKiwi) {
+    // Kiwi Browser: create a tab (no window API)
+    createdTab = await chrome.tabs.create({ url, active: false });
+    tabId = createdTab.id;
+    windowId = null;
+    log(`tab created (Kiwi mode, background tab)`);
+  } else {
+    // Desktop Chrome: create minimized window
+    const win = await chrome.windows.create({ url, state: "minimized" });
+    tabId = win.tabs[0].id;
+    windowId = win.id;
+    log(`tab created (minimized window)`);
+  }
 
   try {
-    await waitForTabLoad(tabId);
+    await waitForTabLoad(tabId, 45000); // Increased timeout for mobile
     log(`page loaded`);
-    await delay(1500);
+
+    // Anti-bot: simulate human-like delay before interaction
+    const initialDelay = 1000 + Math.random() * 1500;
+    await delay(initialDelay);
+    log(`waited ${Math.round(initialDelay)}ms (anti-bot)`);
+
+    // Anti-bot: scroll the page slightly to seem human
+    await injectHumanBehavior(tabId);
+    log(`injected human behavior`);
 
     let timedOut = false;
     if (clickSelector && waitSelector) {
@@ -83,15 +150,42 @@ async function handleFetch(url, waitSelector, clickSelector, timeout) {
     throw Object.assign(err, { logs });
   } finally {
     try {
-      await chrome.windows.remove(windowId);
+      if (windowId) {
+        await chrome.windows.remove(windowId);
+      } else if (tabId) {
+        await chrome.tabs.remove(tabId);
+      }
     } catch {}
   }
 }
 
-/**
- * Click element and wait for content, with retry.
- * If content doesn't appear after first click, try clicking again.
- */
+// ─── Anti-Bot: Human Behavior Simulation ─────────────────────
+
+async function injectHumanBehavior(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        // Simulate slight scroll
+        window.scrollBy(0, Math.floor(Math.random() * 300) + 100);
+
+        // Simulate mouse movement
+        const event = new MouseEvent("mousemove", {
+          clientX: Math.floor(Math.random() * window.innerWidth),
+          clientY: Math.floor(Math.random() * window.innerHeight),
+          bubbles: true,
+        });
+        document.dispatchEvent(event);
+      },
+    });
+  } catch {
+    // Ignore errors — some pages restrict script injection
+  }
+  await delay(300 + Math.random() * 500);
+}
+
+// ─── Click + Wait with Retry ────────────────────────────────
+
 async function clickAndWait(tabId, clickSel, waitSel, timeout, log) {
   const maxRetries = 3;
   const perAttemptTimeout = Math.floor(timeout / maxRetries);
@@ -113,15 +207,16 @@ async function clickAndWait(tabId, clickSel, waitSel, timeout, log) {
     }
 
     log(`attempt ${attempt + 1} timeout — retrying`);
+    // Anti-bot: random delay between retries
+    await randomDelay(500, 1500);
   }
 
   log("all click attempts exhausted");
   return true;
 }
 
-/**
- * Try multiple click methods to maximize compatibility.
- */
+// ─── Robust Click ────────────────────────────────────────────
+
 async function robustClick(tabId, selector) {
   await chrome.scripting.executeScript({
     target: { tabId },
@@ -146,28 +241,36 @@ async function robustClick(tabId, selector) {
   await delay(500);
 }
 
+// ─── Wait for Selector ───────────────────────────────────────
+
 async function waitForSelector(tabId, selector, maxWait, minLength) {
   const start = Date.now();
   while (Date.now() - start < maxWait) {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      args: [selector],
-      func: (sel) => {
-        const el = document.querySelector(sel);
-        if (!el) return 0;
-        const clone = el.cloneNode(true);
-        clone
-          .querySelectorAll("script, style, noscript")
-          .forEach((s) => s.remove());
-        return clone.textContent.trim().length;
-      },
-    });
-    const len = results?.[0]?.result ?? 0;
-    if (len > minLength) return false;
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        args: [selector],
+        func: (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return 0;
+          const clone = el.cloneNode(true);
+          clone
+            .querySelectorAll("script, style, noscript")
+            .forEach((s) => s.remove());
+          return clone.textContent.trim().length;
+        },
+      });
+      const len = results?.[0]?.result ?? 0;
+      if (len > minLength) return false;
+    } catch {
+      // Tab might not be ready yet, retry
+    }
     await delay(500);
   }
   return true;
 }
+
+// ─── Wait for Stable Content ─────────────────────────────────
 
 async function waitForStableContent(tabId, maxWait) {
   const start = Date.now();
@@ -175,32 +278,39 @@ async function waitForStableContent(tabId, maxWait) {
   let stableCount = 0;
   await delay(2000);
   while (Date.now() - start < maxWait) {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        const clone = document.body.cloneNode(true);
-        clone
-          .querySelectorAll("script,style,noscript")
-          .forEach((el) => el.remove());
-        return clone.textContent.trim().length;
-      },
-    });
-    const len = results?.[0]?.result ?? 0;
-    if (len === lastLength && len > 0) {
-      stableCount++;
-      if (stableCount >= 2) return;
-    } else stableCount = 0;
-    lastLength = len;
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          const clone = document.body.cloneNode(true);
+          clone
+            .querySelectorAll("script,style,noscript")
+            .forEach((el) => el.remove());
+          return clone.textContent.trim().length;
+        },
+      });
+      const len = results?.[0]?.result ?? 0;
+      if (len === lastLength && len > 0) {
+        stableCount++;
+        if (stableCount >= 2) return;
+      } else stableCount = 0;
+      lastLength = len;
+    } catch {
+      // Retry
+    }
     await delay(500);
   }
 }
 
-function waitForTabLoad(tabId) {
+// ─── Wait for Tab Load ───────────────────────────────────────
+
+function waitForTabLoad(tabId, timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
-      reject(new Error("Tab load timeout (30s)"));
-    }, 30000);
+      // Don't reject on timeout — resolve anyway (page might be partially loaded)
+      resolve();
+    }, timeoutMs);
     function listener(id, info) {
       if (id === tabId && info.status === "complete") {
         chrome.tabs.onUpdated.removeListener(listener);
@@ -211,6 +321,8 @@ function waitForTabLoad(tabId) {
     chrome.tabs.onUpdated.addListener(listener);
   });
 }
+
+// ─── Utility ─────────────────────────────────────────────────
 
 function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
