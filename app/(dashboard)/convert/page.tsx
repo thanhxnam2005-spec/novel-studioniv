@@ -45,6 +45,7 @@ import {
   ClipboardCopyIcon,
   ClipboardListIcon,
   DownloadIcon,
+  FileUpIcon,
   LoaderIcon,
   RefreshCwIcon,
   SettingsIcon,
