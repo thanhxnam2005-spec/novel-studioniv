@@ -27,18 +27,18 @@ export function DictionaryChecklist() {
   }, [entries]);
 
   const checklistItems = [
-    { label: "Từ đơn", category: "từ đơn", min: 50 },
-    { label: "Từ đôi", category: "từ đôi", min: 100 },
-    { label: "Cụm hành động", category: "cụm hành động", min: 30 },
-    { label: "Cụm cảm xúc", category: "cụm cảm xúc", min: 20 },
-    { label: "Trạng từ", category: "trạng từ", min: 20 },
-    { label: "Từ nối", category: "từ nối", min: 15 },
-    { label: "Trợ từ", category: "trợ từ", min: 10 },
-    { label: "Thuật ngữ tu tiên", category: "thuật ngữ tu tiên", min: 50 },
-    { label: "Phiên âm tên", category: "nhân vật", min: 100 },
-    { label: "Pattern câu", category: "pattern câu", min: 10 },
-    { label: "Context mapping", category: "context mapping", min: 5 },
-    { label: "Âm thanh", category: "âm thanh", min: 10 },
+    { label: "Từ đơn", category: "Từ đơn", min: 50 },
+    { label: "Từ đôi", category: "Từ đôi", min: 100 },
+    { label: "Cụm hành động", category: "Cụm hành động", min: 30 },
+    { label: "Cụm cảm xúc", category: "Cụm cảm xúc", min: 20 },
+    { label: "Trạng từ", category: "Trạng từ", min: 20 },
+    { label: "Từ nối", category: "Từ nối", min: 15 },
+    { label: "Trợ từ", category: "Trợ từ", min: 10 },
+    { label: "Thuật ngữ tu tiên", category: "Thuật ngữ tu tiên", min: 50 },
+    { label: "Phiên âm tên", category: "Phiên âm tên", min: 100 },
+    { label: "Pattern câu", category: "Pattern câu", min: 10 },
+    { label: "Context mapping", category: "Context mapping", min: 5 },
+    { label: "Âm thanh", category: "Âm thanh", min: 10 },
   ];
 
   const completedCount = checklistItems.filter(item => stats[item.category] >= item.min).length;

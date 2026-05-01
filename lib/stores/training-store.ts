@@ -13,6 +13,7 @@ interface TrainingState {
   newlyAddedToDict: Array<{ chinese: string; vietnamese: string; category: string }>;
   batchProgress: { current: number; total: number } | null;
   isAutoNext: boolean;
+  checklistCounts: Record<string, number>;
   
   // Actions
   setInput: (input: string) => void;
@@ -24,6 +25,7 @@ interface TrainingState {
   setNewlyAddedToDict: (dict: Array<{ chinese: string; vietnamese: string; category: string }>) => void;
   setBatchProgress: (progress: { current: number; total: number } | null) => void;
   setIsAutoNext: (isAutoNext: boolean) => void;
+  incrementChecklistCount: (category: string) => void;
   resetTraining: () => void;
 }
 
@@ -39,6 +41,7 @@ export const useTrainingStore = create<TrainingState>()(
       newlyAddedToDict: [],
       batchProgress: null,
       isAutoNext: false,
+      checklistCounts: {},
 
       setInput: (input) => set({ input }),
       setOutput: (output) => set({ output }),
@@ -49,12 +52,19 @@ export const useTrainingStore = create<TrainingState>()(
       setNewlyAddedToDict: (newlyAddedToDict) => set({ newlyAddedToDict }),
       setBatchProgress: (batchProgress) => set({ batchProgress }),
       setIsAutoNext: (isAutoNext) => set({ isAutoNext }),
+      incrementChecklistCount: (category) => set((state) => ({
+        checklistCounts: {
+          ...state.checklistCounts,
+          [category]: (state.checklistCounts[category] || 0) + 1
+        }
+      })),
       resetTraining: () => set({
         isTraining: false,
         lastProcessedIndex: 0,
         trainingSuggestions: [],
         newlyAddedToDict: [],
         batchProgress: null,
+        checklistCounts: {},
       }),
     }),
     {
@@ -67,6 +77,7 @@ export const useTrainingStore = create<TrainingState>()(
         lastProcessedIndex: state.lastProcessedIndex,
         newlyAddedToDict: state.newlyAddedToDict,
         isAutoNext: state.isAutoNext,
+        checklistCounts: state.checklistCounts,
       }),
     }
   )

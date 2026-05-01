@@ -65,7 +65,7 @@ ${opts.aiTranslated.slice(0, 3000)}
 
 <requirements>
 1. Chỉ đề xuất các mục thực sự cải thiện được bản dịch máy (biến nó giống với bản dịch chuyên nghiệp hơn).
-2. Phân loại theo các nhóm: nhân vật, thuật ngữ tu tiên, cụm hành động, cụm cảm xúc, từ nối, v.v.
+2. Phân loại bắt buộc theo một trong các nhóm sau: "Từ đơn", "Từ đôi", "Cụm hành động", "Cụm cảm xúc", "Trạng từ", "Từ nối", "Trợ từ", "Thuật ngữ tu tiên", "Phiên âm tên", "Pattern câu", "Context mapping", "Âm thanh".
 3. Chú trọng vào việc sử dụng từ Hán-Việt cho các thuật ngữ tu tiên, chiêu thức và tên riêng để giữ đúng phong cách tiên hiệp/huyền huyễn.
 4. Tránh dịch quá "thuần Việt" (quá hiện đại hoặc bình dân) cho các bối cảnh cổ đại/tu tiên.
 5. Với mỗi đề xuất, hãy trích dẫn câu văn gốc chứa từ đó (context_zh), bản dịch hiện tại của QT cho câu đó (context_vi_before) và bản dịch đề xuất của bạn cho câu đó (context_vi_after) để người dùng đối chiếu.
