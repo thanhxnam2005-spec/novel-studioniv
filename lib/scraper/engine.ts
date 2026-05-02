@@ -31,6 +31,7 @@ export async function scrapeChapters(
   onProgress?: (completed: number, total: number, currentTitle: string) => void,
   signal?: AbortSignal,
   onDebug?: (entry: ScrapeDebugEntry) => void,
+  delayMs: number = 300,
 ): Promise<ChapterContent[]> {
   const results: ChapterContent[] = [];
 
@@ -98,7 +99,7 @@ export async function scrapeChapters(
     }
 
     if (i < chapters.length - 1) {
-      await delay(300);
+      await delay(delayMs);
     }
   }
 

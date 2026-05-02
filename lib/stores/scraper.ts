@@ -36,6 +36,7 @@ interface ScraperState {
   abortController: AbortController | null;
   retryingIndex: number | null;
   debugLogs: DebugLog[];
+  chapterDelay: number;
 
   // Actions
   setUrl: (url: string) => void;
@@ -50,6 +51,7 @@ interface ScraperState {
   retryScrapeChapter: (index: number) => Promise<void>;
   abortScraping: () => void;
   setStep: (step: ScraperStep) => void;
+  setChapterDelay: (delay: number) => void;
   reset: () => void;
   clearDebugLogs: () => void;
 }
@@ -69,6 +71,7 @@ const initialState = {
   abortController: null as AbortController | null,
   retryingIndex: null as number | null,
   debugLogs: [] as DebugLog[],
+  chapterDelay: 2,
 };
 
 function addLog(label: string, data: unknown) {
@@ -234,6 +237,7 @@ export const useScraperStore = create<ScraperState>((set, get) => ({
 
           logChapterIssue(entry);
         },
+        get().chapterDelay * 1000,
       );
 
       set({
@@ -288,6 +292,7 @@ export const useScraperStore = create<ScraperState>((set, get) => ({
           set({ scrapedChapters: [...prev, entry.parsed] });
           logChapterIssue(entry);
         },
+        get().chapterDelay * 1000,
       );
 
       set({
@@ -380,6 +385,8 @@ export const useScraperStore = create<ScraperState>((set, get) => ({
   },
 
   setStep: (step) => set({ step }),
+
+  setChapterDelay: (delay) => set({ chapterDelay: delay }),
 
   reset: () => set({ ...initialState, debugLogs: [] }),
 

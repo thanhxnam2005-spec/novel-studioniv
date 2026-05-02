@@ -705,6 +705,8 @@ function SelectStep() {
     deselectAll,
     startScraping,
     setStep,
+    chapterDelay,
+    setChapterDelay,
   } = useScraperStore();
 
   const [rangeFrom, setRangeFrom] = useState("");
@@ -798,17 +800,33 @@ function SelectStep() {
           toggleChapter={toggleChapter}
         />
 
-        <div className="flex justify-between pt-1">
+        <div className="flex items-center justify-between pt-1">
           <Button variant="ghost" size="sm" onClick={() => setStep("url")}>
             Quay lại
           </Button>
-          <Button
-            onClick={startScraping}
-            disabled={selectedChapterUrls.size === 0}
-          >
-            Scrape {selectedChapterUrls.size} chương
-            <ArrowRightIcon className="ml-1 size-3.5" />
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="delay-select" className="text-xs text-muted-foreground">
+                Độ trễ (giây):
+              </Label>
+              <Input
+                id="delay-select"
+                type="number"
+                min={0}
+                max={60}
+                value={chapterDelay}
+                onChange={(e) => setChapterDelay(Number(e.target.value))}
+                className="h-8 w-16 text-center text-xs"
+              />
+            </div>
+            <Button
+              onClick={startScraping}
+              disabled={selectedChapterUrls.size === 0}
+            >
+              Scrape {selectedChapterUrls.size} chương
+              <ArrowRightIcon className="ml-1 size-3.5" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -818,7 +836,7 @@ function SelectStep() {
 // ─── Step 2.5: STV Wait ─────────────────────────────────────
 
 function STVWaitStep() {
-  const { novelInfo, selectedChapterUrls, confirmSTVReady, setStep } = useScraperStore();
+  const { novelInfo, selectedChapterUrls, confirmSTVReady, setStep, chapterDelay, setChapterDelay } = useScraperStore();
   if (!novelInfo) return null;
 
   const firstChapter = novelInfo.chapters.find((ch) => selectedChapterUrls.has(ch.url));
@@ -887,14 +905,30 @@ function STVWaitStep() {
           </div>
         </div>
 
-        <div className="flex justify-between">
+        <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => setStep("select")}>
             Quay lại
           </Button>
-          <Button onClick={confirmSTVReady}>
-            Tôi đã mở chương — Tiếp tục
-            <ArrowRightIcon className="ml-1 size-3.5" />
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="delay-stv" className="text-xs text-muted-foreground">
+                Độ trễ (giây):
+              </Label>
+              <Input
+                id="delay-stv"
+                type="number"
+                min={0}
+                max={60}
+                value={chapterDelay}
+                onChange={(e) => setChapterDelay(Number(e.target.value))}
+                className="h-8 w-16 text-center text-xs"
+              />
+            </div>
+            <Button onClick={confirmSTVReady}>
+              Tôi đã mở chương — Tiếp tục
+              <ArrowRightIcon className="ml-1 size-3.5" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

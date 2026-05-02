@@ -23,9 +23,9 @@ import type {
 import { useReaderPanel } from "@/lib/stores/reader-panel";
 import { SegmentRenderer } from "@/components/reader/segment-renderer";
 import { PasswordGate } from "@/components/password-gate";
-import { 
-  extractNamesAI, 
-  extractNamesRuleBased 
+import {
+  extractNamesAI,
+  extractNamesRuleBased
 } from "@/lib/chapter-tools/name-extract";
 import { bulkImportNameEntries, useGlobalNameEntries } from "@/lib/hooks/use-name-entries";
 import { useAIProviders, useAIModels } from "@/lib/hooks/use-ai-providers";
@@ -62,13 +62,44 @@ import { useTrainingStore } from "@/lib/stores/training-store";
 import { useBackgroundTraining } from "@/lib/hooks/use-background-training";
 import { toast } from "sonner";
 
+function splitTextIntoChunks(text: string, maxChunkSize: number = 30000): string[] {
+  const chunks: string[] = [];
+  let currentStart = 0;
+  
+  while (currentStart < text.length) {
+    if (text.length - currentStart <= maxChunkSize) {
+      chunks.push(text.substring(currentStart));
+      break;
+    }
+    
+    let splitPos = text.lastIndexOf('\n', currentStart + maxChunkSize);
+    
+    if (splitPos <= currentStart) {
+      splitPos = text.lastIndexOf('。', currentStart + maxChunkSize);
+    }
+    if (splitPos <= currentStart) {
+      splitPos = text.lastIndexOf('，', currentStart + maxChunkSize);
+    }
+    if (splitPos <= currentStart) {
+      splitPos = currentStart + maxChunkSize;
+    } else {
+      splitPos += 1;
+    }
+    
+    chunks.push(text.substring(currentStart, splitPos));
+    currentStart = splitPos;
+  }
+  
+  return chunks;
+}
+
 export default function ConvertPage() {
   const store = useTrainingStore();
   const { handleTrain, stopTraining } = useBackgroundTraining();
-  
-  const { 
-    input = "", setInput, 
-    output = "", setOutput, 
+
+  const {
+    input = "", setInput,
+    output = "", setOutput,
     segments = [], setSegments,
     isTraining = false,
     trainingSuggestions = [], setTrainingSuggestions,
@@ -114,17 +145,38 @@ export default function ConvertPage() {
     if (!input.trim()) return;
     const seq = ++seqRef.current;
     setIsConverting(true);
+    
     try {
-      const result = await convertText(input, { globalNames, options: mergedOptions });
-      if (seqRef.current === seq) {
-        setOutput(result.plainText);
-        setSegments(result.segments);
-        setDetectedNames(result.detectedNames ?? []);
+      const chunks = splitTextIntoChunks(input, 30000);
+      let finalPlainText = "";
+      let finalSegments: ConvertSegment[] = [];
+      let finalDetectedNames: DictPair[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (seqRef.current !== seq) return;
+        
+        const result = await convertText(chunks[i], { globalNames, options: mergedOptions });
+        
+        finalPlainText += result.plainText;
+        finalSegments = finalSegments.concat(result.segments);
+        
+        const newNames = result.detectedNames ?? [];
+        for (const n of newNames) {
+          if (!finalDetectedNames.some(d => d.chinese === n.chinese)) {
+            finalDetectedNames.push(n);
+          }
+        }
+        
+        if (seqRef.current === seq) {
+          setOutput(finalPlainText);
+          setSegments(finalSegments);
+          setDetectedNames([...finalDetectedNames]);
+        }
       }
     } catch (err) {
-      toast.error(
-        "Lỗi convert: " + (err instanceof Error ? err.message : String(err)),
-      );
+      if (seqRef.current === seq) {
+        toast.error("Lỗi convert: " + (err instanceof Error ? err.message : String(err)));
+      }
     } finally {
       if (seqRef.current === seq) setIsConverting(false);
     }
@@ -152,24 +204,44 @@ export default function ConvertPage() {
     }
     const seq = ++seqRef.current;
     setIsConverting(true);
-    convertText(debouncedInput, { globalNames, options: mergedOptions })
-      .then((result) => {
-        if (seqRef.current === seq) {
-          setOutput(result.plainText);
-          setSegments(result.segments);
-          setDetectedNames(result.detectedNames ?? []);
+    const processChunks = async () => {
+      try {
+        const chunks = splitTextIntoChunks(debouncedInput, 30000);
+        let finalPlainText = "";
+        let finalSegments: ConvertSegment[] = [];
+        let finalDetectedNames: DictPair[] = [];
+
+        for (let i = 0; i < chunks.length; i++) {
+          if (seqRef.current !== seq) return;
+          
+          const result = await convertText(chunks[i], { globalNames, options: mergedOptions });
+          
+          finalPlainText += result.plainText;
+          finalSegments = finalSegments.concat(result.segments);
+          
+          const newNames = result.detectedNames ?? [];
+          for (const n of newNames) {
+            if (!finalDetectedNames.some(d => d.chinese === n.chinese)) {
+              finalDetectedNames.push(n);
+            }
+          }
+          
+          if (seqRef.current === seq) {
+            setOutput(finalPlainText);
+            setSegments(finalSegments);
+            setDetectedNames([...finalDetectedNames]);
+          }
         }
-      })
-      .catch((err) => {
-        if (seqRef.current === seq)
-          toast.error(
-            "Lỗi convert: " +
-              (err instanceof Error ? err.message : String(err)),
-          );
-      })
-      .finally(() => {
+      } catch (err) {
+        if (seqRef.current === seq) {
+          toast.error("Lỗi convert: " + (err instanceof Error ? err.message : String(err)));
+        }
+      } finally {
         if (seqRef.current === seq) setIsConverting(false);
-      });
+      }
+    };
+
+    processChunks();
   }, [liveMode, debouncedInput, mergedOptions, engineReady, globalNames]);
 
   const handleRead = useCallback(() => {
@@ -194,7 +266,7 @@ export default function ConvertPage() {
         // Fallback to engine detection
         results = detectedNames.map(n => ({ chinese: n.chinese, vietnamese: n.vietnamese, category: "nhân vật" }));
       }
-      
+
       setExtractedNames(results);
       setSelectedNames(new Set(results.map(r => r.chinese)));
       setExtractDialogOpen(true);
@@ -330,7 +402,7 @@ export default function ConvertPage() {
               )}
               {lastProcessedIndex > 0 ? "Tiếp tục huấn luyện" : "Huấn luyện AI"}
             </Button>
-            
+
             {isTraining && (
               <Button
                 variant="outline"
@@ -351,7 +423,7 @@ export default function ConvertPage() {
               <FileUpIcon className="mr-1.5 size-3.5" />
               Nhập File
             </Button>
-            
+
             <input
               type="file"
               accept=".txt"
@@ -383,7 +455,7 @@ export default function ConvertPage() {
                 Cài đặt
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-72">
+            <PopoverContent align="end" className="w-[90vw] sm:w-72 max-w-[calc(100vw-1rem)] max-h-[80vh] overflow-y-auto">
               <ConvertConfig />
             </PopoverContent>
           </Popover>
@@ -408,7 +480,7 @@ export default function ConvertPage() {
       {/* ── Interactive Preview & Quick Fix ── */}
       {segments.length > 0 && (
         <div className="mt-4 rounded-md border bg-muted/20 overflow-hidden">
-          <button 
+          <button
             onClick={() => setShowPreview(!showPreview)}
             className="flex w-full items-center justify-between p-3 hover:bg-muted/40 transition-colors"
           >
@@ -421,7 +493,7 @@ export default function ConvertPage() {
               <ChevronDownIcon className={cn("size-4 transition-transform", showPreview && "rotate-180")} />
             </div>
           </button>
-          
+
           {showPreview && (
             <div className="p-4 border-t bg-background/50">
               <SegmentRenderer
@@ -437,7 +509,7 @@ export default function ConvertPage() {
       {/* ── Detected names ── */}
       {detectedNames.length > 0 && (
         <div className="mt-4 rounded-md border bg-muted/20 overflow-hidden shrink-0">
-          <button 
+          <button
             onClick={() => setShowDetectedNames(!showDetectedNames)}
             className="flex w-full items-center justify-between p-3 hover:bg-muted/40 transition-colors"
           >
@@ -450,7 +522,7 @@ export default function ConvertPage() {
               <ChevronDownIcon className={cn("size-4 transition-transform", showDetectedNames && "rotate-180")} />
             </div>
           </button>
-          
+
           {showDetectedNames && (
             <div className="p-4 border-t bg-background/50">
               <ConvertDetectedNames
@@ -472,16 +544,16 @@ export default function ConvertPage() {
                 Kết quả huấn luyện AI {batchProgress && `(Khối hiện tại: ${batchProgress.current}/${batchProgress.total})`}
               </h3>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Tiến độ: {lastProcessedIndex.toLocaleString()} / {input.length.toLocaleString()} ký tự 
+                Tiến độ: {lastProcessedIndex.toLocaleString()} / {input.length.toLocaleString()} ký tự
                 {lastProcessedIndex >= input.length && " (Hoàn thành)"}
               </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <Label htmlFor="auto-next" className="text-[10px] cursor-pointer">Tự động quét tiếp</Label>
-                <Switch 
-                  id="auto-next" 
-                  checked={isAutoNext} 
+                <Switch
+                  id="auto-next"
+                  checked={isAutoNext}
                   onCheckedChange={setIsAutoNext}
                   className="scale-75"
                 />
@@ -491,7 +563,7 @@ export default function ConvertPage() {
               )}
             </div>
           </div>
-          
+
           {Array.isArray(trainingSuggestions) && trainingSuggestions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-2">
               {trainingSuggestions.map((s, idx) => (
@@ -504,7 +576,7 @@ export default function ConvertPage() {
                     </div>
                     <Badge variant="outline" className="text-[10px] capitalize h-5">{s.category}</Badge>
                   </div>
-                  
+
                   {s.context_zh && (
                     <div className="mt-1 space-y-1 rounded border bg-muted/30 p-2 text-[11px]">
                       <div className="flex gap-2">
@@ -568,8 +640,8 @@ export default function ConvertPage() {
             </p>
             {extractedNames.map((n, idx) => (
               <div key={idx} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 border">
-                <Checkbox 
-                  id={`name-${idx}`} 
+                <Checkbox
+                  id={`name-${idx}`}
                   checked={selectedNames.has(n.chinese)}
                   onCheckedChange={(checked) => {
                     const next = new Set(selectedNames);

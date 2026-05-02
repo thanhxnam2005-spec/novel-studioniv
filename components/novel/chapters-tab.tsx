@@ -215,6 +215,14 @@ export function ChaptersTab({
           <FileTextIcon className="size-3.5 sm:mr-1.5" />
           <span className="hidden sm:inline">Thêm nhiều</span>
         </Button>
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="sm:hidden" 
+          onClick={toggleAll}
+        >
+          {filteredChapters.length > 0 && filteredChapters.every((f) => selected.has(f.chapter.id)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+        </Button>
         <div className="ml-auto flex gap-1.5 sm:gap-2">
           <Popover>
             <PopoverTrigger asChild>

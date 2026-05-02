@@ -48,3 +48,5 @@ thoughts
 .vscode
 docs
 .omc
+extension-src/
+extension-pc-src/

@@ -9,9 +9,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "zip:android": "powershell -Command \"Compress-Archive -Path extension\\manifest.json, extension\\background.js -DestinationPath public\\novel-studio-connector-android.zip -Force\"",
-    "zip:pc": "powershell -Command \"Compress-Archive -Path extension-pc\\manifest.json, extension-pc\\background.js -DestinationPath public\\novel-studio-connector-pc.zip -Force\"",
+    "zip:android": "npm run build:ext && powershell -Command \"Compress-Archive -Path extension\\manifest.json, extension\\background.js -DestinationPath public\\novel-studio-connector-android.zip -Force\"",
+    "zip:pc": "npm run build:ext && powershell -Command \"Compress-Archive -Path extension-pc\\manifest.json, extension-pc\\background.js, extension-pc\\content.js -DestinationPath public\\novel-studio-connector-pc.zip -Force\"",
     "zip:all": "npm run zip:android && npm run zip:pc",
+    "build:ext": "powershell -Command \"if (!(Test-Path extension)) { New-Item -ItemType Directory -Path extension }; if (!(Test-Path extension-pc)) { New-Item -ItemType Directory -Path extension-pc }; Copy-Item extension-src/manifest.json extension/manifest.json; Copy-Item extension-pc-src/manifest.json extension-pc/manifest.json; npx.cmd -y javascript-obfuscator extension-src/background.js --output extension/background.js --compact true --self-defending false; npx.cmd -y javascript-obfuscator extension-pc-src/background.js --output extension-pc/background.js --compact true --self-defending false; npx.cmd -y javascript-obfuscator extension-pc-src/content.js --output extension-pc/content.js --compact true --self-defending false\"",
     "postinstall": "mkdir -p public/wasm && cp node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm public/wasm/ 2>/dev/null || true",
     "prepare": "husky"
   },
@@ -82,6 +83,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "husky": "^9.1.7",
+    "javascript-obfuscator": "^4.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
