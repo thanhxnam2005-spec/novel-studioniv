@@ -3,7 +3,7 @@ import type { SiteAdapter } from "../types";
 export const CuocengAdapter: SiteAdapter = {
   name: "错层文学",
   urlPattern: /cuoceng\.com/i,
-  chapterWaitSelector: ".readBody",
+  chapterWaitSelector: "#showReading, .readBody",
 
   getNovelInfo(html, url) {
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -16,8 +16,8 @@ export const CuocengAdapter: SiteAdapter = {
     const coverImg = doc.querySelector("a.book_cover img");
     const coverImage = coverImg ? new URL(coverImg.getAttribute("src") || "", base).href : undefined;
 
-    // Chapters are usually in <div class="dirList"> -> <a> or similar
-    const chapterLinks = doc.querySelectorAll(".dirList a[href*='/book/'], .chapterlist a[href*='/book/'], .index_area a[href*='/book/']");
+    // Chapters are usually in <div class="dirList"> or <div class="box_center"> -> <a>
+    const chapterLinks = doc.querySelectorAll(".box_center a[href*='/book/'], .dirList a[href*='/book/'], .chapterlist a[href*='/book/'], .index_area a[href*='/book/']");
     const chapters = Array.from(chapterLinks).map((a, i) => {
       // Sometimes title is in a span inside a
       const chTitle = a.querySelector("span")?.textContent?.trim() || a.textContent?.trim() || `Chương ${i + 1}`;
@@ -38,9 +38,9 @@ export const CuocengAdapter: SiteAdapter = {
     // Prefer contentText from extension
     let text = contentText || "";
     if (!text) {
-      const contentEl = doc.querySelector(".readBody");
+      const contentEl = doc.querySelector("#showReading") || doc.querySelector(".readBody");
       if (contentEl) {
-        contentEl.querySelectorAll("script, style").forEach((el) => el.remove());
+        contentEl.querySelectorAll("script, style, .read_notice, .read_tip").forEach((el) => el.remove());
         text = contentEl.textContent || "";
       }
     }

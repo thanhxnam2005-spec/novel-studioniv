@@ -72,8 +72,8 @@ export const PiaotiaAdapter: SiteAdapter = {
     if (!text) {
       const contentEl = doc.querySelector("#content");
       if (contentEl) {
-        // Remove ads/scripts if any
-        contentEl.querySelectorAll("script, style, .ads").forEach((el) => el.remove());
+        // Remove navigation links and common noise
+        contentEl.querySelectorAll(".toplink, script, style, a").forEach((el) => el.remove());
         text = contentEl.textContent || "";
       }
     }
@@ -83,6 +83,7 @@ export const PiaotiaAdapter: SiteAdapter = {
       .replace(/&nbsp;/g, " ")
       .replace(/飘天文学/g, "")
       .replace(/www\.piaotia\.com/g, "")
+      .replace(/【[^\]]+】/g, "") // Remove common bracketed ads
       .trim();
 
     return { title: chapterTitle, content: text };
