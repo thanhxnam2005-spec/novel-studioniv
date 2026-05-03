@@ -218,8 +218,14 @@ export const useScraperStore = create<ScraperState>()(
       },
 
       startScraping: async () => {
-        const { novelInfo, selectedChapterUrls, adapter } = get();
-        if (!novelInfo || !adapter) return;
+        let { novelInfo, selectedChapterUrls, adapter, url } = get();
+        if (!novelInfo) return;
+        
+        if (!adapter) {
+          adapter = detectAdapter(url);
+          set({ adapter });
+        }
+        if (!adapter) return;
 
         const selectedChapters = novelInfo.chapters.filter((ch) =>
           selectedChapterUrls.has(ch.url),
@@ -278,8 +284,14 @@ export const useScraperStore = create<ScraperState>()(
       },
 
       startBackgroundScraping: async (mode, novelId, title, desc) => {
-        const { novelInfo, selectedChapterUrls, adapter, url } = get();
-        if (!novelInfo || !adapter) return;
+        let { novelInfo, selectedChapterUrls, adapter, url } = get();
+        if (!novelInfo) return;
+
+        if (!adapter) {
+          adapter = detectAdapter(url);
+          set({ adapter });
+        }
+        if (!adapter) return;
 
         const selectedChapters = novelInfo.chapters.filter((ch) =>
           selectedChapterUrls.has(ch.url),
@@ -394,8 +406,14 @@ export const useScraperStore = create<ScraperState>()(
       },
 
       confirmSTVReady: async () => {
-        const { novelInfo, selectedChapterUrls, adapter } = get();
-        if (!novelInfo || !adapter) return;
+        let { novelInfo, selectedChapterUrls, adapter, url } = get();
+        if (!novelInfo) return;
+
+        if (!adapter) {
+          adapter = detectAdapter(url);
+          set({ adapter });
+        }
+        if (!adapter) return;
 
         const selectedChapters = novelInfo.chapters.filter((ch) =>
           selectedChapterUrls.has(ch.url),
@@ -448,8 +466,14 @@ export const useScraperStore = create<ScraperState>()(
       },
 
       retryScrapeChapter: async (index) => {
-        const { novelInfo, scrapedChapters, adapter } = get();
-        if (!novelInfo || !adapter) return;
+        let { novelInfo, scrapedChapters, adapter, url } = get();
+        if (!novelInfo) return;
+
+        if (!adapter) {
+          adapter = detectAdapter(url);
+          set({ adapter });
+        }
+        if (!adapter) return;
 
         const selectedUrls = get().selectedChapterUrls;
         const selectedChapters = novelInfo.chapters.filter((ch) => selectedUrls.has(ch.url));
@@ -549,8 +573,11 @@ export const useScraperStore = create<ScraperState>()(
         adapter: null, // Don't persist adapter as it contains functions
       }),
       onRehydrateStorage: () => (state: any) => {
-        if (state && Array.isArray(state.selectedChapterUrls)) {
-          state.selectedChapterUrls = new Set(state.selectedChapterUrls);
+        if (state) {
+          if (Array.isArray(state.selectedChapterUrls)) {
+            state.selectedChapterUrls = new Set(state.selectedChapterUrls);
+          }
+          state.adapter = null; // Force clear adapter on reload to prevent function loss issues
         }
       },
     }
