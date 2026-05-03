@@ -62,6 +62,8 @@ export type SceneVersionType =
   | "ai-write"
   | "manual"
   | "qt-convert"
+  | "stv-translate"
+  | "stv-convert"
   | "find-replace";
 
 export interface Scene {
