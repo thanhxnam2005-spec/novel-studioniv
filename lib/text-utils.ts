@@ -51,14 +51,25 @@ export function fixStuckWords(text: string): string {
   // Actually, a simpler way is to use a regex for common combinations.
   
   const stuckPatterns = [
-    { pattern: /(thật)(gọi)/gi, replacement: "$1 $2" },
-    { pattern: /(tên)(thật)/gi, replacement: "$1 $2" },
-    { pattern: /(họ)(Vương)/gi, replacement: "$1 $2" },
+    // Common stuck words (particle/verb/adverb stuck to previous word)
+    { pattern: /([a-z\u00C0-\u1EF9])(là|không|có|cũng|theo|tại|khỏi|rất|như|thế|cái|mấy|với|mà|của|được|những|một|đã|đang|sẽ|rời|định|tinh|cảnh|mặc|nghĩ|nhận|thần|coi|gầy|tiếp|vừa|vẫn|còn|nữa)/g, replacement: "$1 $2" },
+    // Specific cases from user
+    { pattern: /(Trụ)(không|có|Tòng|Tòng)/g, replacement: "$1 $2" },
+    { pattern: /(thể)(gầy|tiếp)/g, replacement: "$1 $2" },
+    { pattern: /(xóm)(coi)/g, replacement: "$1 $2" },
+    { pattern: /(tộc)(Mộc|sự)/g, replacement: "$1 $2" },
+    { pattern: /(Tộc)(cũng)/g, replacement: "$1 $2" },
+    { pattern: /(quản)(gia)/g, replacement: "$1 $2" },
+    { pattern: /(thành)(định)/g, replacement: "$1 $2" },
+    { pattern: /(Hậu)(rời)/g, replacement: "$1 $2" },
   ];
 
   stuckPatterns.forEach(({ pattern, replacement }) => {
     cleaned = cleaned.replace(pattern, replacement);
   });
+
+  // Handle lowercase followed by Uppercase (e.g. làTòng -> là Tòng)
+  cleaned = cleaned.replace(/([a-z\u00C0-\u1EF9])([A-Z\u00C0-\u1EF9])/g, "$1 $2");
 
   return cleaned;
 }
