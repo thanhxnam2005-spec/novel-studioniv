@@ -577,7 +577,12 @@ export const useScraperStore = create<ScraperState>()(
           if (Array.isArray(state.selectedChapterUrls)) {
             state.selectedChapterUrls = new Set(state.selectedChapterUrls);
           }
-          state.adapter = null; // Force clear adapter on reload to prevent function loss issues
+          // Re-detect adapter on rehydration because functions were stripped
+          if (state.url) {
+            state.adapter = detectAdapter(state.url);
+          } else {
+            state.adapter = null;
+          }
         }
       },
     }
