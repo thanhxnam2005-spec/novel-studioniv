@@ -106,7 +106,7 @@ export async function downloadNovelChaptersZip(novelId: string) {
       .map((s) => s.content.replace(UNWANTED_TEXT, "").trim())
       .join("\n\n")
       .trim();
-    const fileName = `${(i + 1).toString().padStart(4, "0")} - ${chapter.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
+    const fileName = `${chapter.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
     folder.file(fileName, content);
   }
 
