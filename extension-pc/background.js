@@ -46,7 +46,11 @@ chrome.runtime.onMessageExternal.addListener((request, _sender, sendResponse) =>
 // Lần gọi tiếp: cache đã có chương mới → lấy → chuyển → respond
 
 async function findSTVTab() {
-  const tabs = await chrome.tabs.query({ url: "*://sangtacviet.com/*" });
+  const tabs = await chrome.tabs.query({ url: [
+    "*://sangtacviet.com/*",
+    "*://sangtacviet.app/*",
+    "*://sangtacviet.vip/*"
+  ] });
   return tabs.length > 0 ? tabs[0].id : null;
 }
 

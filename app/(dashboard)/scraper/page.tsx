@@ -63,12 +63,14 @@ import {
   SquareIcon,
   TerminalIcon,
   Trash2Icon,
+  UploadIcon,
   XIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PasswordGate } from "@/components/password-gate";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -476,145 +478,112 @@ function UrlStep() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Extension config — collapsible when connected */}
-        {extensionAvailable ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-2 text-sm">
-                <CircleDotIcon className="size-3.5 text-green-500" />
-                <span className="text-green-700 dark:text-green-400">
-                  Connector đã kết nối
-                </span>
-                {extensionVersion && (
-                  <Badge
-                    variant="outline"
-                    className="ml-1 text-green-700 dark:text-green-400 border-green-500/30 bg-green-50 dark:bg-green-950/20"
-                  >
-                    v{extensionVersion}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span>Timeout:</span>
-                <Input
-                  type="number"
-                  value={timeout}
-                  onChange={(e) => handleTimeoutChange(e.target.value)}
-                  onBlur={handleTimeoutBlur}
-                  className="h-6 w-14 text-center text-xs"
-                  min={5}
-                  max={60}
-                />
-                <span>s</span>
-              </div>
-            </div>
-            {isVersionOutdated(
-              extensionVersion,
-              REQUIRED_EXTENSION_VERSION,
-            ) && (
-              <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/20">
-                <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                  <AlertTriangleIcon className="size-3.5 shrink-0" />
-                  <span>
-                    Phiên bản cũ (v{extensionVersion}). Cần cập nhật lên v
-                    {REQUIRED_EXTENSION_VERSION}.
+        <Tabs defaultValue={extId === "tampermonkey" ? "tampermonkey" : "extension"} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="extension">PC (Extension)</TabsTrigger>
+            <TabsTrigger value="tampermonkey">Android (Tampermonkey)</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="extension" className="mt-4 space-y-3">
+            {extensionAvailable && extId !== "tampermonkey" ? (
+              <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 text-sm">
+                  <CircleDotIcon className="size-3.5 text-green-500" />
+                  <span className="text-green-700 dark:text-green-400">
+                    Extension đã kết nối
                   </span>
                 </div>
-                <a
-                  href="/novel-studio-connector-pc.zip?v=2.7.1"
-                  download
-                  className="shrink-0 rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-700"
-                >
-                  <DownloadIcon className="mr-1 inline size-3" />
-                  Tải bản mới
-                </a>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="ext-id" className="text-xs">
-                Extension ID
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="ext-id"
-                  placeholder="Paste ID từ chrome://extensions"
-                  value={extId}
-                  onChange={(e) => setExtId(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSaveExtId();
-                  }}
-                  className="font-mono text-xs"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveExtId}
-                  disabled={!extId.trim()}
-                  className="shrink-0 h-8"
-                >
-                  Kết nối
-                </Button>
-              </div>
-            </div>
-
-            {extensionAvailable === null ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <LoaderIcon className="size-3 animate-spin" />
-                Đang kiểm tra...
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); store.checkExtension(); }}>Đổi</Button>
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-muted-foreground/25 p-3 space-y-2.5">
-                <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
-                  <XIcon className="size-3" />
-                  {!getExtensionId()
-                    ? "Chưa nhập Extension ID."
-                    : "Không thể kết nối."}
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ext-id" className="text-xs">
+                    Extension ID
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="ext-id"
+                      placeholder="Paste ID từ chrome://extensions"
+                      value={extId !== "tampermonkey" ? extId : ""}
+                      onChange={(e) => setExtId(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveExtId();
+                      }}
+                      className="font-mono text-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSaveExtId}
+                      disabled={!extId.trim() || extId === "tampermonkey"}
+                      className="shrink-0 h-8"
+                    >
+                      Kết nối
+                    </Button>
+                  </div>
                 </div>
-                <ol className="list-inside list-decimal space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                  <li>Tải extension bên dưới</li>
-                  <li>Giải nén file .zip</li>
-                  <li>
-                    Mở{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
-                      chrome://extensions
-                    </code>
-                  </li>
-                  <li>
-                    Bật <strong>Developer mode</strong> &rarr;{" "}
-                    <strong>Load unpacked</strong>
-                  </li>
-                  <li>Copy ID và dán vào ô trên</li>
-                </ol>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    asChild
-                  >
+                <div className="flex flex-col gap-2">
+                  <ol className="list-inside list-decimal space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                    <li>Tải và giải nén extension bản PC bên dưới.</li>
+                    <li>Mở <code className="rounded bg-muted px-1 py-0.5 text-[10px]">chrome://extensions</code>, bật <strong>Developer mode</strong> &rarr; <strong>Load unpacked</strong>.</li>
+                    <li>Copy ID extension và dán vào ô trên.</li>
+                  </ol>
+                  <Button variant="outline" size="sm" className="h-7 w-fit text-xs" asChild>
                     <a href="/novel-studio-connector-pc.zip?v=2.7.1" download>
                       <DownloadIcon className="mr-1.5 size-3" />
                       Tải bản PC
                     </a>
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    asChild
-                  >
-                    <a href="/novel-studio-connector-android.zip?v=2.7.1" download>
-                      <DownloadIcon className="mr-1.5 size-3" />
-                      Tải bản Android
-                    </a>
-                  </Button>
                 </div>
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
+          
+          <TabsContent value="tampermonkey" className="mt-4 space-y-3">
+             {extensionAvailable && extId === "tampermonkey" ? (
+              <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-2 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 text-sm">
+                  <CircleDotIcon className="size-3.5 text-green-500" />
+                  <span className="text-green-700 dark:text-green-400">
+                    Tampermonkey đã kết nối
+                  </span>
+                </div>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); store.checkExtension(); }}>Đổi</Button>
+              </div>
+            ) : (
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <Link2Icon className="size-4" />
+                  Sử dụng Script tàng hình trên Kiwi Browser
+                </div>
+                <ol className="list-inside list-decimal space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  <li>Đảm bảo bạn đã cài addon <strong>Tampermonkey</strong> trên trình duyệt.</li>
+                  <li>
+                    Cài đặt script kết nối của Novel Studio:{" "}
+                    <a href="/novel-studio-tampermonkey.user.js" target="_blank" className="text-primary hover:underline font-medium">
+                      Bấm vào đây để cài đặt
+                    </a>
+                  </li>
+                  <li>Sau khi cài script, bấm nút dưới đây để kích hoạt kết nối.</li>
+                </ol>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 text-xs w-full"
+                  onClick={() => {
+                    setExtId("tampermonkey");
+                    setExtensionId("tampermonkey");
+                    checkExtension();
+                  }}
+                >
+                  <Link2Icon className="mr-1.5 size-3" />
+                  Kích hoạt Tampermonkey
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* URL + Adapter */}
         <div className="space-y-3">
