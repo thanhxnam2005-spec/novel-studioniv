@@ -1,106 +1,13 @@
-// content.js v4.1 — Clean Handshake Mode
-// Chỉ extract + gửi 1 lần duy nhất khi page load
-// Nhận GO_NEXT → click "Chương sau" → trang mới load → extract lại
-(function() {
-  'use strict';
-  let sent = false;
-
-  const cleanText = (text) => {
-    return (text || '')
-      .replace(/[\u200B\u200C\u200D\uFEFF]/g, '')
-      .replace(/@Bạn đang đọc bản lưu trong hệ thống/g, '')
-      .replace(/Đang tải nội dung chương\.\.\./g, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  };
-
-  const doExtract = () => {
-    const box = document.querySelector('#content-container .contentbox');
-    if (!box) return '';
-    const inner = cleanText(box.innerText);
-    let obf = '';
-    box.querySelectorAll('i').forEach(el => {
-      if ((el.id && el.id.startsWith('ran')) || el.id?.startsWith('exran') ||
-          el.hasAttribute('h') || el.hasAttribute('t') || el.hasAttribute('v')) {
-        obf += el.textContent;
-      }
-    });
-    obf = cleanText(obf);
-    return obf.length > inner.length ? obf : inner;
-  };
-
-  const sendToBackground = (content) => {
-    if (sent || content.length < 200) return;
-    sent = true;
-    const title = (document.title || '').split(/\s+-\s+/)[0]?.trim() || '';
-    chrome.runtime.sendMessage({
-      type: "STV_CONTENT_READY",
-      content, title, url: location.href, length: content.length
-    });
-    console.log(`%c[Extractor] ✅ ${content.length} ký tự — ${title}`, "color:lime;font-size:14px");
-  };
-
-  // Click "Chương sau >" — link CÓ SẴN trên trang STV
-  const clickNextChapter = () => {
-    const links = document.querySelectorAll('a');
-    for (const a of links) {
-      const text = (a.textContent || '').trim();
-      if (text.includes('Chương sau')) {
-        console.log(`[Extractor] Click "Chương sau" → ${a.href}`);
-        a.click();
-        return true;
-      }
-    }
-    return false;
-  };
-
-  // Auto-extract khi page load (CHỈ 1 LẦN)
-  const autoExtract = () => {
-    if (sent) return;
-    const content = doExtract();
-    if (content.length > 200) {
-      sendToBackground(content);
-    }
-  };
-
-  // Polling: thử extract nhiều lần cho đến khi có nội dung
-  const startPolling = () => {
-    for (let i = 0; i < 15; i++) {
-      setTimeout(autoExtract, 1500 + i * 1000);
-    }
-  };
-
-  startPolling();
-
-  // ========== LISTEN FOR COMMANDS ==========
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    // Background yêu cầu extract
-    if (msg.type === "EXTRACT_NOW") {
-      sent = false; // Reset để cho phép extract lại
-      const tryExtract = (n) => {
-        if (n <= 0) { sendResponse({ content: '', length: 0 }); return; }
-        const content = doExtract();
-        if (content.length > 200) {
-          const title = (document.title || '').split(/\s+-\s+/)[0]?.trim() || '';
-          sendResponse({ content, title, length: content.length, url: location.href });
-        } else {
-          setTimeout(() => tryExtract(n - 1), 1000);
-        }
-      };
-      setTimeout(() => tryExtract(12), 1500);
-      return true; // Async response
-    }
-
-    // Background yêu cầu chuyển chương
-    if (msg.type === "GO_NEXT") {
-      console.log("[Extractor] → GO_NEXT");
-      const ok = clickNextChapter();
-      sendResponse({ ok });
-      return false;
-    }
-  });
-
-  // Báo page đã load
-  chrome.runtime.sendMessage({ type: "STV_PAGE_LOADED", url: location.href });
-  console.log('%c[Extractor] v4.1 ready!', 'color:cyan;font-size:14px');
-})();
+/**
+ * Novel Studio Connector - Protected Script
+ * Unauthorized copying or modification is strictly prohibited.
+ */
+(function(_0x1,_0x2){const _0x3=function(_0x4){while(--_0x4){_0x1['push'](_0x1['shift']());}};_0x3(++_0x2);}(function(){return ["atob","from","Buffer","parse","toString"];}(),0x123));
+const _0xload = function(_0xencoded, _0xstrings) {
+  const _0xdecode = (s) => atob(s);
+  const __STR__ = JSON.parse(_0xdecode(_0xstrings));
+  const _0xsource = _0xdecode(_0xencoded);
+  const _0xfn = new Function("__STR__", _0xsource);
+  return _0xfn(__STR__);
+};
+_0xload("KGZ1bmN0aW9uKCkgeyBfX1NUUl9fWzBdOyBsZXQgc2VudCA9IGZhbHNlOyBjb25zdCBjbGVhblRleHQgPSAodGV4dCkgPT4geyByZXR1cm4gKHRleHQgfHwgX19TVFJfX1sxXSkgLnJlcGxhY2UoL1tcdTIwMEJcdTIwMENcdTIwMERcdUZFRkZdL2csIF9fU1RSX19bMl0pIC5yZXBsYWNlKC9AQuG6oW4gxJFhbmcgxJHhu41jIGLhuqNuIGzGsHUgdHJvbmcgaOG7hyB0aOG7kW5nL2csIF9fU1RSX19bM10pIC5yZXBsYWNlKC/EkGFuZyB04bqjaSBu4buZaSBkdW5nIGNoxrDGoW5nXC5cLlwuL2csIF9fU1RSX19bNF0pIC5yZXBsYWNlKC9cbnszLH0vZywgX19TVFJfX1s1XSkgLnRyaW0oKTsgfTsgY29uc3QgZG9FeHRyYWN0ID0gKCkgPT4geyBjb25zdCBib3ggPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKF9fU1RSX19bNl0pOyBpZiAoIWJveCkgcmV0dXJuIF9fU1RSX19bN107IGNvbnN0IGlubmVyID0gY2xlYW5UZXh0KGJveC5pbm5lclRleHQpOyBsZXQgb2JmID0gX19TVFJfX1s4XTsgYm94LnF1ZXJ5U2VsZWN0b3JBbGwoX19TVFJfX1s5XSkuZm9yRWFjaChlbCA9PiB7IGlmICgoZWwuaWQgJiYgZWwuaWQuc3RhcnRzV2l0aChfX1NUUl9fWzEwXSkpIHx8IGVsLmlkPy5zdGFydHNXaXRoKF9fU1RSX19bMTFdKSB8fCBlbC5oYXNBdHRyaWJ1dGUoX19TVFJfX1sxMl0pIHx8IGVsLmhhc0F0dHJpYnV0ZShfX1NUUl9fWzEzXSkgfHwgZWwuaGFzQXR0cmlidXRlKF9fU1RSX19bMTRdKSkgeyBvYmYgKz0gZWwudGV4dENvbnRlbnQ7IH0gfSk7IG9iZiA9IGNsZWFuVGV4dChvYmYpOyByZXR1cm4gb2JmLmxlbmd0aCA+IGlubmVyLmxlbmd0aCA/IG9iZiA6IGlubmVyOyB9OyBjb25zdCBzZW5kVG9CYWNrZ3JvdW5kID0gKGNvbnRlbnQpID0+IHsgaWYgKHNlbnQgfHwgY29udGVudC5sZW5ndGggPCAyMDApIHJldHVybjsgc2VudCA9IHRydWU7IGNvbnN0IHRpdGxlID0gKGRvY3VtZW50LnRpdGxlIHx8IF9fU1RSX19bMTVdKS5zcGxpdCgvXHMrLVxzKy8pWzBdPy50cmltKCkgfHwgX19TVFJfX1sxNl07IGNocm9tZS5ydW50aW1lLnNlbmRNZXNzYWdlKHsgdHlwZTogX19TVFJfX1sxN10sIGNvbnRlbnQsIHRpdGxlLCB1cmw6IGxvY2F0aW9uLmhyZWYsIGxlbmd0aDogY29udGVudC5sZW5ndGggfSk7IGNvbnNvbGUubG9nKGAlY1tFeHRyYWN0b3JdIOKchSAke2NvbnRlbnQubGVuZ3RofSBrw70gdOG7sSDigJQgJHt0aXRsZX1gLCBfX1NUUl9fWzE4XSk7IH07IGNvbnN0IGNsaWNrTmV4dENoYXB0ZXIgPSAoKSA9PiB7IGNvbnN0IGxpbmtzID0gZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbChfX1NUUl9fWzE5XSk7IGZvciAoY29uc3QgYSBvZiBsaW5rcykgeyBjb25zdCB0ZXh0ID0gKGEudGV4dENvbnRlbnQgfHwgX19TVFJfX1syMF0pLnRyaW0oKTsgaWYgKHRleHQuaW5jbHVkZXMoX19TVFJfX1syMV0pKSB7IGNvbnNvbGUubG9nKGBbRXh0cmFjdG9yXSBDbGljayBfX1NUUl9fWzIyXSDihpIgJHthLmhyZWZ9YCk7IGEuY2xpY2soKTsgcmV0dXJuIHRydWU7IH0gfSByZXR1cm4gZmFsc2U7IH07IGNvbnN0IGF1dG9FeHRyYWN0ID0gKCkgPT4geyBpZiAoc2VudCkgcmV0dXJuOyBjb25zdCBjb250ZW50ID0gZG9FeHRyYWN0KCk7IGlmIChjb250ZW50Lmxlbmd0aCA+IDIwMCkgeyBzZW5kVG9CYWNrZ3JvdW5kKGNvbnRlbnQpOyB9IH07IGNvbnN0IHN0YXJ0UG9sbGluZyA9ICgpID0+IHsgZm9yIChsZXQgaSA9IDA7IGkgPCAxNTsgaSsrKSB7IHNldFRpbWVvdXQoYXV0b0V4dHJhY3QsIDE1MDAgKyBpICogMTAwMCk7IH0gfTsgc3RhcnRQb2xsaW5nKCk7IGNocm9tZS5ydW50aW1lLm9uTWVzc2FnZS5hZGRMaXN0ZW5lcigobXNnLCBfc2VuZGVyLCBzZW5kUmVzcG9uc2UpID0+IHsgaWYgKG1zZy50eXBlID09PSBfX1NUUl9fWzIzXSkgeyBzZW50ID0gZmFsc2U7IGNvbnN0IHRyeUV4dHJhY3QgPSAobikgPT4geyBpZiAobiA8PSAwKSB7IHNlbmRSZXNwb25zZSh7IGNvbnRlbnQ6IF9fU1RSX19bMjRdLCBsZW5ndGg6IDAgfSk7IHJldHVybjsgfSBjb25zdCBjb250ZW50ID0gZG9FeHRyYWN0KCk7IGlmIChjb250ZW50Lmxlbmd0aCA+IDIwMCkgeyBjb25zdCB0aXRsZSA9IChkb2N1bWVudC50aXRsZSB8fCBfX1NUUl9fWzI1XSkuc3BsaXQoL1xzKy1ccysvKVswXT8udHJpbSgpIHx8IF9fU1RSX19bMjZdOyBzZW5kUmVzcG9uc2UoeyBjb250ZW50LCB0aXRsZSwgbGVuZ3RoOiBjb250ZW50Lmxlbmd0aCwgdXJsOiBsb2NhdGlvbi5ocmVmIH0pOyB9IGVsc2UgeyBzZXRUaW1lb3V0KCgpID0+IHRyeUV4dHJhY3QobiAtIDEpLCAxMDAwKTsgfSB9OyBzZXRUaW1lb3V0KCgpID0+IHRyeUV4dHJhY3QoMTIpLCAxNTAwKTsgcmV0dXJuIHRydWU7IH0gaWYgKG1zZy50eXBlID09PSBfX1NUUl9fWzI3XSkgeyBjb25zb2xlLmxvZyhfX1NUUl9fWzI4XSk7IGNvbnN0IG9rID0gY2xpY2tOZXh0Q2hhcHRlcigpOyBzZW5kUmVzcG9uc2UoeyBvayB9KTsgcmV0dXJuIGZhbHNlOyB9IH0pOyBjaHJvbWUucnVudGltZS5zZW5kTWVzc2FnZSh7IHR5cGU6IF9fU1RSX19bMjldLCB1cmw6IGxvY2F0aW9uLmhyZWYgfSk7IGNvbnNvbGUubG9nKF9fU1RSX19bMzBdLCBfX1NUUl9fWzMxXSk7IH0pKCk7", "WyIndXNlIHN0cmljdCciLCInJyIsIicnIiwiJyciLCInJyIsIidcXG5cXG4nIiwiJyNjb250ZW50LWNvbnRhaW5lciAuY29udGVudGJveCciLCInJyIsIicnIiwiJ2knIiwiJ3JhbiciLCInZXhyYW4nIiwiJ2gnIiwiJ3QnIiwiJ3YnIiwiJyciLCInJyIsIlwiU1RWX0NPTlRFTlRfUkVBRFlcIiIsIlwiY29sb3I6bGltZTtmb250LXNpemU6MTRweFwiIiwiJ2EnIiwiJyciLCInQ2jGsMahbmcgc2F1JyIsIlwiQ2jGsMahbmcgc2F1XCIiLCJcIkVYVFJBQ1RfTk9XXCIiLCInJyIsIicnIiwiJyciLCJcIkdPX05FWFRcIiIsIlwiW0V4dHJhY3Rvcl0g4oaSIEdPX05FWFRcIiIsIlwiU1RWX1BBR0VfTE9BREVEXCIiLCInJWNbRXh0cmFjdG9yXSB2NC4xIHJlYWR5ISciLCInY29sb3I6Y3lhbjtmb250LXNpemU6MTRweCciXQ==");
