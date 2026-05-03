@@ -1,13 +1,28 @@
 import type { SiteAdapter } from "../types";
+import { extensionFetch } from "../extension-bridge";
 
 export const PiaotiaAdapter: SiteAdapter = {
   name: "飘天文学",
   urlPattern: /piaotia\.com/i,
   chapterWaitSelector: "#content",
 
-  getNovelInfo(html, url) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
+  async getNovelInfo(html, url) {
+    let doc = new DOMParser().parseFromString(html, "text/html");
     const base = new URL(url);
+
+    // Check if we are on the book info page instead of the chapter list (index.html)
+    // The chapter list URL usually contains /html/ and ends with /index.html
+    const isIndexPage = url.includes("/html/") && url.endsWith("/index.html");
+    
+    if (!isIndexPage) {
+      // Try to find the link to the chapter list
+      const indexLink = doc.querySelector("a[href*='/html/'][href$='/index.html']");
+      if (indexLink) {
+        const indexUrl = new URL(indexLink.getAttribute("href") || "", base).href;
+        const res = await extensionFetch(indexUrl);
+        doc = new DOMParser().parseFromString(res.html, "text/html");
+      }
+    }
 
     const title = doc.querySelector("h1")?.textContent?.trim() || "";
     
@@ -25,8 +40,17 @@ export const PiaotiaAdapter: SiteAdapter = {
       }
     });
 
-    const coverImg = doc.querySelector("img[src*='/bookimage/']");
-    const coverImage = coverImg ? new URL(coverImg.getAttribute("src") || "", base).href : undefined;
+    const coverImg = doc.querySelector("img[src*='/bookimage/'], img[src*='/files/article/image/']");
+    let coverImage = coverImg ? new URL(coverImg.getAttribute("src") || "", base).href : undefined;
+
+    // If no cover found, try to derive from URL
+    if (!coverImage) {
+      const match = url.match(/\/(?:html|bookinfo)\/(\d+)\/(\d+)(?:\/index)?\.html/i);
+      if (match) {
+        const [, a, b] = match;
+        coverImage = `https://www.piaotia.com/files/article/image/${a}/${b}/${b}s.jpg`;
+      }
+    }
 
     // Chapters are usually in <div class="centent"> -> <ul><li><a> or <table><td><a>
     const chapterLinks = doc.querySelectorAll(".centent a[href$='.html']");
