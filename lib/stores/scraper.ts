@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { detectAdapter } from "../scraper/adapters";
 import {
   sanitizeChapterContent,
@@ -119,8 +120,6 @@ function logChapterIssue(entry: ScrapeDebugEntry) {
   }
 }
 
-import { persist, createJSONStorage } from "zustand/middleware";
-
 export const useScraperStore = create<ScraperState>()(
   persist(
     (set, get) => ({
@@ -128,7 +127,6 @@ export const useScraperStore = create<ScraperState>()(
 
       setUrl: (url) => {
         const adapter = detectAdapter(url);
-        // Only auto-detect if no manual override or URL changed domain
         const current = get().adapter;
         set({ url, adapter: adapter ?? current, error: null });
       },
@@ -221,7 +219,6 @@ export const useScraperStore = create<ScraperState>()(
         );
         if (selectedChapters.length === 0) return;
 
-        // STV: hiện bước chờ user mở chương 1 bằng tay
         if (adapter.name === "STV") {
           set({ step: "stv-wait", error: null });
           return;
@@ -246,13 +243,12 @@ export const useScraperStore = create<ScraperState>()(
             },
             abortController.signal,
             (entry) => {
-              // Push chapter to store immediately for live UI updates
               const prev = get().scrapedChapters;
               set({ scrapedChapters: [...prev, entry.parsed] });
-
               logChapterIssue(entry);
             },
             get().chapterDelay * 1000,
+            () => get().isPaused
           );
 
           set({
@@ -286,7 +282,6 @@ export const useScraperStore = create<ScraperState>()(
         let finalNovelId = novelId;
         const now = new Date();
 
-        // 1. Prepare Novel
         if (mode === "new") {
           finalNovelId = crypto.randomUUID();
           await db.novels.add({
@@ -300,14 +295,13 @@ export const useScraperStore = create<ScraperState>()(
             updatedAt: now,
           });
         } else if (novelId) {
-          // Update existing novel with sourceUrl if not set
           await db.novels.update(novelId, {
             sourceUrl: url,
             updatedAt: now,
             ...(novelInfo.coverImage ? { coverImage: novelInfo.coverImage } : {}),
           });
         } else {
-          return; // No novel selected
+          return;
         }
 
         const abortController = new AbortController();
@@ -323,7 +317,6 @@ export const useScraperStore = create<ScraperState>()(
           abortController,
         });
 
-        // 2. Start Scraping + Immediate Save
         try {
           await scrapeChapters(
             selectedChapters,
@@ -335,7 +328,6 @@ export const useScraperStore = create<ScraperState>()(
             async (entry) => {
               const { targetNovelId } = get();
               if (targetNovelId) {
-                // Save immediately
                 const chapterId = crypto.randomUUID();
                 const plainText = stripHtml(entry.parsed.content);
                 const currentOrder = await db.chapters
@@ -427,6 +419,7 @@ export const useScraperStore = create<ScraperState>()(
               logChapterIssue(entry);
             },
             get().chapterDelay * 1000,
+            () => get().isPaused
           );
 
           set({
@@ -491,7 +484,6 @@ export const useScraperStore = create<ScraperState>()(
             adapter.getChapterContent(html, chapterLink.url, contentText),
           );
 
-          // Fallback to title from index page or extension result if extracted title is empty
           if (!content.title || content.title.trim() === "") {
             content.title = extTitle || chapterLink.title;
           }
@@ -541,32 +533,18 @@ export const useScraperStore = create<ScraperState>()(
     }),
     {
       name: "novel-studio:scraper-store",
-      storage: createJSONStorage(() => ({
-        getItem: (name) => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
-          const data = JSON.parse(str);
-          // Convert Array back to Set for selectedChapterUrls
-          if (data.state && Array.isArray(data.state.selectedChapterUrls)) {
-            data.state.selectedChapterUrls = new Set(data.state.selectedChapterUrls);
-          }
-          return JSON.stringify(data);
-        },
-        setItem: (name, value) => {
-          const data = JSON.parse(value);
-          // Convert Set to Array for serialization
-          if (data.state && data.state.selectedChapterUrls instanceof Set) {
-            data.state.selectedChapterUrls = Array.from(data.state.selectedChapterUrls);
-          }
-          // Reset non-serializable or transient state
-          data.state.abortController = null;
-          data.state.isLoading = false;
-          data.state.retryingIndex = null;
-          
-          localStorage.setItem(name, JSON.stringify(data));
-        },
-        removeItem: (name) => localStorage.removeItem(name),
-      })),
+      partialize: (state: any) => ({
+        ...state,
+        selectedChapterUrls: Array.from(state.selectedChapterUrls || []),
+        abortController: null,
+        isLoading: false,
+        retryingIndex: null,
+      }),
+      onRehydrateStorage: () => (state: any) => {
+        if (state && Array.isArray(state.selectedChapterUrls)) {
+          state.selectedChapterUrls = new Set(state.selectedChapterUrls);
+        }
+      },
     }
   )
 );
