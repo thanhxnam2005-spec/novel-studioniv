@@ -72,9 +72,14 @@ export const PiaotiaAdapter: SiteAdapter = {
     if (!text) {
       const contentEl = doc.querySelector("#content");
       if (contentEl) {
-        // Remove navigation links and common noise
-        contentEl.querySelectorAll(".toplink, script, style, a").forEach((el) => el.remove());
-        text = contentEl.textContent || "";
+        // Create a clone to avoid messing up title extraction if h1 is inside #content
+        const clone = contentEl.cloneNode(true) as HTMLElement;
+        
+        // Remove navigation, ads, scripts, and tables
+        clone.querySelectorAll(".toplink, script, style, table, .ads, h1").forEach((el) => el.remove());
+        
+        // Get text and clean up whitespace
+        text = clone.textContent || "";
       }
     }
 
