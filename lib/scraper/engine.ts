@@ -36,8 +36,15 @@ export async function scrapeChapters(
 ): Promise<ChapterContent[]> {
   const results: ChapterContent[] = [];
 
+  const safeDelayMs = Math.max(delayMs, 100);
+
   for (let i = 0; i < chapters.length; i++) {
     signal?.throwIfAborted();
+
+    // Wait BEFORE starting the next chapter to ensure tab switching is synced with delay
+    if (i > 0) {
+      await delay(safeDelayMs);
+    }
 
     const chapter = chapters[i];
     onProgress?.(i, chapters.length, chapter.title);
@@ -113,11 +120,8 @@ export async function scrapeChapters(
         );
       }
     }
-
-    if (i < chapters.length - 1) {
-      await delay(delayMs);
-    }
   }
+
 
   onProgress?.(chapters.length, chapters.length, "");
   return results;
