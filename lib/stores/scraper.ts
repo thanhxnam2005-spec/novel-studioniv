@@ -125,13 +125,13 @@ export const useScraperStore = create<ScraperState>()(
     (set, get) => ({
       ...initialState,
 
-      setUrl: (url) => {
+      setUrl: (url: string) => {
         const adapter = detectAdapter(url);
         const current = get().adapter;
         set({ url, adapter: adapter ?? current, error: null });
       },
 
-      setAdapter: (adapter) => {
+      setAdapter: (adapter: SiteAdapter | null) => {
         set({ adapter });
       },
 
@@ -201,7 +201,7 @@ export const useScraperStore = create<ScraperState>()(
         }
       },
 
-      toggleChapter: (url) => {
+      toggleChapter: (url: string) => {
         const selected = new Set(get().selectedChapterUrls);
         if (selected.has(url)) selected.delete(url);
         else selected.add(url);
@@ -465,7 +465,7 @@ export const useScraperStore = create<ScraperState>()(
         }
       },
 
-      retryScrapeChapter: async (index) => {
+      retryScrapeChapter: async (index: number) => {
         let { novelInfo, scrapedChapters, adapter, url } = get();
         if (!novelInfo) return;
 
@@ -554,9 +554,9 @@ export const useScraperStore = create<ScraperState>()(
 
       resumeScraping: () => set({ isPaused: false }),
 
-      setStep: (step) => set({ step }),
+      setStep: (step: ScraperStep) => set({ step }),
 
-      setChapterDelay: (delay) => set({ chapterDelay: delay }),
+      setChapterDelay: (delay: number) => set({ chapterDelay: delay }),
 
       reset: () => set({ ...initialState, debugLogs: [] }),
 
