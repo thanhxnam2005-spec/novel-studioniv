@@ -3,12 +3,14 @@ import { STVAdapter } from "./STV";
 import { UukanshuAdapter } from "./Uukanshu";
 import { PiaotiaAdapter } from "./Piaotia";
 import { CuocengAdapter } from "./Cuoceng";
+import { SixNineShuAdapter } from "./SixNineShu";
 
 const adapters: SiteAdapter[] = [
   STVAdapter,
   UukanshuAdapter,
   PiaotiaAdapter,
   CuocengAdapter,
+  SixNineShuAdapter,
 ];
 
 /** Find the adapter that matches the given URL, or null. */
@@ -21,4 +23,4 @@ export function getAdapters(): SiteAdapter[] {
   return adapters;
 }
 
-export { STVAdapter, UukanshuAdapter, PiaotiaAdapter, CuocengAdapter };
+export { STVAdapter, UukanshuAdapter, PiaotiaAdapter, CuocengAdapter, SixNineShuAdapter };
