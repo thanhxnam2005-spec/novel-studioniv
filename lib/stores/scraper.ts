@@ -141,7 +141,14 @@ export const useScraperStore = create<ScraperState>()(
       },
 
       fetchNovelInfo: async () => {
-        const { url, adapter } = get();
+        let { url, adapter } = get();
+        
+        // Re-detect adapter if it's null (e.g. after page reload)
+        if (!adapter && url) {
+          adapter = detectAdapter(url);
+          set({ adapter });
+        }
+
         if (!adapter) {
           set({ error: "Không tìm thấy adapter cho URL này" });
           return;
@@ -539,6 +546,7 @@ export const useScraperStore = create<ScraperState>()(
         abortController: null,
         isLoading: false,
         retryingIndex: null,
+        adapter: null, // Don't persist adapter as it contains functions
       }),
       onRehydrateStorage: () => (state: any) => {
         if (state && Array.isArray(state.selectedChapterUrls)) {
