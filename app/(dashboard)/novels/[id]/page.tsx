@@ -3,12 +3,11 @@
 import { AnalysisDialog } from "@/components/analysis-dialog";
 import { EditNovelDialog } from "@/components/edit-novel-dialog";
 import { BulkSTVDialog } from "@/components/novel/bulk-stv-dialog";
+import { BulkTranslateDialog } from "@/components/bulk-translate-dialog";
 import { BulkReplaceDialog } from "@/components/novel/bulk-replace-dialog";
 import { BulkResplitDialog } from "@/components/novel/bulk-resplit-dialog";
 import { ChaptersTab } from "@/components/novel/chapters-tab";
-import { CharactersTab } from "@/components/novel/characters-tab";
 import { EditableText } from "@/components/novel/editable-text";
-import { WorldBuildingTab } from "@/components/novel/world-building-tab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,12 +40,10 @@ import { downloadNovelJson, downloadNovelChaptersZip, exportNovel } from "@/lib/
 import {
   DownloadIcon,
   ExternalLinkIcon,
-  GlobeIcon,
   PencilIcon,
   ScrollTextIcon,
   SparklesIcon,
   Trash2Icon,
-  UsersIcon,
   FileArchiveIcon,
 } from "lucide-react";
 import {
@@ -326,7 +323,6 @@ export default function NovelDetailPage() {
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <Badge variant="outline">{chapters?.length ?? 0} chương</Badge>
             <Badge variant="outline">{totalWords.toLocaleString()} từ</Badge>
-            <Badge variant="outline">{characters?.length ?? 0} nhân vật</Badge>
             {novel.genres?.map((g: string) => (
               <Badge key={g} variant="default">
                 {g}
@@ -369,41 +365,10 @@ export default function NovelDetailPage() {
                 {chapters.length}
               </span>
             )}
-            {needsAnalysisCount > 0 && (
-              <span
-                className="inline-flex size-2 rounded-full bg-amber-500"
-                title={`${needsAnalysisCount} chương cần phân tích`}
-              />
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="world-building"
-            className="gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3"
-          >
-            <GlobeIcon className="size-3.5 text-blue-600 dark:text-blue-400" />
-            <span className="hidden sm:inline">Thế giới quan</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="characters"
-            className="gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3"
-          >
-            <UsersIcon className="size-3.5 text-violet-600 dark:text-violet-400" />
-            <span className="hidden sm:inline">Nhân vật</span>
-            {characters && characters.length > 0 && (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-violet-500/10 px-1.5 py-px text-[10px] font-semibold tabular-nums text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
-                {characters.length}
-              </span>
-            )}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="world-building" className="mt-4">
-          <WorldBuildingTab novel={novel} />
-        </TabsContent>
 
-        <TabsContent value="characters" className="mt-4">
-          <CharactersTab characters={characters ?? []} novelId={id} />
-        </TabsContent>
 
         <TabsContent value="chapters" className="mt-4">
           <ChaptersTab
@@ -420,14 +385,13 @@ export default function NovelDetailPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Bulk STV translate dialog */}
-      <BulkSTVDialog
+      {/* Bulk AI translate dialog */}
+      <BulkTranslateDialog
         open={translateOpen}
         onOpenChange={setTranslateOpen}
         novelId={id}
-        chapterIds={translateChapterIds}
+        selectedChapterIds={translateChapterIds}
         chapters={chapters ?? []}
-        mode="translate"
       />
 
       {/* Bulk STV convert dialog */}

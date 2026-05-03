@@ -75,9 +75,16 @@ export const STVAdapter: SiteAdapter = {
     const rawText = contentText ?? "";
     if (!rawText) return { title: chapterTitle, content: "" };
 
+    const junkText = "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
     const text = rawText
       .split("\n")
-      .filter((line) => !line.trimStart().startsWith("@Bạn đang đọc"))
+      .filter((line) => {
+        const trimmed = line.trim();
+        return (
+          !trimmed.startsWith("@Bạn đang đọc") && 
+          trimmed !== junkText
+        );
+      })
       .join("\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();

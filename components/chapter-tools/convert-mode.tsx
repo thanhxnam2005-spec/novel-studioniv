@@ -1,18 +1,13 @@
 "use client";
 
-import { ConvertConfig } from "@/components/convert-config";
-import { ConvertDetectedNames } from "@/components/convert-detected-names";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
-import { useExcludedNamesList } from "@/lib/hooks/use-excluded-names";
+import { Progress } from "@/components/ui/progress";
 import {
   getMergedNameDict,
-  useMergedNameEntries,
 } from "@/lib/hooks/use-name-entries";
-import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
-import type { DictPair } from "@/lib/workers/qt-engine.types";
+import { stvTranslate, type STVTranslateProgress } from "@/lib/api/stv-translator";
 import {
   createSceneVersion,
   ensureInitialVersion,
@@ -30,7 +25,6 @@ import type { TranslateResult } from "./translate-mode";
 interface ConvertSummary {
   originalLines: number;
   convertedLines: number;
-  nameCount: number;
   oldTitle: string | null;
   newTitle: string | null;
 }
@@ -53,15 +47,11 @@ export function ConvertMode({
   renderFooter: (node: React.ReactNode) => void;
 }) {
   const [isConverting, setIsConverting] = useState(false);
+  const [progress, setProgress] = useState<STVTranslateProgress | null>(null);
   const [summary, setSummary] = useState<ConvertSummary | null>(null);
   const [useNameDict, setUseNameDict] = useState(true);
   const [convertTitle, setConvertTitle] = useState(true);
-  const [detectedNames, setDetectedNames] = useState<DictPair[]>([]);
   const scenes = useScenes(chapterId);
-  const mergedEntries = useMergedNameEntries(novelId);
-  const rejectedAutoNames = useExcludedNamesList(novelId);
-  const engineReady = useQTEngineReady();
-  const convertOptions = useConvertSettings();
 
   const handleConvert = useCallback(async () => {
     if (!content.trim()) {
@@ -70,24 +60,29 @@ export function ConvertMode({
     }
     setIsConverting(true);
     setSummary(null);
+    setProgress(null);
+    
     try {
       const nameDict = useNameDict
         ? await getMergedNameDict(novelId)
         : undefined;
-      const result = await convertText(content, {
-        novelNames: nameDict,
-        options: { ...convertOptions, rejectedAutoNames },
+      
+      const onProgress = (p: STVTranslateProgress) => {
+        setProgress(p);
+      };
+
+      // Convert content
+      const convertedContent = await stvTranslate(content, {
+        dictionary: nameDict,
+        onProgress
       });
-      setDetectedNames(result.detectedNames ?? []);
 
       // Convert chapter title if enabled
       let newTitle: string | undefined;
       if (convertTitle && chapterTitle.trim()) {
-        const titleResult = await convertText(chapterTitle, {
-          novelNames: nameDict,
-          options: convertOptions,
+        newTitle = await stvTranslate(chapterTitle, {
+          dictionary: nameDict
         });
-        newTitle = titleResult.plainText.trim();
       }
 
       // Save version before overwriting
@@ -97,29 +92,29 @@ export function ConvertMode({
         await createSceneVersion(
           scene.id,
           novelId,
-          "qt-convert",
-          result.plainText,
+          "stv-convert",
+          convertedContent,
         );
-        await updateScene(scene.id, { content: result.plainText });
+        await updateScene(scene.id, { content: convertedContent });
       }
 
       // Apply to textarea
-      onTranslated({ content: result.plainText, title: newTitle });
+      onTranslated({ content: convertedContent, title: newTitle });
 
       setSummary({
         originalLines: content.split("\n").length,
-        convertedLines: result.plainText.split("\n").length,
-        nameCount: nameDict?.length ?? 0,
+        convertedLines: convertedContent.split("\n").length,
         oldTitle: convertTitle ? chapterTitle : null,
         newTitle: newTitle ?? null,
       });
 
-      toast.success("Đã convert và áp dụng");
+      toast.success("Đã convert STV và áp dụng");
     } catch (err) {
-      console.error("Convert failed:", err);
-      toast.error("Lỗi khi convert");
+      console.error("STV Convert failed:", err);
+      toast.error("Lỗi khi convert STV");
     } finally {
       setIsConverting(false);
+      setProgress(null);
     }
   }, [
     content,
@@ -129,8 +124,6 @@ export function ConvertMode({
     useNameDict,
     scenes,
     onTranslated,
-    convertOptions,
-    rejectedAutoNames,
   ]);
 
   const handleReConvert = useCallback(() => {
@@ -157,10 +150,10 @@ export function ConvertMode({
       <Button
         className="w-full"
         onClick={handleConvert}
-        disabled={!content.trim() || !engineReady}
+        disabled={!content.trim()}
       >
         <GitCompareArrowsIcon className="mr-1.5 size-3.5" />
-        {!engineReady ? "Đang tải từ điển..." : "Convert chương"}
+        Bắt đầu Convert STV
       </Button>,
     );
     return () => renderFooter(null);
@@ -171,48 +164,61 @@ export function ConvertMode({
     handleReConvert,
     renderFooter,
     content,
-    engineReady,
   ]);
 
   const showConfig = !isConverting && !summary;
+  const percent = progress ? Math.round(((progress.currentChunk + 1) / progress.totalChunks) * 100) : 0;
 
   return (
     <div className="space-y-4">
       {/* Config */}
       {showConfig && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="convert-title"
-              checked={convertTitle}
-              onCheckedChange={(v) => setConvertTitle(v === true)}
-            />
-            <Label htmlFor="convert-title" className="cursor-pointer text-xs">
-              Convert tiêu đề chương
-            </Label>
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Sử dụng server SangTacViet để convert văn bản. Tốc độ khoảng 10.000 ký tự / 2 giây.
+          </p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="convert-title"
+                checked={convertTitle}
+                onCheckedChange={(v) => setConvertTitle(v === true)}
+              />
+              <Label htmlFor="convert-title" className="cursor-pointer text-xs">
+                Convert tiêu đề chương
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="convert-use-name-dict"
+                checked={useNameDict}
+                onCheckedChange={(v) => setUseNameDict(v === true)}
+              />
+              <Label
+                htmlFor="convert-use-name-dict"
+                className="cursor-pointer text-xs"
+              >
+                Sử dụng từ điển tên (ưu tiên nghĩa trong từ điển)
+              </Label>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="convert-use-name-dict"
-              checked={useNameDict}
-              onCheckedChange={(v) => setUseNameDict(v === true)}
-            />
-            <Label
-              htmlFor="convert-use-name-dict"
-              className="cursor-pointer text-xs"
-            >
-              Sử dụng từ điển tên ({(mergedEntries ?? []).length} mục)
-            </Label>
-          </div>
-          <ConvertConfig />
         </div>
       )}
 
       {/* Converting indicator */}
       {isConverting && (
-        <div className="flex items-center gap-2 py-4">
-          <Loader2Icon className="size-4 animate-spin" />
-          <span className="text-muted-foreground text-sm">Đang convert...</span>
+        <div className="space-y-3 py-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+               <Loader2Icon className="size-4 animate-spin text-primary" />
+               <span className="text-muted-foreground">Đang xử lý STV...</span>
+            </span>
+            <span className="font-mono text-xs">{percent}%</span>
+          </div>
+          <Progress value={percent} className="h-1.5" />
+          <p className="text-[10px] text-muted-foreground italic text-center">
+             Vui lòng không đóng bảng điều khiển khi đang chạy.
+          </p>
         </div>
       )}
 
@@ -222,7 +228,7 @@ export function ConvertMode({
           <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
             <CheckCircle2Icon className="size-4 shrink-0" />
             <span className="text-xs font-medium">
-              Đã convert và áp dụng thành công
+              Đã convert STV và áp dụng thành công
             </span>
           </div>
 
@@ -254,21 +260,10 @@ export function ConvertMode({
                 </span>
               )}
             </div>
-            {summary.nameCount > 0 && (
-              <div className="text-muted-foreground">
-                Sử dụng {summary.nameCount} mục từ điển tên
-              </div>
-            )}
           </div>
-
-          {detectedNames.length > 0 && (
-            <ConvertDetectedNames
-              detectedNames={detectedNames}
-              novelId={novelId}
-            />
-          )}
         </div>
       )}
     </div>
   );
 }
+

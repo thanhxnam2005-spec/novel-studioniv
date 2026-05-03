@@ -376,62 +376,7 @@ export default function ConvertPage() {
         </div>
       </div>
 
-      {/* ── Dictionary Bar (Thanh từ điển bên trên) ── */}
-      <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        <div className="flex shrink-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-r pr-2">
-          <BookTextIcon className="size-3" />
-          Từ điển & Gợi ý:
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
-          {/* 1. Hiển thị các từ ĐÃ CÓ trong từ điển */}
-          {activeEntries.map((entry) => (
-            <Badge
-              key={entry.id}
-              variant="secondary"
-              className="px-2 py-0.5 text-[10px] font-medium whitespace-nowrap border-primary/20 bg-primary/5"
-            >
-              <span className="text-primary mr-1">{entry.chinese}</span>
-              <span className="opacity-50">→</span>
-              <span className="ml-1">{entry.vietnamese}</span>
-            </Badge>
-          ))}
 
-          {/* 2. Hiển thị các GỢI Ý từ AI vừa quét được */}
-          {trainingSuggestions.map((s, idx) => (
-            <Badge
-              key={`suggest-${idx}`}
-              variant="outline"
-              className="px-2 py-0.5 text-[10px] font-medium whitespace-nowrap cursor-pointer hover:bg-primary/10 border-dashed border-primary/50 animate-in fade-in zoom-in duration-300"
-              onClick={() => handleAddTrainingSuggestion(s)}
-              title="Click để thêm vào từ điển"
-            >
-              <SparklesIcon className="size-2.5 mr-1 text-primary" />
-              <span className="font-bold">{s.chinese}</span>
-              <span className="mx-1 opacity-50">:</span>
-              <span>{s.vietnamese}</span>
-              <PlusIcon className="size-2.5 ml-1.5 opacity-50" />
-            </Badge>
-          ))}
-
-          {activeEntries.length === 0 && trainingSuggestions.length === 0 && (
-            <span className="text-[10px] text-muted-foreground italic">Chưa phát hiện từ điển hoặc gợi ý...</span>
-          )}
-        </div>
-        <div className="ml-auto pl-2 border-l">
-           <Popover open={dictPopoverOpen} onOpenChange={setDictPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="link" size="xs" className="h-auto p-0 text-[10px] uppercase font-bold text-primary">
-                  Quản lý
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="end">
-                <div className="max-h-[500px] overflow-y-auto custom-scrollbar p-3">
-                   <DictionaryManagement compact />
-                </div>
-              </PopoverContent>
-            </Popover>
-        </div>
-      </div>
 
       {/* ── Side-by-side editor ── */}
       <div className="flex-1 min-h-[600px]" ref={scrollContainerRef}>

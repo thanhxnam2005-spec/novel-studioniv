@@ -25,8 +25,8 @@ const TOOLS: {
   icon: React.ElementType;
   label: string;
 }[] = [
-  { mode: "convert", icon: GitCompareArrowsIcon, label: "Convert chương" },
-  { mode: "translate", icon: LanguagesIcon, label: "Dịch chương" },
+  { mode: "convert", icon: GitCompareArrowsIcon, label: "Convert STV" },
+  { mode: "translate", icon: LanguagesIcon, label: "Dịch AI" },
   { mode: "review", icon: ClipboardCheckIcon, label: "Đánh giá chương" },
   { mode: "edit", icon: SparklesIcon, label: "Chỉnh sửa chương" },
   { mode: "replace", icon: ReplaceAllIcon, label: "Thay thế" },

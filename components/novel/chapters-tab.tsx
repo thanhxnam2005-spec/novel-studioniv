@@ -247,18 +247,10 @@ export function ChaptersTab({
             <PopoverContent align="end" className="w-48 p-1">
               <button
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                onClick={() => onAnalyze("selected", Array.from(selected))}
-              >
-                <SearchIcon className="size-3.5" />
-                Phân tích đã chọn
-              </button>
-
-              <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                 onClick={() => onTranslate(Array.from(selected))}
               >
                 <LanguagesIcon className="size-3.5" />
-                Dịch đã chọn
+                Dịch AI đã chọn
               </button>
               {onReplace && (
                 <button
@@ -275,7 +267,7 @@ export function ChaptersTab({
                   onClick={() => onConvert(Array.from(selected))}
                 >
                   <GitCompareArrowsIcon className="size-3.5" />
-                  Convert đã chọn
+                  Convert STV đã chọn
                 </button>
               )}
               {onResplit && (
@@ -289,29 +281,6 @@ export function ChaptersTab({
               )}
             </PopoverContent>
           </Popover>
-          {needsAnalysisCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onAnalyze("incremental")}
-              title={`Phân tích còn lại (${needsAnalysisCount})`}
-            >
-              <SearchIcon className="size-3.5 sm:mr-1.5" />
-              <span className="hidden sm:inline">
-                Phân tích còn lại ({needsAnalysisCount})
-              </span>
-              <span className="sm:hidden">{needsAnalysisCount}</span>
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onAnalyze("full")}
-            title="Phân tích tất cả"
-          >
-            <SearchIcon className="size-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Phân tích tất cả</span>
-          </Button>
         </div>
       </div>
 

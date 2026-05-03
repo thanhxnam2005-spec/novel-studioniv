@@ -64,11 +64,16 @@ export async function scrapeChapters(
     let extTitle: string | undefined = undefined;
     if (adapter.name === "STV" && chapter.id) {
       try {
-        const res = await extensionDownloadSTVChapter(chapter.id, chapter.url);
+        const res = await extensionDownloadSTVChapter(
+          chapter.id,
+          chapter.url,
+          i < chapters.length - 1 && !signal?.aborted,
+        );
         html = res.data ?? "";
         contentText = (res as any).contentText ?? res.content ?? undefined;
         timedOut = (res as any).timedOut ?? false;
         extTitle = res.title;
+        if (res.stopped) break;
       } catch (err: any) {
         timedOut = true; // Mark as issue if it fails
         logs.push(err.message);
@@ -115,6 +120,7 @@ export async function scrapeChapters(
     if (results.length >= 3) {
       const lastThree = results.slice(-3);
       if (lastThree.every((ch) => ch.warning)) {
+        await extensionStopScrape();
         throw new Error(
           "Đã dừng: 3 chương liên tiếp không load được nội dung. Vui lòng mở trang gốc để đảm bảo trang truyện không bị lỗi.",
         );
@@ -122,7 +128,7 @@ export async function scrapeChapters(
     }
   }
 
-
+  await extensionStopScrape();
   onProgress?.(chapters.length, chapters.length, "");
   return results;
 }

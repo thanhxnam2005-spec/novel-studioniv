@@ -126,7 +126,6 @@ export default function DashboardPage() {
               <StatCard label="Tiểu thuyết" value={stats.novelCount} icon={BookOpenIcon} />
               <StatCard label="Chương" value={stats.chapterCount} icon={FileTextIcon} />
               <StatCard label="Tổng từ" value={stats.wordCount} icon={PenLineIcon} />
-              <StatCard label="Nhân vật" value={stats.characterCount} icon={UsersIcon} />
             </>
           )}
         </div>

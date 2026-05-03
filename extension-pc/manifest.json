@@ -17,9 +17,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://sangtacviet.com/*",
-        "*://sangtacviet.app/*",
-        "*://sangtacviet.vip/*"
+        "<all_urls>"
       ],
       "js": ["content.js"],
       "run_at": "document_idle",
@@ -28,9 +26,8 @@
   ],
   "externally_connectable": {
     "matches": [
-      "*://thuyetthucac.vercel.app/*",
-      "http://localhost:*/*",
-      "https://localhost:*/*"
+      "*://*.vercel.app/*",
+      "*://localhost/*"
     ]
   }
 }

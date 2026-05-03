@@ -17,10 +17,10 @@ import { ReviewMode } from "./review-mode";
 import { TranslateMode, type TranslateResult } from "./translate-mode";
 
 const MODE_TITLES: Record<ChapterToolMode, string> = {
-  translate: "Dịch chương",
+  translate: "Dịch AI",
   review: "Đánh giá chương",
   edit: "Chỉnh sửa chương",
-  convert: "Convert chương",
+  convert: "Convert STV",
   replace: "Thay thế",
 };
 

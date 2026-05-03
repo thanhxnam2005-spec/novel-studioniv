@@ -163,15 +163,27 @@ export async function extensionFetch(
 export async function extensionDownloadSTVChapter(
   chapterId: string | number,
   chapterUrl: string,
-): Promise<{ success: boolean; rawHtml?: string; content?: string; data?: string; title?: string; json?: any; error?: string }> {
+  allowNext: boolean = true,
+): Promise<{ success: boolean; rawHtml?: string; content?: string; data?: string; title?: string; json?: any; error?: string; stopped?: boolean }> {
   const response: any = await sendMessage({
     action: "downloadChapter",
-    payload: { chapterId, chapterUrl },
+    payload: { chapterId, chapterUrl, allowNext },
   });
   if (!response.success) {
     throw new Error(response.error ?? "SangTacViet download failed");
   }
   return response;
+}
+
+/**
+ * Tell the extension to stop any pending automated navigation (next chapter).
+ */
+export async function extensionStopScrape(): Promise<void> {
+  try {
+    await sendMessage({ action: "stopScrape" });
+  } catch (err) {
+    console.warn("Stop scrape signal failed:", err);
+  }
 }
 
 /**
