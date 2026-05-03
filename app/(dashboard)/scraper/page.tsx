@@ -561,9 +561,10 @@ function UrlStep() {
               </div>
             ) : (
               <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                <ol className="list-inside list-decimal space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  <li>
                     <a href="/novel-studio-tampermonkey.user.js" target="_blank" className="text-primary hover:underline font-medium">
-                      Bấm vào đây để cài đặt
+                      Bấm vào đây để cài đặt script
                     </a>
                   </li>
                   <li>Sau khi cài script, bấm nút dưới đây để kích hoạt kết nối.</li>
