@@ -124,15 +124,16 @@ export default function ConvertPage() {
       });
       
       if (seqRef.current === seq) {
-        setOutput(result);
+        // Tự động dọn dẹp văn bản sau khi dịch xong (sửa lỗi từ bị dính, từ bị rời rạc)
+        const cleanedResult = cleanVietnameseText(fixStuckWords(result));
+        setOutput(cleanedResult);
         setSTVProgress(null);
         
         // Nếu đang ở chế độ Live và dịch xong, tự động tắt Live và bật chế độ Sửa
-        // để người dùng có thể chỉnh sửa văn bản mà không sợ bị dịch lại đè lên
         if (liveMode && input.trim()) {
           setLiveMode(false);
           setEditMode(true);
-          toast.success("Dịch hoàn tất. Đã chuyển sang chế độ chỉnh sửa.");
+          toast.success("Dịch và dọn dẹp hoàn tất. Đã chuyển sang chế độ chỉnh sửa.");
         }
       }
     } catch (err) {
@@ -154,12 +155,13 @@ export default function ConvertPage() {
     }
   }, [debouncedInput, liveMode, editMode, handleConvert]);
 
-  // Khi bật chế độ sửa, tắt chế độ live để tránh bị ghi đè khi sửa văn bản
+  // Khi bật chế độ sửa, tắt chế độ live và tự động chạy dọn dẹp văn bản
   useEffect(() => {
     if (editMode) {
       setLiveMode(false);
+      handleCleanOutput();
     }
-  }, [editMode]);
+  }, [editMode, handleCleanOutput]);
 
   const handleQuickScan = useCallback(async () => {
     if (!input.trim()) return;

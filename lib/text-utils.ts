@@ -23,53 +23,47 @@ export function cleanVietnameseText(text: string): string {
 }
 
 /**
- * Attempts to fix stuck words in Vietnamese text.
- * This is heuristic-based and uses common Vietnamese word patterns.
+ * Attempts to fix stuck words and split words in Vietnamese text.
  */
 export function fixStuckWords(text: string): string {
   if (!text) return "";
 
-  // Common Vietnamese words that often get stuck
-  // This is a very basic list.
-  const commonWords = [
-    "là", "của", "được", "trong", "có", "cho", "và", "với", "như", "khi",
-    "người", "những", "một", "tên", "thật", "gọi", "đến", "không", "mà", "lại",
-    "ra", "vào", "lên", "xuống", "đi", "đã", "đang", "sẽ"
-  ];
-
   let cleaned = text;
 
-  // Heuristic: if a common word is followed by another word without a space
-  // We can't easily do this without a full dictionary or knowing the boundaries.
-  // But we can look for specific cases requested by the user like "thậtgọi"
+  // 1. Fix split characters (e.g., "t r ời" -> "trời", "b ình" -> "bình", "ng ơ" -> "ngơ")
+  // Rule: if a word is a single consonant/vowel followed by a space and then something starting with a vowel/accent
+  // We look for patterns like: [consonant] [space] [vowel with accent]
+  // Consonants: b, c, d, đ, g, h, k, l, m, n, p, q, r, s, t, v, x
+  // Vowels: a, e, i, o, u, y, ư, ơ, â, ê, ô
   
-  // Rule: if we see "thật" + another word, insert space
-  // We need to be careful not to break longer words if any.
-  // In Vietnamese, words are mostly 1-2 syllables.
-  
-  // Let's try to find instances where a common word is a prefix of a longer string that isn't a known word.
-  // Actually, a simpler way is to use a regex for common combinations.
-  
+  // Pattern to merge single letters separated by spaces if they form Vietnamese sounds
+  // This is a complex one, let's target the specific common splits first
+  const splitPatterns = [
+    { pattern: /\b(b|c|d|đ|g|h|k|l|m|n|p|q|r|s|t|v|x|gi|qu|th|ph|nh|ch|tr|ng|ngh)\s+([aáàảãạeéèẻẽẹiíìỉĩịoóòỏõọuúùủũụyýỳỷỹỵưứừửữựơớờởỡợâấầẩẫậêếềểễệôốồổỗộ])/gi, replacement: "$1$2" },
+    { pattern: /([aáàảãạeéèẻẽẹiíìỉĩịoóòỏõọuúùủũụyýỳỷỹỵưứừửữựơớờởỡợâấầẩẫậêếềểễệôốồổỗộ])\s+([\u0300-\u036f])/g, replacement: "$1$2" }, // Merge combining diacritics
+    { pattern: /\b(gi|qu|th|ph|nh|ch|tr|ng|ngh)\s+([a-z\u00C0-\u1EF9])/gi, replacement: "$1$2" },
+  ];
+
+  splitPatterns.forEach(({ pattern, replacement }) => {
+    cleaned = cleaned.replace(pattern, replacement);
+  });
+
+  // Repeat once to catch cases like "t r ơ" -> "tr ơ" -> "trơ"
+  splitPatterns.forEach(({ pattern, replacement }) => {
+    cleaned = cleaned.replace(pattern, replacement);
+  });
+
+  // 2. Fix stuck words (e.g., "làTòng" -> "là Tòng")
   const stuckPatterns = [
     // Common stuck words (particle/verb/adverb stuck to previous word)
     { pattern: /([a-z\u00C0-\u1EF9])(là|không|có|cũng|theo|tại|khỏi|rất|như|thế|cái|mấy|với|mà|của|được|những|một|đã|đang|sẽ|rời|định|tinh|cảnh|mặc|nghĩ|nhận|thần|coi|gầy|tiếp|vừa|vẫn|còn|nữa)/g, replacement: "$1 $2" },
-    // Specific cases from user
-    { pattern: /(Trụ)(không|có|Tòng|Tòng)/g, replacement: "$1 $2" },
-    { pattern: /(thể)(gầy|tiếp)/g, replacement: "$1 $2" },
-    { pattern: /(xóm)(coi)/g, replacement: "$1 $2" },
-    { pattern: /(tộc)(Mộc|sự)/g, replacement: "$1 $2" },
-    { pattern: /(Tộc)(cũng)/g, replacement: "$1 $2" },
-    { pattern: /(quản)(gia)/g, replacement: "$1 $2" },
-    { pattern: /(thành)(định)/g, replacement: "$1 $2" },
-    { pattern: /(Hậu)(rời)/g, replacement: "$1 $2" },
+    // Handle lowercase followed by Uppercase (e.g. làTòng -> là Tòng)
+    { pattern: /([a-z\u00C0-\u1EF9])([A-Z\u00C0-\u1EF9])/g, replacement: "$1 $2" },
   ];
 
   stuckPatterns.forEach(({ pattern, replacement }) => {
     cleaned = cleaned.replace(pattern, replacement);
   });
-
-  // Handle lowercase followed by Uppercase (e.g. làTòng -> là Tòng)
-  cleaned = cleaned.replace(/([a-z\u00C0-\u1EF9])([A-Z\u00C0-\u1EF9])/g, "$1 $2");
 
   return cleaned;
 }
