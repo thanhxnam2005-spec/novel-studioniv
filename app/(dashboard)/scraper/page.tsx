@@ -493,7 +493,7 @@ function UrlStep() {
                     Extension đã kết nối
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); store.checkExtension(); }}>Đổi</Button>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); checkExtension(); }}>Đổi</Button>
               </div>
             ) : (
               <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
@@ -549,7 +549,7 @@ function UrlStep() {
                     Tampermonkey đã kết nối
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); store.checkExtension(); }}>Đổi</Button>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); checkExtension(); }}>Đổi</Button>
               </div>
             ) : (
               <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
