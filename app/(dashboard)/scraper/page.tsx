@@ -1023,11 +1023,17 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
     sourceUrlLinkAppliedRef.current = true;
   }, [novelMatchedBySourceUrl]);
 
+  const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
   const totalWords = scrapedChapters.reduce(
     (sum, ch) => sum + countWords(stripHtml(ch.content)),
     0,
   );
   const warnCount = scrapedChapters.filter((ch) => ch.warning).length;
+  
+  const displayedChapters = useMemo(() => {
+    if (!showOnlyWarnings) return scrapedChapters;
+    return scrapedChapters.filter(ch => ch.warning);
+  }, [scrapedChapters, showOnlyWarnings]);
 
   const handleImport = async () => {
     if (mode === "new" && !novelTitle.trim()) {
@@ -1059,6 +1065,7 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
                 ? { coverImage: novelInfo.coverImage }
                 : {}),
               createdAt: now,
+              updatedAt: now,
               updatedAt: now,
             });
             await insertChapters(novelId, 0, now);
@@ -1156,11 +1163,17 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
           </span>
           {warnCount > 0 && (
             <Badge
-              variant="secondary"
-              className="gap-1 border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+              variant={showOnlyWarnings ? "default" : "secondary"}
+              className={cn(
+                "gap-1 cursor-pointer transition-all",
+                showOnlyWarnings 
+                  ? "bg-amber-500 text-white hover:bg-amber-600" 
+                  : "border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 hover:bg-amber-100"
+              )}
+              onClick={() => setShowOnlyWarnings(!showOnlyWarnings)}
             >
               <AlertTriangleIcon className="size-3" />
-              {warnCount} cảnh báo
+              {showOnlyWarnings ? `Đang hiện ${warnCount} cảnh báo` : `${warnCount} cảnh báo`}
             </Badge>
           )}
         </CardDescription>
@@ -1254,9 +1267,14 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
         )}
 
         <VirtualPreviewChapterRows
-          chapters={scrapedChapters}
+          chapters={displayedChapters}
           retryingIndex={retryingIndex}
-          onRetry={(i) => useScraperStore.getState().retryScrapeChapter(i)}
+          onRetry={(i) => {
+            // Re-map index if filtering is active
+            const chapterToRetry = displayedChapters[i];
+            const realIndex = scrapedChapters.findIndex(ch => ch.title === chapterToRetry.title);
+            useScraperStore.getState().retryScrapeChapter(realIndex);
+          }}
         />
 
         <div className="flex justify-between pt-1">
