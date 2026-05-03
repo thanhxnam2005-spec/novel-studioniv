@@ -42,6 +42,7 @@ import {
   SparklesIcon,
   Trash2Icon,
   Volume2Icon,
+  Wand2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sify } from "chinese-conv";
@@ -53,6 +54,7 @@ import { DictionaryManagement } from "@/components/dictionary-management";
 import { useMergedNameEntries } from "@/lib/hooks/use-name-entries";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
+import { cleanVietnameseText, fixStuckWords } from "@/lib/text-utils";
 
 export default function ConvertPage() {
   const store = useTrainingStore();
@@ -231,6 +233,13 @@ export default function ConvertPage() {
     setOutput("");
   }, []);
 
+  const handleCleanOutput = useCallback(() => {
+    if (!output) return;
+    const cleaned = cleanVietnameseText(fixStuckWords(output));
+    setOutput(cleaned);
+    toast.success("Đã dọn dẹp văn bản");
+  }, [output, setOutput]);
+
   const handleAddTrainingSuggestion = async (s: TrainingSuggestion) => {
     try {
       await bulkImportNameEntries("global", [{ chinese: s.chinese, vietnamese: s.vietnamese }], s.category, "replace");
@@ -279,6 +288,10 @@ export default function ConvertPage() {
                   <ClipboardCopyIcon className="mr-1.5 size-3.5" />
                 )}
                 {copied ? "Đã chép" : "Sao chép"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleCleanOutput} title="Dọn dẹp văn bản (xóa dấu cách thừa, sửa chữ viết liền)">
+                <Wand2Icon className="mr-1.5 size-3.5" />
+                Dọn dẹp
               </Button>
             </>
           )}
@@ -359,20 +372,7 @@ export default function ConvertPage() {
               onChange={handleFileUpload}
             />
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <SettingsIcon className="mr-1.5 size-3.5" />
-                  Cài đặt
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80" align="end">
-                <ConvertConfig />
-              </PopoverContent>
-            </Popover>
           </div>
-
-
         </div>
       </div>
 
