@@ -67,18 +67,19 @@ export const PiaotiaAdapter: SiteAdapter = {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const chapterTitle = doc.querySelector("h1")?.textContent?.trim() || "";
 
-    // Prefer contentText from extension
+    // Prefer contentText from extension (it already handles line breaks)
     let text = contentText || "";
     if (!text) {
       const contentEl = doc.querySelector("#content");
       if (contentEl) {
-        // Create a clone to avoid messing up title extraction if h1 is inside #content
         const clone = contentEl.cloneNode(true) as HTMLElement;
         
         // Remove navigation, ads, scripts, and tables
         clone.querySelectorAll(".toplink, script, style, table, .ads, h1").forEach((el) => el.remove());
         
-        // Get text and clean up whitespace
+        // Replace <br> with newlines to preserve formatting in textContent
+        clone.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+        
         text = clone.textContent || "";
       }
     }
