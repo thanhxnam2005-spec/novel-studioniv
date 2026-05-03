@@ -1,5 +1,5 @@
 import { sanitizeText } from "../utils";
-import { extensionFetch, extensionDownloadSTVChapter } from "./extension-bridge";
+import { extensionFetch, extensionDownloadSTVChapter, extensionStopScrape } from "./extension-bridge";
 import type { ChapterContent, ChapterLink, SiteAdapter } from "./types";
 
 export function sanitizeChapterContent(c: ChapterContent): ChapterContent {
