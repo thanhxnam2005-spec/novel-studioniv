@@ -101,7 +101,11 @@ export async function downloadNovelChaptersZip(novelId: string) {
       .filter((s) => s.chapterId === chapter.id)
       .sort((a, b) => a.order - b.order);
 
-    const content = chapterScenes.map((s) => s.content).join("\n\n");
+    const UNWANTED_TEXT = "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
+    const content = chapterScenes
+      .map((s) => s.content.replace(UNWANTED_TEXT, "").trim())
+      .join("\n\n")
+      .trim();
     const fileName = `${(i + 1).toString().padStart(4, "0")} - ${chapter.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
     folder.file(fileName, content);
   }
