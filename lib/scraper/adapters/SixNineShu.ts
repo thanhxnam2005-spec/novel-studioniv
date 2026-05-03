@@ -45,13 +45,22 @@ export const SixNineShuAdapter: SiteAdapter = {
     const coverImg = doc.querySelector(".bookimg2 img, .bookimg img");
     const coverImage = coverImg ? new URL(coverImg.getAttribute("src") || "", currentBase).href : undefined;
 
-    // Chapters are in <ul><li><a>
+    // Chapters are in <ul><li><a> - use a Map to deduplicate by URL
     const chapterLinks = doc.querySelectorAll("ul li a[href*='/txt/']");
-    const chapters = Array.from(chapterLinks).map((a, i) => ({
-      title: a.textContent?.trim() || `Chương ${i + 1}`,
-      url: new URL(a.getAttribute("href") || "", currentBase).href,
-      order: i,
-    }));
+    const seenUrls = new Set<string>();
+    const chapters: any[] = [];
+    
+    Array.from(chapterLinks).forEach((a) => {
+      const absUrl = new URL(a.getAttribute("href") || "", currentBase).href;
+      if (seenUrls.has(absUrl)) return;
+      seenUrls.add(absUrl);
+      
+      chapters.push({
+        title: a.textContent?.trim() || `Chương ${chapters.length + 1}`,
+        url: absUrl,
+        order: chapters.length,
+      });
+    });
 
     return { title, author, chapters, coverImage };
   },
