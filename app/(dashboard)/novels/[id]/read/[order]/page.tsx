@@ -51,8 +51,12 @@ function ChapterContent({
   }
 
   return (
-    <div className="prose prose-stone max-w-none dark:prose-invert whitespace-pre-wrap leading-relaxed md:leading-loose text-lg md:text-xl font-serif tracking-wide px-2 md:px-4">
-      {text}
+    <div className="prose prose-stone max-w-none dark:prose-invert whitespace-pre-wrap leading-relaxed md:leading-loose text-lg md:text-xl font-sans tracking-wide px-2 md:px-4 [&>br+br]:block [&>br+br]:content-[''] [&>br+br]:mb-4">
+      {text.split(/\n{2,}/).map((paragraph, i) => (
+        <p key={i} className="mb-4 first:mt-0">
+          {paragraph}
+        </p>
+      ))}
     </div>
   );
 }

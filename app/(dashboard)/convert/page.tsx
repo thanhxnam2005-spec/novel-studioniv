@@ -54,7 +54,7 @@ import { DictionaryManagement } from "@/components/dictionary-management";
 import { useMergedNameEntries } from "@/lib/hooks/use-name-entries";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
-import { cleanVietnameseText, fixStuckWords } from "@/lib/text-utils";
+import { cleanVietnameseText, cleanSTVOutput } from "@/lib/text-utils";
 
 export default function ConvertPage() {
   const store = useTrainingStore();
@@ -118,13 +118,14 @@ export default function ConvertPage() {
         dictionary: dict,
         onProgress: (p) => {
           if (seqRef.current !== seq) return;
-          setOutput(p.partialResult);
+          // Áp dụng cleanSTVOutput cho kết quả tạm thời
+          setOutput(cleanVietnameseText(cleanSTVOutput(p.partialResult)));
           setSTVProgress(`Đang dịch: ${p.currentChunk + 1}/${p.totalChunks} phần`);
         },
       });
       
       if (seqRef.current === seq) {
-        const cleanedResult = cleanVietnameseText(fixStuckWords(result));
+        const cleanedResult = cleanVietnameseText(cleanSTVOutput(result));
         setOutput(cleanedResult);
         setSTVProgress(null);
       }
@@ -244,7 +245,7 @@ export default function ConvertPage() {
 
   const handleCleanOutput = useCallback(() => {
     if (!output) return;
-    const cleaned = cleanVietnameseText(fixStuckWords(output));
+    const cleaned = cleanVietnameseText(cleanSTVOutput(output));
     setOutput(cleaned);
     toast.success("Đã dọn dẹp văn bản");
   }, [output, setOutput]);

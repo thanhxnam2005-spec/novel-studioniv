@@ -1,208 +1,139 @@
 // ==UserScript==
-// @name         Novel Studio - Tampermonkey Bridge
+// @name         Novel Studio - Tampermonkey Bridge (Source)
 // @namespace    http://tampermonkey.net/
-// @version      2.1
-// @description  Cầu nối (Bridge) giúp Novel Studio tải truyện trực tiếp qua Tampermonkey trên Android (Kiwi Browser).
-// @author       You
+// @version      3.0
+// @description  Cầu nối mạnh mẽ hỗ trợ Android/Mobile tải truyện SangTacViet và vượt CORS.
+// @author       Novel Studio Team
 // @match        http://localhost:3000/*
 // @match        https://thuyetthucac.vercel.app/*
 // @grant        GM_xmlhttpRequest
-// @connect      sangtacviet.vip
-// @connect      sangtacviet.com
-// @connect      sangtacviet.app
 // @connect      *
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    console.log("[Novel Studio Bridge] Initialized on", window.location.href);
+    console.log('[Novel Studio Bridge] Userscript initialized on', window.location.href);
 
-    // Báo cho app biết Tampermonkey đã sẵn sàng
-    window.postMessage({ type: 'TAMPERMONKEY_BRIDGE_READY', version: '2.1' }, '*');
+    // Báo cho App biết là Bridge đã sẵn sàng
+    window.postMessage({ type: 'TAMPERMONKEY_BRIDGE_READY', version: '3.0' }, '*');
 
-    window.addEventListener('message', function(event) {
+    window.addEventListener('message', async function(event) {
+        // Chỉ nhận tin nhắn từ cùng origin (app Novel Studio)
         if (event.origin !== window.location.origin) return;
 
         const data = event.data;
         if (!data || data.source !== 'novel-studio-app') return;
 
         const id = data.id;
+        const action = data.action || data.type;
 
-        // Xử lý PING
-        if (data.action === 'PING') {
-            window.postMessage({
-                source: 'novel-studio-bridge',
-                id: id,
-                response: { ok: true, version: '2.1 (Tampermonkey)' }
-            }, '*');
-            return;
-        }
-
-        // Xử lý FETCH
-        if (data.action === 'downloadChapter') {
-            const { chapterUrl } = data.payload;
-            console.log("[Novel Studio Bridge] Đang tải chương STV:", chapterUrl);
-            
-            const match = chapterUrl.match(/truyen\/([^\/]+)\/([^\/]+)\/([^\/]+)\/?/);
-            if (match) {
-                const host = match[1];
-                const id = match[2];
-                const chap = match[3];
-                const stvUrl = new URL(chapterUrl);
-                const apiUrl = `${stvUrl.origin}/index.php?sajax=readchapter&id=${id}&host=${host}&chap=${chap}`;
-
-                GM_xmlhttpRequest({
-                    method: "GET",
-                    url: apiUrl,
-                    headers: { "User-Agent": navigator.userAgent },
-                    onload: function(res) {
-                        const html = res.responseText;
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, "text/html");
-                        
-                        const cleanText = (text) => {
-                            return (text || '')
-                              .replace(/[\u200B\u200C\u200D\uFEFF]/g, '')
-                              .replace(/@Bạn đang đọc bản lưu trong hệ thống/g, '')
-                              .replace(/Đang tải nội dung chương\.\.\./g, '')
-                              .replace(/\n{3,}/g, '\n\n')
-                              .trim();
-                        };
-
-                        const box = doc.querySelector('.contentbox') || doc.body;
-                        
-                        const getInnerText = (el) => {
-                            let text = '';
-                            for (let node of el.childNodes) {
-                                if (node.nodeType === 3) text += node.textContent;
-                                else if (node.nodeName === 'BR' || node.nodeName === 'P' || node.nodeName === 'DIV') text += '\n' + getInnerText(node) + '\n';
-                                else if (node.nodeType === 1) text += getInnerText(node);
-                            }
-                            return text;
-                        };
-                        const inner = cleanText(getInnerText(box));
-                        
-                        let obf = '';
-                        box.querySelectorAll('i').forEach(el => {
-                            if ((el.id && el.id.startsWith('ran')) || el.id?.startsWith('exran') ||
-                                el.hasAttribute('h') || el.hasAttribute('t') || el.hasAttribute('v')) {
-                                obf += el.textContent;
-                            }
-                        });
-                        obf = cleanText(obf);
-                        
-                        const finalContent = obf.length > inner.length ? obf : inner;
-
-                        window.postMessage({
-                            source: 'novel-studio-bridge',
-                            id: data.id,
-                            response: { 
-                                success: true, 
-                                content: finalContent,
-                                contentText: finalContent,
-                                length: finalContent.length,
-                                timedOut: false
-                            }
-                        }, '*');
-                    },
-                    onerror: function(err) {
-                        window.postMessage({ source: 'novel-studio-bridge', id: data.id, response: { success: false, error: err.toString() } }, '*');
-                    }
-                });
-            } else {
-                window.postMessage({ source: 'novel-studio-bridge', id: data.id, response: { success: false, error: "Invalid STV Chapter URL" } }, '*');
+        try {
+            if (action === 'PING') {
+                sendResponse(id, { ok: true, version: '3.0 (Android Bridge)' });
+                return;
             }
-            return;
+
+            if (action === 'FETCH') {
+                await handleFetch(id, data);
+            } else if (action === 'downloadChapter') {
+                await handleDownloadSTV(id, data.payload);
+            }
+        } catch (error) {
+            console.error('[Novel Studio Bridge] Error:', error);
+            sendResponse(id, { ok: false, error: error.message });
         }
-
-        if (data.action === 'FETCH') {
-            const url = data.url;
-            console.log("[Novel Studio Bridge] Đang tải:", url);
-            
-            GM_xmlhttpRequest({
-                method: "GET",
-                url: url,
-                headers: {
-                    "User-Agent": navigator.userAgent,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-                },
-                onload: function(response) {
-                    let html = response.responseText;
-
-                    if (url.includes('sangtacviet')) {
-                        const match = html.match(/var\s+bookinfo\s*=\s*(\{.*?\})/);
-                        if (match) {
-                            try {
-                                const bookinfo = JSON.parse(match[1]);
-                                if (bookinfo.id) {
-                                    console.log("[Novel Studio Bridge] Đang gọi API lấy danh sách chương STV...");
-                                    const stvUrl = new URL(url);
-                                    const baseUrl = stvUrl.origin;
-                                    
-                                    GM_xmlhttpRequest({
-                                        method: "GET",
-                                        url: `${baseUrl}/index.php?sajax=getchapter&id=${bookinfo.id}&host=${bookinfo.host || ''}`,
-                                        headers: {
-                                            "User-Agent": navigator.userAgent,
-                                            "Accept": "*/*"
-                                        },
-                                        onload: function(chapRes) {
-                                            const chapHtml = chapRes.responseText;
-                                            html += `<div id="content-container">${chapHtml}</div>`;
-                                            
-                                            window.postMessage({
-                                                source: 'novel-studio-bridge',
-                                                id: id,
-                                                response: { ok: true, html: html }
-                                            }, '*');
-                                        },
-                                        onerror: function() {
-                                            window.postMessage({ source: 'novel-studio-bridge', id: id, response: { ok: true, html: html } }, '*');
-                                        }
-                                    });
-                                    return;
-                                }
-                            } catch (e) {
-                                console.error("[Novel Studio Bridge] Lỗi parse STV bookinfo", e);
-                            }
-                        }
-                    }
-
-                    window.postMessage({
-                        source: 'novel-studio-bridge',
-                        id: id,
-                        response: { 
-                            ok: true, 
-                            html: html 
-                        }
-                    }, '*');
-                },
-                onerror: function(error) {
-                    console.error("[Novel Studio Bridge] Lỗi kết nối tới", url, error);
-                    window.postMessage({
-                        source: 'novel-studio-bridge',
-                        id: id,
-                        response: { 
-                            ok: false, 
-                            error: "Lỗi mạng từ Tampermonkey (Hãy chắc chắn đã cấp quyền @connect)" 
-                        }
-                    }, '*');
-                },
-                ontimeout: function() {
-                    window.postMessage({
-                        source: 'novel-studio-bridge',
-                        id: id,
-                        response: { 
-                            ok: true, 
-                            html: "",
-                            timedOut: true
-                        }
-                    }, '*');
-                }
-            });
-            return;
-        }
-
     });
+
+    function sendResponse(id, response) {
+        window.postMessage({
+            source: 'novel-studio-bridge',
+            id: id,
+            response: response
+        }, '*');
+    }
+
+    async function handleFetch(id, data) {
+        const url = data.url;
+        console.log('[Novel Studio Bridge] Fetching:', url);
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: url,
+            headers: {
+                'User-Agent': navigator.userAgent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            },
+            onload: function(res) {
+                sendResponse(id, { ok: true, html: res.responseText });
+            },
+            onerror: function(err) {
+                sendResponse(id, { ok: false, error: 'Network error via Tampermonkey' });
+            }
+        });
+    }
+
+    async function handleDownloadSTV(id, payload) {
+        const { chapterUrl } = payload;
+        console.log('[Novel Studio Bridge] Downloading STV Chapter:', chapterUrl);
+
+        // STV Chapter URL: https://sangtacviet.vip/truyen/host/bookid/chapid/
+        const match = chapterUrl.match(/truyen\/([^\/]+)\/([^\/]+)\/([^\/]+)\/?/);
+        if (!match) {
+            sendResponse(id, { success: false, error: 'Invalid SangTacViet URL format' });
+            return;
+        }
+
+        const host = match[1];
+        const bookId = match[2];
+        const chapIdx = match[3];
+
+        const stvUrl = new URL(chapterUrl);
+        const apiUrl = `${stvUrl.origin}/index.php?sajax=readchapter&id=${bookId}&host=${host}&chap=${chapIdx}`;
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: apiUrl,
+            headers: { 'User-Agent': navigator.userAgent },
+            onload: function(res) {
+                const html = res.responseText;
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                // Logic trích xuất text (giống Extension PC)
+                const box = doc.querySelector('.contentbox') || doc.body;
+                
+                // Loại bỏ rác
+                const cleanText = (t) => t.replace(/[\u200B\u200C\u200D\uFEFF]/g, '').trim();
+
+                // Lấy nội dung gốc
+                let content = '';
+                for (let node of box.childNodes) {
+                    if (node.nodeType === 3) content += node.textContent;
+                    else if (['BR', 'P', 'DIV'].includes(node.nodeName)) content += '\n' + node.textContent;
+                }
+
+                // Kiểm tra nội dung ẩn (obfuscated) nếu có
+                let obfContent = '';
+                box.querySelectorAll('i').forEach(el => {
+                   if (el.id?.startsWith('ran') || el.id?.startsWith('exran') || el.hasAttribute('h') || el.hasAttribute('t')) {
+                       obfContent += el.textContent;
+                   }
+                });
+
+                const finalContent = cleanText(obfContent.length > content.length ? obfContent : content);
+
+                sendResponse(id, {
+                    success: true,
+                    content: finalContent,
+                    contentText: finalContent,
+                    ok: true
+                });
+            },
+            onerror: function(err) {
+                sendResponse(id, { success: false, error: 'STV Download failed' });
+            }
+        });
+    }
+
 })();

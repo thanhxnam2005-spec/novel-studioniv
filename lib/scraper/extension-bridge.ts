@@ -98,9 +98,16 @@ function sendTampermonkeyMessage(message: any): Promise<ExtensionResponse> {
 
 // ─── Core Logic ────────────────────────────────────────────
 
+export function isAndroid(): boolean {
+  if (typeof window === "undefined") return false;
+  return /Android/i.test(navigator.userAgent);
+}
+
 function sendMessage(message: unknown): Promise<ExtensionResponse> {
   const extensionId = getExtensionId();
-  if (extensionId === "tampermonkey") {
+  
+  // If explicitly set to "tampermonkey" or on Android with no extension ID configured, use userscript bridge
+  if (extensionId === "tampermonkey" || (isAndroid() && !extensionId)) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return sendTampermonkeyMessage(message as any);
   }
@@ -108,22 +115,25 @@ function sendMessage(message: unknown): Promise<ExtensionResponse> {
   return new Promise((resolve, reject) => {
     const runtime = getChromeRuntime();
     if (!runtime) {
+      // Fallback to tampermonkey if chrome runtime is missing but it might be available
+      if (typeof window !== "undefined") {
+        return sendTampermonkeyMessage(message as any).then(resolve).catch(reject);
+      }
       reject(new Error("Chrome extension API not available"));
       return;
     }
 
     if (!extensionId) {
-      reject(new Error("Extension ID chưa được cấu hình"));
+      reject(new Error("Extension ID chưa được cấu hình. Nếu dùng Android, hãy nhập 'tampermonkey' vào ID."));
       return;
     }
 
     runtime.sendMessage(extensionId, message, (response: unknown) => {
       if (!response) {
-        reject(
-          new Error(
-            "No response from extension. Is Novel Studio Connector installed?",
-          ),
-        );
+        // Last resort: try tampermonkey bridge if extension didn't respond
+        sendTampermonkeyMessage(message as any).then(resolve).catch(() => {
+          reject(new Error("Không có phản hồi từ Extension. Hãy kiểm tra ID hoặc dùng Tampermonkey."));
+        });
         return;
       }
       resolve(response as ExtensionResponse);

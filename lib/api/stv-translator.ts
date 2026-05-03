@@ -156,50 +156,87 @@ export async function stvTranslate(
     processedText = applyDictionaryPreTranslate(text, options.dictionary);
   }
 
-  const lines = processedText.split("\n");
-  const results: string[] = [];
+  // Tách thành các đoạn văn (paragraph) dựa trên dòng trống
+  // Điều này giúp bảo toàn khoảng trống giữa các đoạn khi dịch
+  const paragraphs = processedText.split(/\n{2,}/);
+  const translatedParagraphs: string[] = [];
   
-  const batches: string[][] = [];
-  let currentBatch: string[] = [];
-  let currentBatchLen = 0;
+  let totalBatches = 0;
+  // Đếm tổng số batches trước
+  for (const para of paragraphs) {
+    if (!para.trim()) { totalBatches++; continue; }
+    const lines = para.split("\n");
+    let batchLen = 0;
+    let batchCount = 1;
+    for (const line of lines) {
+      if (batchLen + line.length + 1 > 8000) { batchCount++; batchLen = line.length; }
+      else { batchLen += line.length + 1; }
+    }
+    totalBatches += batchCount;
+  }
 
-  for (const line of lines) {
-    if (line.length > RATE_LIMIT_CHARS) {
-      if (currentBatch.length > 0) batches.push(currentBatch);
-      batches.push([line]);
-      currentBatch = [];
-      currentBatchLen = 0;
+  let completedBatches = 0;
+
+  for (const para of paragraphs) {
+    if (!para.trim()) {
+      translatedParagraphs.push("");
+      completedBatches++;
+      options?.onProgress?.({
+        currentChunk: completedBatches,
+        totalChunks: totalBatches,
+        partialResult: translatedParagraphs.join("\n\n"),
+      });
       continue;
     }
 
-    if (currentBatchLen + line.length + 1 > 8000) {
-      batches.push(currentBatch);
-      currentBatch = [line];
-      currentBatchLen = line.length;
-    } else {
-      currentBatch.push(line);
-      currentBatchLen += line.length + 1;
+    const lines = para.split("\n");
+    const results: string[] = [];
+    
+    const batches: string[][] = [];
+    let currentBatch: string[] = [];
+    let currentBatchLen = 0;
+
+    for (const line of lines) {
+      if (line.length > RATE_LIMIT_CHARS) {
+        if (currentBatch.length > 0) batches.push(currentBatch);
+        batches.push([line]);
+        currentBatch = [];
+        currentBatchLen = 0;
+        continue;
+      }
+
+      if (currentBatchLen + line.length + 1 > 8000) {
+        batches.push(currentBatch);
+        currentBatch = [line];
+        currentBatchLen = line.length;
+      } else {
+        currentBatch.push(line);
+        currentBatchLen += line.length + 1;
+      }
     }
-  }
-  if (currentBatch.length > 0) batches.push(currentBatch);
+    if (currentBatch.length > 0) batches.push(currentBatch);
 
-  for (let i = 0; i < batches.length; i++) {
-    if (options?.signal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
+    for (let i = 0; i < batches.length; i++) {
+      if (options?.signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
+      const batchText = batches[i].join("\n");
+      const translated = await translateChunk(batchText);
+      results.push(translated);
+      completedBatches++;
+
+      options?.onProgress?.({
+        currentChunk: completedBatches,
+        totalChunks: totalBatches,
+        partialResult: [...translatedParagraphs, results.join("\n")].join("\n\n"),
+      });
     }
 
-    const batchText = batches[i].join("\n");
-    const translated = await translateChunk(batchText);
-    results.push(translated);
-
-    options?.onProgress?.({
-      currentChunk: i,
-      totalChunks: batches.length,
-      partialResult: results.join("\n"),
-    });
+    translatedParagraphs.push(results.join("\n"));
   }
 
-  return results.join("\n");
+  return translatedParagraphs.join("\n\n");
 }
 
 /**

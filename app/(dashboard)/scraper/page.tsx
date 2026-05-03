@@ -472,7 +472,21 @@ function UrlStep() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Extension config — collapsible when connected */}
-        <Tabs defaultValue={extId === "tampermonkey" ? "tampermonkey" : "extension"} className="w-full">
+        <Tabs 
+          defaultValue={extId === "tampermonkey" ? "tampermonkey" : "extension"} 
+          className="w-full"
+          onValueChange={(val) => {
+            if (val === "tampermonkey") {
+              setExtId("tampermonkey");
+              setExtensionId("tampermonkey");
+              checkExtension();
+            } else if (extId === "tampermonkey") {
+              setExtId("");
+              setExtensionId("");
+              checkExtension();
+            }
+          }}
+        >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="extension">PC (Extension)</TabsTrigger>
             <TabsTrigger value="tampermonkey">Android (Tampermonkey)</TabsTrigger>
@@ -484,7 +498,7 @@ function UrlStep() {
                 <div className="flex items-center gap-2 text-sm">
                   <CircleDotIcon className="size-3.5 text-green-500" />
                   <span className="text-green-700 dark:text-green-400">
-                    Extension đã kết nối
+                    Extension đã kết nối (v{extensionVersion})
                   </span>
                 </div>
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); checkExtension(); }}>Đổi</Button>
@@ -492,7 +506,7 @@ function UrlStep() {
             ) : (
               <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
                 <div className="space-y-1.5">
-                  <Label htmlFor="ext-id" className="text-xs">
+                  <Label htmlFor="ext-id" className="text-xs font-medium">
                     Extension ID
                   </Label>
                   <div className="flex gap-2">
@@ -520,13 +534,13 @@ function UrlStep() {
                 <div className="flex flex-col gap-2">
                   <ol className="list-inside list-decimal space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
                     <li>Tải và giải nén extension bản PC bên dưới.</li>
-                    <li>Mở <code className="rounded bg-muted px-1 py-0.5 text-[10px]">chrome://extensions</code>, bật <strong>Developer mode</strong> &rarr; <strong>Load unpacked</strong>.</li>
-                    <li>Copy ID extension và dán vào ô trên.</li>
+                    <li>Mở <code className="rounded bg-muted px-1 py-0.5 text-[10px]">chrome://extensions</code>, bật <strong>Developer mode</strong>.</li>
+                    <li>Chọn <strong>Load unpacked</strong> &rarr; Trỏ tới thư mục vừa giải nén.</li>
                   </ol>
                   <Button variant="outline" size="sm" className="h-7 w-fit text-xs" asChild>
                     <a href="/novel-studio-connector-pc.zip?v=2.7.1" download>
                       <DownloadIcon className="mr-1.5 size-3" />
-                      Tải bản PC
+                      Tải Extension (.zip)
                     </a>
                   </Button>
                 </div>
@@ -540,7 +554,7 @@ function UrlStep() {
                 <div className="flex items-center gap-2 text-sm">
                   <CircleDotIcon className="size-3.5 text-green-500" />
                   <span className="text-green-700 dark:text-green-400">
-                    Tampermonkey đã kết nối
+                    Tampermonkey Bridge đã sẵn sàng (v3.0)
                   </span>
                 </div>
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => { setExtId(""); setExtensionId(""); checkExtension(); }}>Đổi</Button>
@@ -548,13 +562,6 @@ function UrlStep() {
             ) : (
               <div className="space-y-3 rounded-lg border p-3 bg-muted/10">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                  <Link2Icon className="size-4" />
-                  Sử dụng Script tàng hình trên Kiwi Browser
-                </div>
-                <ol className="list-inside list-decimal space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                  <li>Đảm bảo bạn đã cài addon <strong>Tampermonkey</strong> trên trình duyệt.</li>
-                  <li>
-                    Cài đặt script kết nối của Novel Studio:{" "}
                     <a href="/novel-studio-tampermonkey.user.js" target="_blank" className="text-primary hover:underline font-medium">
                       Bấm vào đây để cài đặt
                     </a>
@@ -1252,7 +1259,6 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
                 ? { coverImage: novelInfo.coverImage }
                 : {}),
               createdAt: now,
-              updatedAt: now,
               updatedAt: now,
             });
             await insertChapters(novelId, 0, now);
