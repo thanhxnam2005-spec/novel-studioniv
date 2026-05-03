@@ -14,6 +14,7 @@ import type { SiteAdapter } from "../types";
  */
 export const STVAdapter: SiteAdapter = {
   name: "STV",
+  group: "vn",
   urlPattern: /sangtacviet\.\w+/,
   chapterWaitSelector: "#content-container .contentbox",
   chapterClickSelector: "#content-container .contentbox",

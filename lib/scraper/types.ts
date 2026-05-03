@@ -3,6 +3,8 @@
 export interface SiteAdapter {
   /** Display name, e.g. "Sáng Tác Việt" */
   name: string;
+  /** Site group: "cn" for Chinese sites, "vn" for Vietnamese sites */
+  group?: "cn" | "vn";
   /** Regex to auto-detect adapter from URL */
   urlPattern: RegExp;
   /** CSS selector to wait for before extracting chapter HTML (AJAX content) */

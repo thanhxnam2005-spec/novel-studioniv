@@ -12,6 +12,7 @@ const UUKANSHU_CHAPTER_BODY =
 
 export const UukanshuAdapter: SiteAdapter = {
   name: "UU看書",
+  group: "cn",
   urlPattern: /uukanshu\.cc/i,
   chapterWaitSelector: UUKANSHU_CHAPTER_BODY,
 

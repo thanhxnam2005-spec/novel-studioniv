@@ -610,92 +610,109 @@ function UrlStep() {
             </div>
           </div>
 
-          {/* Adapter selector */}
-          <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">Truy cập nhanh</Label>
-              <Badge variant="outline" className="text-[10px] font-normal opacity-70">Supported Sites</Badge>
+          {/* Quick Access Groups */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Web Việt */}
+            <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
+              <Label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Web Việt</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://sangtacviet.com" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-blue-500" />
+                    SangTacViet
+                  </a>
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                asChild
-              >
-                <a href="https://sangtacviet.com" target="_blank" rel="noreferrer">
-                  <GlobeIcon className="size-3.5" />
-                  SangTacViet
-                </a>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                asChild
-              >
-                <a href="https://uukanshu.cc/quanben/" target="_blank" rel="noreferrer">
-                  <GlobeIcon className="size-3.5" />
-                  Uukanshu
-                </a>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                asChild
-              >
-                <a href="https://www.piaotia.com/" target="_blank" rel="noreferrer">
-                  <GlobeIcon className="size-3.5" />
-                  PiaoTian
-                </a>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                asChild
-              >
-                <a href="https://www.cuoceng.com/" target="_blank" rel="noreferrer">
-                  <GlobeIcon className="size-3.5" />
-                  CuoCeng
-                </a>
-              </Button>
+
+            {/* Web Trung */}
+            <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
+              <Label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Web Trung</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://uukanshu.cc/quanben/" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-red-500" />
+                    Uukanshu
+                  </a>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://www.piaotia.com/" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-red-500" />
+                    PiaoTian
+                  </a>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://www.cuoceng.com/" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-red-500" />
+                    CuoCeng
+                  </a>
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Label className="shrink-0 text-xs text-muted-foreground">
-              Bộ giải mã:
-            </Label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {getAdapters().map((a) => {
-                const autoDetected = url && a.urlPattern.test(url);
-                const isSelected = adapter?.name === a.name;
-                return (
-                  <button
-                    key={a.name}
-                    onClick={() =>
-                      useScraperStore
-                        .getState()
-                        .setAdapter(isSelected ? null : a)
-                    }
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all ${
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : autoDetected
-                          ? "border-primary/50 bg-primary/10 text-primary"
-                          : "border-dashed border-muted-foreground/30 text-muted-foreground/60 hover:border-muted-foreground/50 hover:text-muted-foreground"
-                    }`}
-                  >
-                    {isSelected && <CheckIcon className="size-2.5" />}
-                    {a.name}
-                    {autoDetected && !isSelected && (
-                      <span className="text-[9px] opacity-60">auto</span>
-                    )}
-                  </button>
-                );
-              })}
+          <div className="space-y-3">
+            <Label className="text-xs text-muted-foreground">Bộ giải mã:</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { group: "vn", label: "Việt Nam" },
+                { group: "cn", label: "Trung Quốc" },
+              ].map((g) => (
+                <div key={g.group} className="space-y-2">
+                  <p className="text-[10px] font-bold text-muted-foreground/40 px-1 uppercase tracking-tight">{g.label}</p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {getAdapters()
+                      .filter((a) => (a.group || "cn") === g.group)
+                      .map((a) => {
+                        const autoDetected = url && a.urlPattern.test(url);
+                        const isSelected = adapter?.name === a.name;
+                        return (
+                          <button
+                            key={a.name}
+                            onClick={() =>
+                              useScraperStore
+                                .getState()
+                                .setAdapter(isSelected ? null : a)
+                            }
+                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : autoDetected
+                                  ? "border-primary/50 bg-primary/10 text-primary"
+                                  : "border-dashed border-muted-foreground/30 text-muted-foreground/60 hover:border-muted-foreground/50 hover:text-muted-foreground"
+                            }`}
+                          >
+                            {isSelected && <CheckIcon className="size-2.5" />}
+                            {a.name}
+                            {autoDetected && !isSelected && (
+                              <span className="text-[9px] opacity-60">auto</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

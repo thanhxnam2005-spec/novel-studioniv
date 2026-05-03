@@ -2,6 +2,7 @@ import type { SiteAdapter } from "../types";
 
 export const CuocengAdapter: SiteAdapter = {
   name: "错层文学",
+  group: "cn",
   urlPattern: /cuoceng\.com/i,
   chapterWaitSelector: "#showReading, .readBody",
 
