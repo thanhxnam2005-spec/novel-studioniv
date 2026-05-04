@@ -681,9 +681,20 @@ function UrlStep() {
                   className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
                   asChild
                 >
-                  <a href="https://69shuba.tw/" target="_blank" rel="noreferrer">
+                  <a href="https://www.69shuba.com/" target="_blank" rel="noreferrer">
                     <GlobeIcon className="size-3.5 text-red-500" />
                     69Shu
+                  </a>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://69shuba.tw/" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-red-500" />
+                    69Shu (TW)
                   </a>
                 </Button>
                 <Button 
