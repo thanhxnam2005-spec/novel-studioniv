@@ -686,6 +686,17 @@ function UrlStep() {
                     69Shu
                   </a>
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://www.jjwxc.net/" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-red-500" />
+                    JJWXC
+                  </a>
+                </Button>
               </div>
             </div>
           </div>
@@ -961,7 +972,7 @@ function BackgroundScrapeDialog() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Mô tả</Label>
-                <Textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} />
+                <Textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} className="max-h-32 overflow-y-auto" />
               </div>
             </div>
           ) : (
@@ -1431,11 +1442,12 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
                 Mô tả
               </Label>
               <Textarea
-                id="novel-desc"
+                id="desc"
                 value={novelDescription}
                 onChange={(e) => setNovelDescription(e.target.value)}
-                className="mt-1"
-                rows={2}
+                placeholder="Mô tả ngắn gọn (không bắt buộc)..."
+                rows={4}
+                className="mt-1 max-h-48 overflow-y-auto"
               />
             </div>
           </div>

@@ -96,7 +96,7 @@ export default function DashboardPage() {
               <Link key={item.novel.id} href={`/novels/${item.novel.id}`} className="group flex flex-col gap-2">
                 <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted border border-border/50 group-hover:border-primary/50 transition-colors shadow-sm">
                   {item.novel.coverImage ? (
-                    <img src={item.novel.coverImage} alt={item.novel.title} className="w-full h-full object-cover" />
+                    <img src={item.novel.coverImage} alt={item.novel.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                   ) : (
                     <>
                       <div className={`absolute inset-0 bg-gradient-to-br opacity-20 ${i % 2 === 0 ? 'from-blue-500 to-purple-500' : 'from-green-500 to-emerald-500'}`}></div>
