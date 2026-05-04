@@ -119,6 +119,42 @@ export async function downloadNovelChaptersZip(novelId: string) {
   URL.revokeObjectURL(url);
 }
 
+export async function downloadNovelTxt(novelId: string) {
+  const novel = await db.novels.get(novelId);
+  if (!novel) throw new Error("Novel not found");
+
+  const [chapters, scenes] = await Promise.all([
+    db.chapters.where("novelId").equals(novelId).sortBy("order"),
+    db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray(),
+  ]);
+
+  let content = `${novel.title}\n${novel.author ? `Tác giả: ${novel.author}\n` : ""}\n`;
+
+  const UNWANTED_TEXT = "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
+
+  for (let i = 0; i < chapters.length; i++) {
+    const chapter = chapters[i];
+    const chapterScenes = scenes
+      .filter((s) => s.chapterId === chapter.id)
+      .sort((a, b) => a.order - b.order);
+
+    const chapterContent = chapterScenes
+      .map((s) => s.content.replace(UNWANTED_TEXT, "").trim())
+      .join("\n\n")
+      .trim();
+    
+    content += `\n\nChương ${i + 1}: ${chapter.title}\n\n${chapterContent}`;
+  }
+
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${novel.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Import ─────────────────────────────────────────────────
 
 export async function importNovel(file: File): Promise<string> {

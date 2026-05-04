@@ -12,6 +12,7 @@ import {
   buildTranslateUserPrompt,
 } from "./prompts";
 import type { TranslateChapterResult, TranslateError } from "@/lib/stores/bulk-translate";
+import { cleanGarbageLines } from "@/lib/text-utils";
 
 // ── Shared constants & helpers (also used by translate-mode.tsx) ──
 
@@ -181,9 +182,10 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
       }
 
       // Build user prompt
+      const cleanedJoinedContent = cleanGarbageLines(joinedContent);
       const userPrompt = translateTitle
-        ? buildTranslateUserPrompt(joinedContent, chapter.title, TITLE_SEPARATOR)
-        : joinedContent;
+        ? buildTranslateUserPrompt(cleanedJoinedContent, chapter.title, TITLE_SEPARATOR)
+        : cleanedJoinedContent;
 
       // Stream translation
       const result = streamText({

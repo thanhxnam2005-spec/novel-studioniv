@@ -323,3 +323,33 @@ export function cleanSTVOutput(text: string): string {
 
   return cleaned;
 }
+
+/**
+ * Filter out injected ads and navigation links from scraped text.
+ */
+export function cleanGarbageLines(text: string): string {
+  if (!text) return text;
+  
+  const lines = text.split('\n');
+  const cleanedLines = lines.filter(line => {
+    const t = line.trim().toLowerCase();
+    if (!t) return true;
+    
+    // STV navigation
+    if (t.includes("chương trước") && t.includes("mục lục") && t.includes("chương sau")) return false;
+    if (t === "về trang sách" || t.includes("về trang sách")) return false;
+    if (t.includes("bạn đang đọc truyện trên")) return false;
+    if (t.includes("sangtacviet")) return false;
+    
+    // Common injected ads
+    if (t.includes("meetsingles")) return false;
+    if (t.includes("singleflirt")) return false;
+    if (t.includes("looking for someone in")) return false;
+    if (t.includes("seeking someone to do")) return false;
+    if (t.includes("never believe why i moved to")) return false;
+    
+    return true;
+  });
+  
+  return cleanedLines.join('\n').replace(/\n{3,}/g, "\n\n");
+}

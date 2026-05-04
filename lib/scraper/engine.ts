@@ -92,6 +92,7 @@ export async function scrapeChapters(
     const content = sanitizeChapterContent(
       adapter.getChapterContent(html, chapter.url, contentText),
     );
+    content.order = chapter.order;
 
     // Fallback to title from index page or extension result if extracted title is empty
     if (!content.title || content.title.trim() === "") {
@@ -100,7 +101,7 @@ export async function scrapeChapters(
 
     if (timedOut) {
       content.warning = `Timeout — nội dung chưa load được (${content.content.length} ký tự)`;
-    } else if (content.content.length < 1000) {
+    } else if (content.content.length < 30) {
       content.warning = `Nội dung quá ngắn (${content.content.length} ký tự)`;
     }
     results.push(content);

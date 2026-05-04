@@ -359,7 +359,7 @@ export const useScraperStore = create<ScraperState>()(
                   id: chapterId,
                   novelId: targetNovelId,
                   title: entry.parsed.title,
-                  order: currentOrder,
+                  order: entry.parsed.order ?? currentOrder,
                   createdAt: now,
                   updatedAt: now,
                 });
@@ -515,6 +515,7 @@ export const useScraperStore = create<ScraperState>()(
           const content = sanitizeChapterContent(
             adapter.getChapterContent(html, chapterLink.url, contentText),
           );
+          content.order = chapterLink.order;
 
           if (!content.title || content.title.trim() === "") {
             content.title = extTitle || chapterLink.title;
@@ -522,7 +523,7 @@ export const useScraperStore = create<ScraperState>()(
 
           if (timedOut) {
             content.warning = `Timeout — nội dung chưa load được (${content.content.length} ký tự)`;
-          } else if (content.content.length < 1000) {
+          } else if (content.content.length < 30) {
             content.warning = `Nội dung quá ngắn (${content.content.length} ký tự) — có thể chưa load được`;
           }
           const updated = [...scrapedChapters];

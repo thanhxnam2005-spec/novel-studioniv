@@ -1,3 +1,4 @@
+import { cleanGarbageLines } from "../../text-utils";
 import type { SiteAdapter } from "../types";
 
 /**
@@ -77,7 +78,7 @@ export const STVAdapter: SiteAdapter = {
     if (!rawText) return { title: chapterTitle, content: "" };
 
     const junkText = "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
-    const text = rawText
+    let text = rawText
       .split("\n")
       .filter((line) => {
         const trimmed = line.trim();
@@ -86,9 +87,9 @@ export const STVAdapter: SiteAdapter = {
           trimmed !== junkText
         );
       })
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
+      .join("\n");
+      
+    text = cleanGarbageLines(text);
 
     return { title: chapterTitle, content: text };
   },

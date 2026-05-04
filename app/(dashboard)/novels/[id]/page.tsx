@@ -36,7 +36,7 @@ import {
   useNovel,
   useNovelScenes,
 } from "@/lib/hooks";
-import { downloadNovelJson, downloadNovelChaptersZip, exportNovel } from "@/lib/novel-io";
+import { downloadNovelJson, downloadNovelChaptersZip, exportNovel, downloadNovelTxt } from "@/lib/novel-io";
 import {
   DownloadIcon,
   ExternalLinkIcon,
@@ -142,6 +142,16 @@ export default function NovelDetailPage() {
       toast.success(`Đã xuất ZIP "${novel.title}"`);
     } catch {
       toast.error("Xuất ZIP thất bại");
+    }
+  };
+
+  const handleExportTxt = async () => {
+    if (!novel) return;
+    try {
+      await downloadNovelTxt(novel.id);
+      toast.success(`Đã xuất TXT gộp "${novel.title}"`);
+    } catch {
+      toast.error("Xuất TXT thất bại");
     }
   };
 
@@ -280,6 +290,14 @@ export default function NovelDetailPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Xuất ZIP (TXT)</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleExportTxt}>
+                    <ScrollTextIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Xuất TXT (Gộp)</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

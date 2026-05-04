@@ -8,14 +8,23 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TextCompareEditor } from "@/components/ui/text-compare-editor";
 import { useDebouncedValue } from "@/lib/hooks/use-debounce";
 import { useReaderPanel } from "@/lib/stores/reader-panel";
 import { getMergedNameDict, bulkImportNameEntries } from "@/lib/hooks/use-name-entries";
 import { useAIProviders, useAIModels } from "@/lib/hooks/use-ai-providers";
-import { getModel } from "@/lib/ai/provider";
 import { type TrainingSuggestion } from "@/lib/ai/training-tools";
+import { aiPolishTranslation } from "@/lib/ai/convert-pipeline";
+import { getModel } from "@/lib/ai/provider";
 import {
   Dialog,
   DialogContent,
@@ -54,13 +63,39 @@ import { DictionaryManagement } from "@/components/dictionary-management";
 import { useMergedNameEntries } from "@/lib/hooks/use-name-entries";
 import { convertText, useQTEngineReady } from "@/lib/hooks/use-qt-engine";
 import { useConvertSettings } from "@/lib/hooks/use-convert-settings";
-import { cleanVietnameseText, cleanSTVOutput } from "@/lib/text-utils";
+import { cleanVietnameseText, cleanSTVOutput, cleanGarbageLines } from "@/lib/text-utils";
 
 export default function ConvertPage() {
   const store = useTrainingStore();
   const { handleTrain, stopTraining } = useBackgroundTraining();
   const qtReady = useQTEngineReady();
   const convertSettings = useConvertSettings();
+  const aiProviders = useAIProviders();
+  const availableProviders = useMemo(() => aiProviders?.filter(p => p.isActive && p.providerType !== "webgpu") || [], [aiProviders]);
+  
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+
+  useEffect(() => {
+    if (availableProviders.length > 0 && !selectedProviderId) {
+      setSelectedProviderId(availableProviders[0].id);
+    }
+  }, [availableProviders, selectedProviderId]);
+
+  const activeProvider = availableProviders.find(p => p.id === selectedProviderId);
+  const models = useAIModels(selectedProviderId);
+  
+  useEffect(() => {
+    if (models && models.length > 0) {
+      if (!selectedModelId || !models.find(m => m.modelId === selectedModelId)) {
+        setSelectedModelId(models[0].modelId);
+      }
+    } else {
+      setSelectedModelId("");
+    }
+  }, [models, selectedModelId]);
+
+  const defaultModel = models?.find(m => m.modelId === selectedModelId);
 
   const {
     input = "", setInput,
@@ -75,11 +110,14 @@ export default function ConvertPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [liveMode, setLiveMode] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [useSTVMode, setUseSTVMode] = useState(true);
   const [stvProgress, setSTVProgress] = useState<string | null>(null);
+  const [pipelineProgress, setPipelineProgress] = useState<string | null>(null);
   const [dictPopoverOpen, setDictPopoverOpen] = useState(false);
+  
+  const [stvOut, setStvOut] = useState("");
+  const [activeTab, setActiveTab] = useState<"ai" | "stv">("ai");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -96,11 +134,13 @@ export default function ConvertPage() {
 
   const debouncedInput = useDebouncedValue(input, 500);
 
-  const handleConvert = useCallback(async () => {
+  const handleSTVTranslate = useCallback(async () => {
     if (!input.trim()) {
-      setOutput("");
+      setStvOut("");
       return;
     }
+    
+    const cleanedInput = cleanGarbageLines(input);
     const seq = ++seqRef.current;
     setIsConverting(true);
     setSTVProgress(null);
@@ -110,29 +150,26 @@ export default function ConvertPage() {
       const controller = new AbortController();
       stvAbortRef.current = controller;
       
-      // Lấy từ điển hiện tại
       const dict = await getMergedNameDict();
       
-      const result = await stvTranslate(input, {
+      const result = await stvTranslate(cleanedInput, {
         signal: controller.signal,
         dictionary: dict,
         onProgress: (p) => {
           if (seqRef.current !== seq) return;
-          // Áp dụng cleanSTVOutput cho kết quả tạm thời
-          setOutput(cleanVietnameseText(cleanSTVOutput(p.partialResult)));
-          setSTVProgress(`Đang dịch: ${p.currentChunk + 1}/${p.totalChunks} phần`);
+          setStvOut(cleanVietnameseText(cleanSTVOutput(p.partialResult)));
+          setSTVProgress(`Đang dịch STV: ${p.currentChunk + 1}/${p.totalChunks} phần`);
         },
       });
       
       if (seqRef.current === seq) {
-        const cleanedResult = cleanVietnameseText(cleanSTVOutput(result));
-        setOutput(cleanedResult);
+        setStvOut(cleanVietnameseText(cleanSTVOutput(result)));
         setSTVProgress(null);
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       if (seqRef.current === seq) {
-        toast.error("Lỗi convert: " + (err instanceof Error ? err.message : String(err)));
+        toast.error("Lỗi STV: " + (err instanceof Error ? err.message : String(err)));
       }
     } finally {
       if (seqRef.current === seq) {
@@ -140,21 +177,7 @@ export default function ConvertPage() {
         setSTVProgress(null);
       }
     }
-  }, [input, setOutput, liveMode]); // Add liveMode to dependencies to access it inside
-
-  useEffect(() => {
-    if (liveMode && !editMode) {
-      handleConvert();
-    }
-  }, [debouncedInput, liveMode, editMode, handleConvert]);
-
-  // Khi bật chế độ sửa, tắt chế độ live và tự động chạy dọn dẹp văn bản
-  useEffect(() => {
-    if (editMode && !liveMode) {
-      // Avoid calling handleCleanOutput on every render
-      // The cleanup is already done when switching to editMode from handleConvert
-    }
-  }, [editMode, liveMode]);
+  }, [input]);
 
   const handleQuickScan = useCallback(async () => {
     if (!input.trim()) return;
@@ -241,7 +264,8 @@ export default function ConvertPage() {
   const handleClear = useCallback(() => {
     setInput("");
     setOutput("");
-  }, []);
+    setStvOut("");
+  }, [setInput, setOutput]);
 
   const handleCleanOutput = useCallback(() => {
     if (!output) return;
@@ -260,16 +284,72 @@ export default function ConvertPage() {
     }
   };
 
+  const handleAIPipeline = async () => {
+    if (!input.trim()) return;
+    if (!activeProvider || !defaultModel) {
+      toast.error("Vui lòng kích hoạt một AI Provider trong cài đặt để dùng tính năng này.");
+      return;
+    }
+    
+    setIsConverting(true);
+    stvAbortRef.current?.abort();
+    
+    try {
+      const model = await getModel(activeProvider, defaultModel.modelId);
+      const dict = await getMergedNameDict();
+      const cleanedInput = cleanGarbageLines(input);
+      
+      // Split input into chunks of max 1500 chars, preserving paragraph boundaries if possible
+      const chunks = cleanedInput.match(/[^]{1,1500}(?:\n\n|$)|[^]{1,1500}/g) || [];
+      let finalTranslation = "";
+      let finalStv = "";
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i].trim();
+        if (!chunk) continue;
+        
+        setPipelineProgress(`Đang xử lý phần ${i + 1}/${chunks.length}... (STV)`);
+        const draftTranslation = await stvTranslate(chunk, { dictionary: dict });
+        const cleanedDraft = cleanVietnameseText(cleanSTVOutput(draftTranslation));
+        finalStv += cleanedDraft + "\n\n";
+        setStvOut(finalStv.trim());
+        
+        setPipelineProgress(`Đang xử lý phần ${i + 1}/${chunks.length}... (AI Nhuận sắc)`);
+        const polished = await aiPolishTranslation({
+          model,
+          sourceText: chunk,
+          draftTranslation: cleanedDraft,
+        });
+        
+        finalTranslation += polished + "\n\n";
+        setOutput(finalTranslation.trim());
+        
+        // Wait 2.5s to avoid AI rate limits (e.g. 15 RPM limit)
+        if (i < chunks.length - 1) {
+          await new Promise(r => setTimeout(r, 2500));
+        }
+      }
+      
+      toast.success("Dịch Thông Minh 3 Bước hoàn tất!");
+      
+    } catch (err) {
+      toast.error("Lỗi Dịch Thông Minh: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsConverting(false);
+      setPipelineProgress(null);
+    }
+  };
+
   return (
     <main className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden px-6 py-4">
       {/* ── Header ── */}
       <div className="mb-4 flex shrink-0 items-start justify-between flex-col sm:flex-row gap-2">
         <div>
           <h1 className="font-serif text-2xl font-bold">Convert nhanh</h1>
-          {stvProgress && (
+          {(stvProgress || pipelineProgress) && (
             <p className="text-xs text-primary mt-1 flex items-center gap-1.5">
               <LoaderIcon className="size-3 animate-spin" />
-              {stvProgress}
+              {pipelineProgress || stvProgress}
             </p>
           )}
         </div>
@@ -310,17 +390,6 @@ export default function ConvertPage() {
 
           <div className="flex items-center gap-2 border-l pl-4 mr-2">
             <Switch
-              id="live-mode"
-              checked={liveMode}
-              onCheckedChange={setLiveMode}
-            />
-            <Label htmlFor="live-mode" className="text-sm">
-              Live
-            </Label>
-          </div>
-
-          <div className="flex items-center gap-2 border-l pl-4 mr-2">
-            <Switch
               id="edit-mode"
               checked={editMode}
               onCheckedChange={setEditMode}
@@ -347,8 +416,60 @@ export default function ConvertPage() {
               ) : (
                 <SearchIcon className="mr-1.5 size-3.5" />
               )}
-              Quét toàn bộ từ điển
+              Quét QT
             </Button>
+
+            <div className="flex items-center gap-1 border border-input rounded-md px-1 bg-background/50">
+              <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
+                <SelectTrigger className="h-8 w-[100px] border-0 focus:ring-0 text-xs shadow-none px-2">
+                  <SelectValue placeholder="AI Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableProviders.map(p => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="w-px h-4 bg-border" />
+              <Select value={selectedModelId} onValueChange={setSelectedModelId} disabled={!models?.length}>
+                <SelectTrigger className="h-8 w-[120px] border-0 focus:ring-0 text-xs shadow-none px-2">
+                  <SelectValue placeholder="Model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models?.map(m => (
+                    <SelectItem key={m.modelId} value={m.modelId} className="text-xs">
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {activeTab === "stv" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSTVTranslate}
+                disabled={isConverting || !input}
+                className="border-blue-500/30 bg-blue-500/5 text-blue-600 hover:bg-blue-500/10"
+              >
+                <Wand2Icon className="mr-1.5 size-3.5" />
+                Chạy STV Convert
+              </Button>
+            )}
+
+            {activeTab === "ai" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleAIPipeline}
+                disabled={isConverting || !input}
+                className="border-blue-500/30 bg-blue-500/5 text-blue-600 hover:bg-blue-500/10"
+              >
+                <Wand2Icon className="mr-1.5 size-3.5" />
+                Chạy Toàn Bộ (Dịch AI 2 Bước)
+              </Button>
+            )}
 
             <Button
               size="sm"
@@ -389,16 +510,33 @@ export default function ConvertPage() {
 
 
       {/* ── Side-by-side editor ── */}
-      <div className="flex-1 min-h-[600px]" ref={scrollContainerRef}>
+      <div className="flex-1 min-h-[600px] flex flex-col" ref={scrollContainerRef}>
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="mb-2 w-full">
+          <div className="flex justify-between items-center bg-muted/30 p-1 rounded-md border">
+            <TabsList className="bg-transparent border-none h-8">
+              <TabsTrigger value="ai" className="text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Dịch AI</TabsTrigger>
+              <TabsTrigger value="stv" className="text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">STV Convert</TabsTrigger>
+            </TabsList>
+            <div className="text-[10px] text-muted-foreground mr-2 hidden sm:block">
+              (Bản gốc tiếng Trung ở bên trái, kết quả chọn ở bên phải)
+            </div>
+          </div>
+        </Tabs>
+
         <TextCompareEditor
-          panelWrapperClassName="h-[calc(100vh-280px)] min-h-[500px]"
+          panelWrapperClassName="h-[calc(100vh-320px)] min-h-[500px]"
           leftValue={input}
-          rightValue={output}
-          onChange={editMode ? setOutput : (val) => setInput(sify(val))}
-          editableSide={editMode ? "right" : "left"}
+          rightValue={
+            activeTab === "stv" ? stvOut : output
+          }
+          onChange={editMode && activeTab === "ai" ? setOutput : undefined}
+          editableSide={editMode && activeTab === "ai" ? "right" : "left"}
           storageKey="convert-stv"
           leftLabel="Văn bản gốc (Trung)"
-          rightLabel={editMode ? "Kết quả (Có thể sửa)" : "Kết quả (Chỉ đọc)"}
+          rightLabel={
+            activeTab === "stv" ? "STV Convert (Chỉ đọc)" :
+            (editMode ? "Dịch AI (Có thể sửa)" : "Dịch AI (Chỉ đọc)")
+          }
         />
       </div>
 

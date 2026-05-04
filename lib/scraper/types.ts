@@ -40,6 +40,8 @@ export interface ChapterContent {
   content: string;
   /** Warning message if content may be incomplete */
   warning?: string;
+  /** Original order index from the table of contents */
+  order?: number;
 }
 
 export interface ScrapeProgress {

@@ -1325,7 +1325,7 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
         id: chapterId,
         novelId,
         title: ch.title,
-        order: startOrder + i,
+        order: ch.order ?? (startOrder + i),
         createdAt: now,
         updatedAt: now,
       });
