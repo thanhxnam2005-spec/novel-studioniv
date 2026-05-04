@@ -708,6 +708,17 @@ function UrlStep() {
                     JJWXC
                   </a>
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                  asChild
+                >
+                  <a href="https://fanqienovel.com/" target="_blank" rel="noreferrer">
+                    <GlobeIcon className="size-3.5 text-red-500" />
+                    Fanqie
+                  </a>
+                </Button>
               </div>
             </div>
           </div>
