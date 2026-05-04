@@ -14,7 +14,7 @@ export const SixNineShuTwAdapter: SiteAdapter = {
     // Get basic info from the current page (book info page or first index page)
     const title = doc.querySelector("h1, .bookname h1, .book-title, .bookinfo h1")?.textContent?.trim() || "";
     const author = doc.querySelector(".booknav2 a[href*='author'], .author a, .bookinfo .author")?.textContent?.trim() || "";
-    const coverImg = doc.querySelector(".bookimg2 img, .bookimg img, .book-cover img, .imgbox img");
+    const coverImg = doc.querySelector(".bookimg2 img, .bookimg img, .book-cover img, .imgbox img, img[src*='p.69shuba']");
     const coverImage = coverImg ? new URL(coverImg.getAttribute("src") || "", currentBase).href : undefined;
 
     // Determine the first index page URL
