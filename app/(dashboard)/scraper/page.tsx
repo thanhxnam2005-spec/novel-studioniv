@@ -1338,34 +1338,67 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
     startOrder: number,
     now: Date,
   ) => {
+    const existingChapters = await db.chapters.where("novelId").equals(novelId).toArray();
+    const existingByTitle = new Map(existingChapters.map(c => [c.title, c]));
+
     for (let i = 0; i < scrapedChapters.length; i++) {
       const ch = scrapedChapters[i];
-      const chapterId = crypto.randomUUID();
       const plainText = stripHtml(ch.content);
+      const existing = existingByTitle.get(ch.title);
 
-      await db.chapters.add({
-        id: chapterId,
-        novelId,
-        title: ch.title,
-        order: ch.order ?? (startOrder + i),
-        createdAt: now,
-        updatedAt: now,
-      });
+      if (existing) {
+        // Find active scene and update it
+        const scenes = await db.scenes.where("chapterId").equals(existing.id).toArray();
+        const activeScene = scenes.find(s => s.isActive === 1);
+        if (activeScene) {
+          await db.scenes.update(activeScene.id, {
+            content: ch.content,
+            wordCount: countWords(plainText),
+            updatedAt: now,
+          });
+        } else {
+          // If no active scene found, create one
+          await db.scenes.add({
+            id: crypto.randomUUID(),
+            chapterId: existing.id,
+            novelId,
+            title: ch.title,
+            content: ch.content,
+            order: 0,
+            wordCount: countWords(plainText),
+            version: 0,
+            versionType: "manual",
+            isActive: 1,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } else {
+        const chapterId = crypto.randomUUID();
+        await db.chapters.add({
+          id: chapterId,
+          novelId,
+          title: ch.title,
+          order: ch.order ?? (startOrder + i),
+          createdAt: now,
+          updatedAt: now,
+        });
 
-      await db.scenes.add({
-        id: crypto.randomUUID(),
-        chapterId,
-        novelId,
-        title: ch.title,
-        content: ch.content,
-        order: 0,
-        wordCount: countWords(plainText),
-        version: 0,
-        versionType: "manual",
-        isActive: 1,
-        createdAt: now,
-        updatedAt: now,
-      });
+        await db.scenes.add({
+          id: crypto.randomUUID(),
+          chapterId,
+          novelId,
+          title: ch.title,
+          content: ch.content,
+          order: 0,
+          wordCount: countWords(plainText),
+          version: 0,
+          versionType: "manual",
+          isActive: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     }
   };
 

@@ -348,36 +348,53 @@ export const useScraperStore = create<ScraperState>()(
             async (entry) => {
               const { targetNovelId } = get();
               if (targetNovelId) {
-                const chapterId = crypto.randomUUID();
-                const plainText = stripHtml(entry.parsed.content);
-                const currentOrder = await db.chapters
-                  .where("novelId")
-                  .equals(targetNovelId)
-                  .count();
+                const existing = await db.chapters
+                  .where({ novelId: targetNovelId })
+                  .filter(c => c.title === entry.parsed.title)
+                  .first();
 
-                await db.chapters.add({
-                  id: chapterId,
-                  novelId: targetNovelId,
-                  title: entry.parsed.title,
-                  order: entry.parsed.order ?? currentOrder,
-                  createdAt: now,
-                  updatedAt: now,
-                });
+                if (existing) {
+                  const scenes = await db.scenes.where({ chapterId: existing.id }).toArray();
+                  const activeScene = scenes.find(s => s.isActive === 1);
+                  if (activeScene) {
+                    await db.scenes.update(activeScene.id, {
+                      content: entry.parsed.content,
+                      wordCount: countWords(stripHtml(entry.parsed.content)),
+                      updatedAt: now,
+                    });
+                  }
+                } else {
+                  const chapterId = crypto.randomUUID();
+                  const plainText = stripHtml(entry.parsed.content);
+                  const currentOrder = await db.chapters
+                    .where("novelId")
+                    .equals(targetNovelId)
+                    .count();
 
-                await db.scenes.add({
-                  id: crypto.randomUUID(),
-                  chapterId,
-                  novelId: targetNovelId,
-                  title: entry.parsed.title,
-                  content: entry.parsed.content,
-                  order: 0,
-                  wordCount: countWords(plainText),
-                  version: 0,
-                  versionType: "manual",
-                  isActive: 1,
-                  createdAt: now,
-                  updatedAt: now,
-                });
+                  await db.chapters.add({
+                    id: chapterId,
+                    novelId: targetNovelId,
+                    title: entry.parsed.title,
+                    order: entry.parsed.order ?? currentOrder,
+                    createdAt: now,
+                    updatedAt: now,
+                  });
+
+                  await db.scenes.add({
+                    id: crypto.randomUUID(),
+                    chapterId,
+                    novelId: targetNovelId,
+                    title: entry.parsed.title,
+                    content: entry.parsed.content,
+                    order: 0,
+                    wordCount: countWords(plainText),
+                    version: 0,
+                    versionType: "manual",
+                    isActive: 1,
+                    createdAt: now,
+                    updatedAt: now,
+                  });
+                }
               }
 
               const prev = get().scrapedChapters;

@@ -59,8 +59,7 @@ export const SixNineShuTwAdapter: SiteAdapter = {
     // Check if there is pagination (e.g., 69shuba.tw indexlist)
     const selectOptions = doc.querySelectorAll("select#indexselect-top option");
     if (selectOptions.length > 1) {
-      // The first option is usually the current page. Fetch the rest.
-      for (let i = 1; i < selectOptions.length; i++) {
+      for (let i = 0; i < selectOptions.length; i++) {
         const opt = selectOptions[i] as HTMLOptionElement;
         const pageUrl = new URL(opt.getAttribute("value") || "", currentBase).href;
         if (pageUrl !== currentBase.href) {
