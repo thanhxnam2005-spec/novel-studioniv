@@ -47,28 +47,18 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   CircleDashedIcon,
-  GaugeIcon,
   LanguagesIcon,
   LoaderIcon,
+  Minimize2Icon,
   RotateCcwIcon,
   SaveIcon,
-  TelescopeIcon,
   XIcon,
-  ZapIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import { toast } from "sonner";
 
-const DEPTH_OPTIONS: {
-  value: ContextDepth;
-  label: string;
-  icon: React.ElementType;
-}[] = [
-  { value: "quick", label: "Nhanh", icon: ZapIcon },
-  { value: "standard", label: "Tiêu chuẩn", icon: GaugeIcon },
-  { value: "deep", label: "Chi tiết", icon: TelescopeIcon },
-];
+
 
 const STATUS_ICON: Record<string, React.ElementType> = {
   pending: CircleDashedIcon,
@@ -206,7 +196,6 @@ export function BulkTranslateDialog({
   const isCustomPrompt = promptText.trim() !== DEFAULT_TRANSLATE_SYSTEM.trim();
 
   // Other config
-  const [depth, setDepth] = useState<ContextDepth>("standard");
   const [translateTitle, setTranslateTitle] = useState(true);
   const [autoSave, setAutoSave] = useState(false);
 
@@ -238,7 +227,7 @@ export function BulkTranslateDialog({
         novelId,
         chapterIds,
         model,
-        depth,
+        depth: "standard",
         translateTitle,
         autoSave,
         settings,
@@ -249,7 +238,6 @@ export function BulkTranslateDialog({
     },
     [
       novelId,
-      depth,
       translateTitle,
       autoSave,
       settings,
@@ -305,10 +293,12 @@ export function BulkTranslateDialog({
       open={open}
       onOpenChange={(v) => {
         if (!v) {
-          guard(() => {
-            useBulkTranslateStore.getState().cancel();
+          if (isRunning) {
+            // If running, just hide (minimize) instead of canceling
+            onOpenChange(false);
+          } else {
             handleClose();
-          });
+          }
         } else {
           onOpenChange(v);
         }
@@ -321,12 +311,27 @@ export function BulkTranslateDialog({
           onCancel={dismiss}
         />
         <DialogHeader>
-          <DialogTitle>
-            Dịch hàng loạt ({selectedChapterIds.length} chương)
-          </DialogTitle>
-          <DialogDescription>
-            Dịch tuần tự từng chương đã chọn.
-          </DialogDescription>
+          <div className="flex items-center justify-between pr-8">
+            <div>
+              <DialogTitle>
+                Dịch hàng loạt ({selectedChapterIds.length} chương)
+              </DialogTitle>
+              <DialogDescription>
+                Dịch tuần tự từng chương đã chọn.
+              </DialogDescription>
+            </div>
+            {isRunning && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => onOpenChange(false)}
+              >
+                <Minimize2Icon className="mr-1.5 size-3.5" />
+                Ẩn (Chạy ngầm)
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh]">
@@ -334,26 +339,7 @@ export function BulkTranslateDialog({
             {/* ── Step 1: Config ── */}
             {step === "config" && (
               <>
-                {/* Depth */}
-                <div>
-                  <p className="mb-2 text-xs font-medium">Ngữ cảnh</p>
-                  <div className="flex gap-2">
-                    {DEPTH_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setDepth(opt.value)}
-                        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                          depth === opt.value
-                            ? "border-primary bg-primary/5 text-primary"
-                            : "hover:bg-muted/50"
-                        }`}
-                      >
-                        <opt.icon className="size-3.5" />
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
 
                 {/* Model picker */}
                 <div className="space-y-2">

@@ -5,7 +5,8 @@ import { SentenceRenderer } from "@/components/reader/sentence-renderer";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useChapters, useNovel, useScenes } from "@/lib/hooks";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useChapters, useNovel, useOriginalScenes, useScenes } from "@/lib/hooks";
 import { useMediaSession } from "@/lib/hooks/use-media-session";
 import { useReaderPanel } from "@/lib/stores/reader-panel";
 import {
@@ -13,10 +14,12 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   PencilIcon,
+  BookOpenIcon,
+  LanguagesIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 function ChapterContent({
   chapterId,
@@ -28,35 +31,69 @@ function ChapterContent({
   chapterHeader?: string;
 }) {
   const scenes = useScenes(chapterId);
-  if (!scenes) return <Skeleton className="h-64 w-full" />;
-  const text = scenes.map((s) => s.content).join("\n\n");
+  const originalScenes = useOriginalScenes(chapterId);
+  const [activeTab, setActiveTab] = useState<"translated" | "original">("translated");
 
-  if (!text) {
+  if (!scenes || !originalScenes) return <Skeleton className="h-64 w-full" />;
+
+  const translatedText = scenes.map((s) => s.content).join("\n\n");
+  const originalText = originalScenes.map((s) => s.content).join("\n\n");
+
+  const hasTranslation = translatedText !== originalText;
+
+  const renderText = (text: string) => {
+    if (!text) {
+      return (
+        <div className="prose prose-sm max-w-none whitespace-pre-wrap dark:prose-invert">
+          <p className="italic text-muted-foreground">
+            Chương này chưa có nội dung.
+          </p>
+        </div>
+      );
+    }
+
+    if (readerOpen) {
+      const ttsContent = chapterHeader ? `${chapterHeader}\n\n${text}` : text;
+      return (
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          <SentenceRenderer content={ttsContent} />
+        </div>
+      );
+    }
+
     return (
-      <div className="prose prose-sm max-w-none whitespace-pre-wrap dark:prose-invert">
-        <p className="italic text-muted-foreground">
-          Chương này chưa có nội dung.
-        </p>
+      <div className="prose prose-stone max-w-none dark:prose-invert whitespace-pre-wrap leading-relaxed md:leading-loose text-lg md:text-xl font-sans tracking-wide px-2 md:px-4 [&>br+br]:block [&>br+br]:content-[''] [&>br+br]:mb-4">
+        {text.split(/\n{2,}/).map((paragraph, i) => (
+          <p key={i} className="mb-4 first:mt-0">
+            {paragraph}
+          </p>
+        ))}
       </div>
     );
-  }
-
-  if (readerOpen) {
-    const ttsContent = chapterHeader ? `${chapterHeader}\n\n${text}` : text;
-    return (
-      <div className="prose prose-sm max-w-none dark:prose-invert">
-        <SentenceRenderer content={ttsContent} />
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="prose prose-stone max-w-none dark:prose-invert whitespace-pre-wrap leading-relaxed md:leading-loose text-lg md:text-xl font-sans tracking-wide px-2 md:px-4 [&>br+br]:block [&>br+br]:content-[''] [&>br+br]:mb-4">
-      {text.split(/\n{2,}/).map((paragraph, i) => (
-        <p key={i} className="mb-4 first:mt-0">
-          {paragraph}
-        </p>
-      ))}
+    <div className="space-y-6">
+      {hasTranslation && (
+        <div className="flex justify-center">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-auto">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="translated" className="gap-2 text-xs">
+                <LanguagesIcon className="size-3.5" />
+                Bản dịch
+              </TabsTrigger>
+              <TabsTrigger value="original" className="gap-2 text-xs">
+                <BookOpenIcon className="size-3.5" />
+                Văn bản gốc
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+
+      <div className="relative">
+        {activeTab === "translated" ? renderText(translatedText) : renderText(originalText)}
+      </div>
     </div>
   );
 }

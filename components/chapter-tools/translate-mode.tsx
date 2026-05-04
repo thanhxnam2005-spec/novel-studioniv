@@ -4,10 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangleIcon,
   CheckCircle2Icon,
-  GaugeIcon,
   LanguagesIcon,
-  TelescopeIcon,
-  ZapIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +13,7 @@ import { toast } from "sonner";
 import { useChapterTools } from "@/lib/stores/chapter-tools";
 import { useAnalysisSettings, useChatSettings, useAIProvider } from "@/lib/hooks";
 import { resolveChapterToolPrompts, DEFAULT_TRANSLATE_SYSTEM } from "@/lib/chapter-tools/prompts";
-import { buildTranslateContext, type ContextDepth } from "@/lib/chapter-tools/context";
+import { buildTranslateContext } from "@/lib/chapter-tools/context";
 import {
   getChapterToolModelMissingMessage,
   resolveChapterToolModel,
@@ -26,32 +23,6 @@ import { TITLE_SEPARATOR, parseTranslateResult } from "@/lib/chapter-tools/bulk-
 import { getMergedNameDict } from "@/lib/hooks/use-name-entries";
 import { ToolConfig } from "./tool-config";
 import { StreamingDisplay } from "./streaming-display";
-
-const DEPTH_OPTIONS: {
-  value: ContextDepth;
-  label: string;
-  description: string;
-  icon: React.ElementType;
-}[] = [
-  {
-    value: "quick",
-    label: "Nhanh",
-    description: "3 chương trước, không metadata",
-    icon: ZapIcon,
-  },
-  {
-    value: "standard",
-    label: "Tiêu chuẩn",
-    description: "8 chương + tên nhân vật, địa danh",
-    icon: GaugeIcon,
-  },
-  {
-    value: "deep",
-    label: "Chi tiết",
-    description: "20 chương + thế giới quan đầy đủ",
-    icon: TelescopeIcon,
-  },
-];
 
 interface TranslateSummary {
   originalLines: number;
@@ -90,9 +61,7 @@ export function TranslateMode({
   const chatSettings = useChatSettings();
   const provider = useAIProvider(chatSettings?.providerId);
   const [hasContext, setHasContext] = useState<boolean | null>(null);
-  const [depth, setDepth] = useState<ContextDepth>("standard");
   const [translateTitle, setTranslateTitle] = useState(true);
-  const [useNameDict, setUseNameDict] = useState(false);
   const [summary, setSummary] = useState<TranslateSummary | null>(null);
 
   const handleTranslate = useCallback(async () => {
@@ -103,12 +72,12 @@ export function TranslateMode({
       return;
     }
 
-    const nameDict = useNameDict
-      ? await getMergedNameDict(novelId)
-      : undefined;
+    // Always load dictionary — dynamic filtering ensures only relevant
+    // terms (those present in source text) are sent, so overhead is minimal
+    const nameDict = await getMergedNameDict(novelId);
     const [model, context] = await Promise.all([
       resolveChapterToolModel(settings.translateModel, provider, chatSettings),
-      buildTranslateContext(novelId, chapterOrder, depth, nameDict),
+      buildTranslateContext(novelId, chapterOrder, "standard", nameDict, content),
     ]);
     setHasContext(context !== null);
 
@@ -163,9 +132,7 @@ export function TranslateMode({
     novelId,
     chapterOrder,
     chapterTitle,
-    depth,
     translateTitle,
-    useNameDict,
     settings,
     provider,
     chatSettings,
@@ -214,7 +181,7 @@ export function TranslateMode({
         promptLabel="Prompt dịch thuật"
       />
 
-      {/* Translate title toggle + name dict toggle */}
+      {/* Translate title toggle */}
       {showConfig && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -227,44 +194,13 @@ export function TranslateMode({
               Dịch tiêu đề chương
             </Label>
           </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="use-name-dict"
-              checked={useNameDict}
-              onCheckedChange={(v) => setUseNameDict(v === true)}
-            />
-            <Label htmlFor="use-name-dict" className="text-xs cursor-pointer">
-              Sử dụng từ điển tên
-            </Label>
-          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Từ điển tên riêng được tự động lọc theo nội dung chương
+          </p>
         </div>
       )}
 
-      {/* Context depth selector */}
-      {showConfig && (
-        <div>
-          <p className="mb-2 text-xs font-medium">Ngữ cảnh</p>
-          <div className="flex gap-2">
-            {DEPTH_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setDepth(opt.value)}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-md border px-2 py-2 text-center transition-colors ${
-                  depth === opt.value
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "hover:bg-muted/50"
-                }`}
-              >
-                <opt.icon className="size-3.5" />
-                <span className="text-xs font-medium">{opt.label}</span>
-                <span className="text-[10px] leading-tight text-muted-foreground">
-                  {opt.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {hasContext === false && !summary && (
         <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">

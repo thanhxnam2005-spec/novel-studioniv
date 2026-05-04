@@ -1,8 +1,8 @@
 {
-  "name": "Browser Screen Translator",
-  "version": "2.0.0",
+  "name": "STV RealtimeChineseTranslate",
+  "version": "1.7.0",
   "manifest_version": 3,
-  "description": "Auto-translate web pages from Chinese, English, Japanese, Korean and more to Vietnamese using Google Translate.",
+  "description": "Extension Dịch tự động trang web tiếng Trung",
   "homepage_url": "https://sangtacviet.com/",
   "icons": {
     "16": "icons/icon16.png",
@@ -12,6 +12,8 @@
   "permissions": [
     "storage",
     "contextMenus",
+    "desktopCapture",
+    "clipboardWrite",
     "scripting",
     "activeTab"
   ],
@@ -33,8 +35,8 @@
     "service_worker": "src/inject/background.js"
   },
   "action": {
-    "default_icon": "icons/icon48.png",
-    "default_title": "Browser Screen Translator",
+    "default_icon": "icons/icon19.png",
+    "default_title": "Cài đặt",
     "default_popup": "src/browser_action/browser_action.html"
   }
 }

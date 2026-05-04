@@ -337,7 +337,7 @@ export function cleanGarbageLines(text: string): string {
     
     // STV navigation
     if (t.includes("chương trước") && t.includes("mục lục") && t.includes("chương sau")) return false;
-    if (t === "về trang sách" || t.includes("về trang sách")) return false;
+    if (t === "về trang sách" || t.includes("về trang sách") || t.includes("quay lại trang sách")) return false;
     if (t.includes("bạn đang đọc truyện trên")) return false;
     if (t.includes("sangtacviet")) return false;
     

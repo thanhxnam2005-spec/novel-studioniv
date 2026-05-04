@@ -17,6 +17,39 @@ export function useScenes(chapterId: string | undefined) {
   return scenes;
 }
 
+/** Reactive query: all original (version 1, manual) versions for a chapter's scenes. */
+export function useOriginalScenes(chapterId: string | undefined) {
+  const originalScenes = useLiveQuery(
+    async () => {
+      if (!chapterId) return [];
+      // 1. Get all active scenes for this chapter to know the orders
+      const activeScenes = await db.scenes
+        .where("[chapterId+isActive]")
+        .equals([chapterId, 1])
+        .sortBy("order");
+
+      if (activeScenes.length === 0) return [];
+
+      // 2. For each active scene, find its version 1 (manual)
+      const results = await Promise.all(
+        activeScenes.map(async (active) => {
+          const original = await db.scenes
+            .where("activeSceneId")
+            .equals(active.id)
+            .filter((s) => s.version === 1 && s.versionType === "manual")
+            .first();
+          
+          // If no version 1 found, it means the active content is still the original
+          return original || active;
+        })
+      );
+      return results;
+    },
+    [chapterId],
+  );
+  return originalScenes;
+}
+
 export function useNovelScenes(novelId: string | undefined) {
   const scenes = useLiveQuery(
     () =>

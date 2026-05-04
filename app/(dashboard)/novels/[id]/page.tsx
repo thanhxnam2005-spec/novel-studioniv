@@ -28,6 +28,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   deleteNovel,
   updateNovel,
   useChapterAnalysisStatus,
@@ -45,6 +53,8 @@ import {
   SparklesIcon,
   Trash2Icon,
   FileArchiveIcon,
+  BookOpenIcon,
+  LanguagesIcon,
 } from "lucide-react";
 import {
   useParams,
@@ -135,21 +145,21 @@ export default function NovelDetailPage() {
     }
   };
 
-  const handleExportZip = async () => {
+  const handleExportZip = async (mode: "translated" | "original" = "translated") => {
     if (!novel) return;
     try {
-      await downloadNovelChaptersZip(novel.id);
-      toast.success(`Đã xuất ZIP "${novel.title}"`);
+      await downloadNovelChaptersZip(novel.id, mode);
+      toast.success(`Đã xuất ZIP ${mode === "original" ? "Bản Gốc" : ""} "${novel.title}"`);
     } catch {
       toast.error("Xuất ZIP thất bại");
     }
   };
 
-  const handleExportTxt = async () => {
+  const handleExportTxt = async (mode: "translated" | "original" = "translated") => {
     if (!novel) return;
     try {
-      await downloadNovelTxt(novel.id);
-      toast.success(`Đã xuất TXT gộp "${novel.title}"`);
+      await downloadNovelTxt(novel.id, mode);
+      toast.success(`Đã xuất TXT gộp ${mode === "original" ? "Bản Gốc" : ""} "${novel.title}"`);
     } catch {
       toast.error("Xuất TXT thất bại");
     }
@@ -283,22 +293,55 @@ export default function NovelDetailPage() {
                 </TooltipTrigger>
                 <TooltipContent>Chỉnh sửa</TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={handleExportZip}>
-                    <FileArchiveIcon className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Xuất ZIP (TXT)</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={handleExportTxt}>
-                    <ScrollTextIcon className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Xuất TXT (Gộp)</TooltipContent>
-              </Tooltip>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <FileArchiveIcon className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Xuất ZIP (TXT)</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Tải xuống ZIP</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExportZip("translated")}>
+                    <LanguagesIcon className="mr-2 size-4" />
+                    Bản dịch AI
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportZip("original")}>
+                    <BookOpenIcon className="mr-2 size-4" />
+                    Văn bản gốc
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <ScrollTextIcon className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Xuất TXT (Gộp)</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Tải xuống TXT</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExportTxt("translated")}>
+                    <LanguagesIcon className="mr-2 size-4" />
+                    Bản dịch AI
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportTxt("original")}>
+                    <BookOpenIcon className="mr-2 size-4" />
+                    Văn bản gốc
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={handleExport}>

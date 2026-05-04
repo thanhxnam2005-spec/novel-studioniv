@@ -3,6 +3,7 @@ import type { LanguageModel } from "ai";
 import { db } from "@/lib/db";
 import type { AnalysisSettings, Scene } from "@/lib/db";
 import { createSceneVersion, ensureInitialVersion } from "@/lib/hooks/use-scene-versions";
+import { getMergedNameDict } from "@/lib/hooks/use-name-entries";
 import type { ContextDepth } from "./context";
 import { buildTranslateContext } from "./context";
 import {
@@ -29,8 +30,14 @@ export function parseTranslateResult(
   const sepIndex = raw.indexOf(`\n${TITLE_SEPARATOR}\n`);
   if (sepIndex === -1) return { title: null, content: raw };
 
-  const title = raw.slice(0, sepIndex).trim();
-  const content = raw.slice(sepIndex + TITLE_SEPARATOR.length + 2).trim();
+  let title = raw.slice(0, sepIndex).trim();
+  // Strip XML tags like <chapter_title> if AI accidentally outputs them
+  title = title.replace(/<\/?chapter_title>/gi, '').trim();
+
+  let content = raw.slice(sepIndex + TITLE_SEPARATOR.length + 2).trim();
+  // Strip other XML tags just in case
+  content = content.replace(/<\/?chapter_content>/gi, '').trim();
+
   return { title: title || null, content };
 }
 
@@ -143,6 +150,9 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
 
   const basePrompt = customPrompt?.trim() || resolveChapterToolPrompts(settings).translate;
 
+  // Fetch name dictionary once for dynamic filtering per chapter
+  const nameDict = await getMergedNameDict(novelId);
+
   for (const chapter of chapters) {
     if (signal?.aborted) break;
 
@@ -166,8 +176,11 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
         ? scenes.map((s) => s.content).join(`\n\n${SCENE_BREAK}\n\n`)
         : scenes[0].content;
 
-      // Build context (uses chapter summaries — varies per chapter order)
-      const context = await buildTranslateContext(novelId, chapter.order, depth);
+      // Build context with dynamic dictionary filtering:
+      // Only terms that appear in this chapter's source text are sent to AI
+      const context = await buildTranslateContext(
+        novelId, chapter.order, depth, nameDict, joinedContent,
+      );
 
       // Build system prompt
       let systemPrompt = basePrompt;

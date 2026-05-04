@@ -81,17 +81,38 @@ export function downloadNovelJson(data: NovelExportData) {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadNovelChaptersZip(novelId: string) {
+export async function downloadNovelChaptersZip(
+  novelId: string,
+  mode: "translated" | "original" = "translated",
+) {
   const novel = await db.novels.get(novelId);
   if (!novel) throw new Error("Novel not found");
 
   const [chapters, scenes] = await Promise.all([
     db.chapters.where("novelId").equals(novelId).sortBy("order"),
-    db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray(),
+    mode === "translated"
+      ? db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray()
+      : (async () => {
+          const active = await db.scenes
+            .where("[novelId+isActive]")
+            .equals([novelId, 1])
+            .toArray();
+          return Promise.all(
+            active.map(async (a) => {
+              const original = await db.scenes
+                .where("activeSceneId")
+                .equals(a.id)
+                .filter((v) => v.version === 1 && v.versionType === "manual")
+                .first();
+              return original || a;
+            }),
+          );
+        })(),
   ]);
 
   const zip = new JSZip();
-  const folder = zip.folder(novel.title.replace(/[/\\?%*:|"<>]/g, "_"));
+  const folderName = `${novel.title.replace(/[/\\?%*:|"<>]/g, "_")}${mode === "original" ? "_GOC" : ""}`;
+  const folder = zip.folder(folderName);
 
   if (!folder) throw new Error("Could not create folder in ZIP");
 
@@ -101,12 +122,13 @@ export async function downloadNovelChaptersZip(novelId: string) {
       .filter((s) => s.chapterId === chapter.id)
       .sort((a, b) => a.order - b.order);
 
-    const UNWANTED_TEXT = "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
+    const UNWANTED_TEXT =
+      "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
     const content = chapterScenes
       .map((s) => s.content.replace(UNWANTED_TEXT, "").trim())
       .join("\n\n")
       .trim();
-    const fileName = `${chapter.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
+    const fileName = `${String(i + 1).padStart(4, "0")}_${chapter.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
     folder.file(fileName, content);
   }
 
@@ -114,23 +136,44 @@ export async function downloadNovelChaptersZip(novelId: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${novel.title.replace(/[/\\?%*:|"<>]/g, "_")}_chapters.zip`;
+  a.download = `${novel.title.replace(/[/\\?%*:|"<>]/g, "_")}_chapters${mode === "original" ? "_goc" : ""}.zip`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export async function downloadNovelTxt(novelId: string) {
+export async function downloadNovelTxt(
+  novelId: string,
+  mode: "translated" | "original" = "translated",
+) {
   const novel = await db.novels.get(novelId);
   if (!novel) throw new Error("Novel not found");
 
   const [chapters, scenes] = await Promise.all([
     db.chapters.where("novelId").equals(novelId).sortBy("order"),
-    db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray(),
+    mode === "translated"
+      ? db.scenes.where("[novelId+isActive]").equals([novelId, 1]).toArray()
+      : (async () => {
+          const active = await db.scenes
+            .where("[novelId+isActive]")
+            .equals([novelId, 1])
+            .toArray();
+          return Promise.all(
+            active.map(async (a) => {
+              const original = await db.scenes
+                .where("activeSceneId")
+                .equals(a.id)
+                .filter((v) => v.version === 1 && v.versionType === "manual")
+                .first();
+              return original || a;
+            }),
+          );
+        })(),
   ]);
 
-  let content = `${novel.title}\n${novel.author ? `Tác giả: ${novel.author}\n` : ""}\n`;
+  let content = `${novel.title}${mode === "original" ? " (Bản Gốc)" : ""}\n${novel.author ? `Tác giả: ${novel.author}\n` : ""}\n`;
 
-  const UNWANTED_TEXT = "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
+  const UNWANTED_TEXT =
+    "Bạn đang xem văn bản gốc chưa dịch, có thể kéo xuống cuối trang để chọn bản dịch.";
 
   for (let i = 0; i < chapters.length; i++) {
     const chapter = chapters[i];
@@ -142,7 +185,7 @@ export async function downloadNovelTxt(novelId: string) {
       .map((s) => s.content.replace(UNWANTED_TEXT, "").trim())
       .join("\n\n")
       .trim();
-    
+
     content += `\n\nChương ${i + 1}: ${chapter.title}\n\n${chapterContent}`;
   }
 
@@ -150,7 +193,7 @@ export async function downloadNovelTxt(novelId: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${novel.title.replace(/[/\\?%*:|"<>]/g, "_")}.txt`;
+  a.download = `${novel.title.replace(/[/\\?%*:|"<>]/g, "_")}${mode === "original" ? "_goc" : ""}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 }

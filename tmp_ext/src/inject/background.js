@@ -1,6 +1,6 @@
 /**
- * Browser Screen Translator v2.0.0
- * Background Script - Handles context menus, URL pattern matching, and browser automation
+ * Chrome Extension Background Script for Vietnamese Novel Translation
+ * Handles context menus, URL pattern matching, and browser automation
  */
 
 // Constants and Configuration

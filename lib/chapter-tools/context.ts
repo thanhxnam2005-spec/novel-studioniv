@@ -1,31 +1,110 @@
 import { db } from "@/lib/db";
 
+/** @deprecated Depth is now unified — kept for backward API compatibility */
 export type ContextDepth = "quick" | "standard" | "deep";
 
-const DEPTH_CONFIG: Record<ContextDepth, { maxChapters: number; includeDetails: boolean }> = {
-  quick: { maxChapters: 3, includeDetails: false },
-  standard: { maxChapters: 8, includeDetails: true },
-  deep: { maxChapters: 20, includeDetails: true },
+// Unified config: 1 chapter summary + 8 trailing lines + full metadata + filtered dictionary
+const UNIFIED_CONFIG = { maxChapters: 1, includeDetails: true, trailingLines: 8 };
+const DEPTH_CONFIG: Record<ContextDepth, typeof UNIFIED_CONFIG> = {
+  quick: UNIFIED_CONFIG,
+  standard: UNIFIED_CONFIG,
+  deep: UNIFIED_CONFIG,
 };
+
+// ── Dynamic Dictionary Filtering ────────────────────────────
+
+/**
+ * Filter a name dictionary to only include entries whose Chinese term
+ * actually appears in the source text. This dramatically reduces token
+ * usage (e.g. 1000 entries → 10 relevant entries) while keeping AI
+ * translations consistent.
+ */
+export function filterDictBySourceText(
+  nameDict: Array<{ chinese: string; vietnamese: string }>,
+  sourceText: string,
+): Array<{ chinese: string; vietnamese: string }> {
+  if (!nameDict || nameDict.length === 0 || !sourceText) return [];
+  return nameDict.filter((entry) => sourceText.includes(entry.chinese));
+}
+
+// ── Trailing Context (Previous Chapter Ending) ──────────────
+
+/**
+ * Get the last N non-empty lines from the previous chapter's content.
+ * This helps the AI maintain continuity between chapters (matching
+ * pronouns, tone, and narrative flow).
+ */
+async function getPreviousChapterTrailing(
+  novelId: string,
+  currentChapterOrder: number,
+  maxLines: number,
+): Promise<string | null> {
+  if (currentChapterOrder <= 0 || maxLines <= 0) return null;
+
+  // Find the chapter immediately before this one
+  const allChapters = await db.chapters
+    .where("novelId")
+    .equals(novelId)
+    .sortBy("order");
+
+  const prevChapter = allChapters
+    .filter((ch) => ch.order < currentChapterOrder)
+    .pop();
+
+  if (!prevChapter) return null;
+
+  // Get the active scene(s) of the previous chapter
+  const prevScenes = await db.scenes
+    .where("[chapterId+isActive]")
+    .equals([prevChapter.id, 1])
+    .sortBy("order");
+
+  if (prevScenes.length === 0) return null;
+
+  // Take the last scene's content and extract trailing lines
+  const lastScene = prevScenes[prevScenes.length - 1];
+  if (!lastScene.content?.trim()) return null;
+
+  const lines = lastScene.content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const trailing = lines.slice(-maxLines);
+  return trailing.length > 0 ? trailing.join("\n") : null;
+}
+
+// ── Main Context Builder ────────────────────────────────────
 
 /**
  * Build translation context: previous chapter summaries + novel metadata.
  * `depth` controls how many chapters and how much detail to include.
+ *
+ * NEW: Dynamic Dictionary Injection
+ * - If both `nameDict` and `sourceText` are provided, the dictionary is
+ *   filtered to only include terms that appear in the source text.
+ * - This saves 90%+ of tokens compared to sending the full dictionary.
+ *
+ * NEW: Trailing Context
+ * - Includes the last few lines of the previous chapter so the AI can
+ *   seamlessly continue the narrative flow.
  */
 export async function buildTranslateContext(
   novelId: string,
   currentChapterOrder: number,
   depth: ContextDepth = "standard",
   nameDict?: Array<{ chinese: string; vietnamese: string }>,
+  sourceText?: string,
 ): Promise<string | null> {
   const config = DEPTH_CONFIG[depth];
 
-  const [chapters, novel, characters] = await Promise.all([
+  const [chapters, novel, characters, trailing] = await Promise.all([
     db.chapters.where("novelId").equals(novelId).sortBy("order"),
     config.includeDetails ? db.novels.get(novelId) : Promise.resolve(undefined),
     config.includeDetails
       ? db.characters.where("novelId").equals(novelId).toArray()
       : Promise.resolve([]),
+    getPreviousChapterTrailing(novelId, currentChapterOrder, config.trailingLines),
   ]);
 
   const parts: string[] = [];
@@ -48,7 +127,7 @@ export async function buildTranslateContext(
     parts.push(`## Thuật ngữ & tên riêng\n${metaParts.join("\n")}`);
   }
 
-  // Previous chapter summaries
+  // Previous chapter summary (only the immediately preceding chapter)
   const previous = chapters
     .filter((ch) => ch.order < currentChapterOrder && ch.summary)
     .slice(-config.maxChapters);
@@ -60,20 +139,24 @@ export async function buildTranslateContext(
     parts.push(`## Tóm tắt chương trước\n${summaries}`);
   }
 
-  // Name dictionary entries for translation consistency
+  // Trailing context: last lines of previous chapter for narrative continuity
+  if (trailing) {
+    parts.push(`## Đoạn cuối chương trước (để nối mạch văn)\n${trailing}`);
+  }
+
+  // Dynamic Dictionary Injection: filter to only relevant entries
   if (nameDict && nameDict.length > 0) {
-    const MAX_NAME_ENTRIES = 500;
-    const entries = nameDict.length > MAX_NAME_ENTRIES
-      ? nameDict.slice(0, MAX_NAME_ENTRIES)
+    const filteredDict = sourceText
+      ? filterDictBySourceText(nameDict, sourceText)
       : nameDict;
-    const nameParts = entries
-      .map((e) => `${e.chinese} → ${e.vietnamese}`)
-      .join("\n");
-    let section = `## Bảng tên riêng\nKhi dịch, hãy sử dụng bảng tên sau để đảm bảo tính nhất quán:\n${nameParts}`;
-    if (nameDict.length > MAX_NAME_ENTRIES) {
-      section += `\n... và ${nameDict.length - MAX_NAME_ENTRIES} mục khác`;
+
+    if (filteredDict.length > 0) {
+      const nameParts = filteredDict
+        .map((e) => `${e.chinese} → ${e.vietnamese}`)
+        .join("\n");
+      const section = `## Bảng tên riêng (${filteredDict.length} mục liên quan)\nBẮT BUỘC sử dụng đúng tên dịch trong bảng sau:\n${nameParts}`;
+      parts.push(section);
     }
-    parts.push(section);
   }
 
   return parts.length > 0 ? parts.join("\n\n") : null;

@@ -137,6 +137,31 @@ export function applyDictionaryPreTranslate(
 }
 
 /**
+ * Remove garbage lines while preserving line count (replaces with empty string).
+ */
+function stripGarbagePreserveLines(text: string, isVietnamese: boolean): string {
+  if (!text) return text;
+  return text.split("\n").map(line => {
+    const t = line.trim().toLowerCase();
+    if (!t) return line;
+    
+    if (isVietnamese) {
+      if (t.includes("chương trước") && t.includes("mục lục") && t.includes("chương sau")) return "";
+      if (t === "về trang sách" || t.includes("về trang sách")) return "";
+      if (t.includes("bạn đang đọc truyện trên")) return "";
+      if (t.includes("sangtacviet")) return "";
+      // common injected ads
+      if (t.includes("meetsingles") || t.includes("singleflirt")) return "";
+    } else {
+      if (t.includes("上一章") && t.includes("目录") && t.includes("下一章")) return "";
+      if (t.includes("返回书页") || t === "返回") return "";
+    }
+    
+    return line;
+  }).join("\n");
+}
+
+/**
  * Dịch toàn bộ văn bản tiếng Trung sang tiếng Việt qua STV API.
  * Bảo toàn cấu trúc xuống dòng bằng cách xử lý theo từng đoạn văn.
  */
@@ -149,6 +174,8 @@ export async function stvTranslate(
   },
 ): Promise<string> {
   if (!text || !text.trim()) return "";
+
+  text = stripGarbagePreserveLines(text, false);
 
   // 1. Áp dụng từ điển trước khi gửi đi (Tiền xử lý)
   let processedText = text;
@@ -236,7 +263,8 @@ export async function stvTranslate(
     translatedParagraphs.push(results.join("\n"));
   }
 
-  return translatedParagraphs.join("\n\n");
+  const finalResult = translatedParagraphs.join("\n\n");
+  return stripGarbagePreserveLines(finalResult, true);
 }
 
 /**
@@ -252,6 +280,8 @@ export async function stvTranslatePreserveLines(
   },
 ): Promise<string> {
   if (!text || !text.trim()) return "";
+
+  text = stripGarbagePreserveLines(text, false);
 
   // Tách dòng, gom thành các batch ≤ RATE_LIMIT_CHARS
   // dùng delimiter =|==|= để server dịch từng phần riêng
@@ -296,5 +326,6 @@ export async function stvTranslatePreserveLines(
     });
   }
 
-  return allTranslatedLines.join("\n");
+  const finalResult = allTranslatedLines.join("\n");
+  return stripGarbagePreserveLines(finalResult, true);
 }

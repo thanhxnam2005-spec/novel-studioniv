@@ -38,6 +38,7 @@ import {
   SettingsIcon,
   ChevronRightIcon,
   LogOutIcon,
+  LaptopIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -53,6 +54,11 @@ export const navConfig = [
     title: "Cài đặt AI",
     href: "/settings/ai-settings",
     icon: BrainIcon,
+  },
+  {
+    title: "Tiện ích & Scripts",
+    href: "/settings/scripts",
+    icon: LaptopIcon,
   },
   {
     title: "Quản lý dữ liệu",

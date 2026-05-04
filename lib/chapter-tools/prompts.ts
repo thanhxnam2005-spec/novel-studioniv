@@ -87,10 +87,10 @@ export function resolveChapterToolPrompts(settings: AnalysisSettings) {
 
 export function buildTranslateTitleNote(titleSeparator: string): string {
   return `\n\n<title_format_note>
-Ngoài nội dung chương, bạn cũng cần dịch tiêu đề chương. Định dạng kết quả:
-<tiêu đề đã dịch>
+Ngoài nội dung chương, bạn cũng cần dịch tiêu đề chương. Định dạng kết quả (Tuyệt đối không dùng XML tag như <chapter_title>):
+[Tiêu đề đã dịch]
 ${titleSeparator}
-<nội dung đã dịch>
+[Nội dung đã dịch]
 </title_format_note>`;
 }
 
@@ -106,7 +106,7 @@ export function buildTranslateUserPrompt(
   titleSeparator?: string,
 ): string {
   if (title && titleSeparator) {
-    return `<chapter_title>${title}</chapter_title>\n${titleSeparator}\n${content}`;
+    return `Tiêu đề: ${title}\n${titleSeparator}\n${content}`;
   }
   return content;
 }
