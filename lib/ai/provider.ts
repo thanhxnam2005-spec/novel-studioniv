@@ -82,6 +82,16 @@ export async function getModel(
           baseURL: provider.baseUrl.replace(/\/+$/, ""),
           apiKey: provider.apiKey,
           supportsStructuredOutputs: false,
+          fetch: async (url, options) => {
+            // Route through server-side proxy to bypass CORS
+            return fetch("/api/ai-proxy", {
+              ...options,
+              headers: {
+                ...options?.headers,
+                "x-target-url": url.toString(),
+              },
+            });
+          },
         }).chatModel(modelId),
       );
   }

@@ -14,7 +14,7 @@ export interface SiteAdapter {
   /** Parse novel page HTML → novel info + chapter list */
   getNovelInfo(html: string, url: string): NovelInfo | Promise<NovelInfo>;
   /** Parse chapter page HTML → chapter content. contentText is innerText from live DOM (bypasses font obfuscation). */
-  getChapterContent(html: string, url: string, contentText?: string): ChapterContent;
+  getChapterContent(html: string, url: string, contentText?: string): ChapterContent | Promise<ChapterContent>;
 }
 
 // ─── Data Types ────────────────────────────────────────────

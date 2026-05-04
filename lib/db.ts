@@ -236,6 +236,7 @@ export interface AnalysisSettings {
   translatePrompt?: string;
   reviewPrompt?: string;
   editPrompt?: string;
+  translateDelaySeconds?: number;
 }
 
 // ─── Name Dictionary ─────────────────────────────────────────

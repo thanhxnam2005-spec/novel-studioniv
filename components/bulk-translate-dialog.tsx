@@ -198,6 +198,17 @@ export function BulkTranslateDialog({
   // Other config
   const [translateTitle, setTranslateTitle] = useState(true);
   const [autoSave, setAutoSave] = useState(false);
+  const [delaySeconds, setDelaySeconds] = useState(settings.translateDelaySeconds ?? 0);
+
+  useEffect(() => {
+    setDelaySeconds(settings.translateDelaySeconds ?? 0);
+  }, [settings.translateDelaySeconds]);
+
+  const handleDelayChange = (val: string) => {
+    const num = parseInt(val) || 0;
+    setDelaySeconds(num);
+    updateAnalysisSettings({ translateDelaySeconds: num } as Partial<AnalysisSettings>);
+  };
 
   const selectedChapters = useMemo(
     () => chapters.filter((c) => selectedChapterIds.includes(c.id)),
@@ -233,6 +244,7 @@ export function BulkTranslateDialog({
         settings,
         customPrompt: promptText,
         signal,
+        delayMs: delaySeconds * 1000,
         ...makeCallbacks(autoSave),
       });
     },
@@ -242,6 +254,7 @@ export function BulkTranslateDialog({
       autoSave,
       settings,
       promptText,
+      delaySeconds,
       resolveModel,
     ],
   );
@@ -402,6 +415,21 @@ export function BulkTranslateDialog({
                     >
                       Tự động lưu sau mỗi chương
                     </Label>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <Label htmlFor="translate-delay" className="text-xs">
+                      Độ trễ giữa các chương (giây)
+                    </Label>
+                    <input
+                      id="translate-delay"
+                      type="number"
+                      min="0"
+                      max="60"
+                      className="h-8 w-16 rounded-md border bg-background px-2 text-center text-xs focus:ring-1 focus:ring-primary"
+                      value={delaySeconds}
+                      onChange={(e) => handleDelayChange(e.target.value)}
+                    />
                   </div>
                 </div>
 

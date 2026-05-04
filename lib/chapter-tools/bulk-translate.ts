@@ -101,6 +101,8 @@ export interface BulkTranslateOptions {
   /** Overrides the translate prompt from settings when provided. */
   customPrompt?: string;
   signal?: AbortSignal;
+  /** Delay in milliseconds between chapters to avoid rate limits. */
+  delayMs?: number;
 
   onChapterStart: (chapterId: string, chapterTitle: string) => void;
   onChapterComplete: (result: TranslateChapterResult) => void;
@@ -119,6 +121,7 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
     settings,
     customPrompt,
     signal,
+    delayMs,
     onChapterStart,
     onChapterComplete,
     onChapterError,
@@ -153,7 +156,17 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
   // Fetch name dictionary once for dynamic filtering per chapter
   const nameDict = await getMergedNameDict(novelId);
 
+  let isFirst = true;
+
   for (const chapter of chapters) {
+    if (signal?.aborted) break;
+
+    // Apply delay between chapters (skip for the first one)
+    if (!isFirst && delayMs && delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    isFirst = false;
+
     if (signal?.aborted) break;
 
     onChapterStart(chapter.id, chapter.title);

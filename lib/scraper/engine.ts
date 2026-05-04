@@ -90,7 +90,7 @@ export async function scrapeChapters(
       logs = fetchRes.logs ?? [];
     }
     const content = sanitizeChapterContent(
-      adapter.getChapterContent(html, chapter.url, contentText),
+      await adapter.getChapterContent(html, chapter.url, contentText),
     );
     content.order = chapter.order;
 

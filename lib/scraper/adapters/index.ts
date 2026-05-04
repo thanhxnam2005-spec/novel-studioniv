@@ -6,7 +6,6 @@ import { CuocengAdapter } from "./Cuoceng";
 import { SixNineShuAdapter } from "./SixNineShu";
 import { SixNineShuTwAdapter } from "./SixNineShuTw";
 import { JjwxcAdapter } from "./Jjwxc";
-import { FanqieAdapter } from "./Fanqie";
 
 const adapters: SiteAdapter[] = [
   STVAdapter,
@@ -16,7 +15,6 @@ const adapters: SiteAdapter[] = [
   SixNineShuAdapter,
   SixNineShuTwAdapter,
   JjwxcAdapter,
-  FanqieAdapter,
 ];
 
 /** Find the adapter that matches the given URL, or null. */
@@ -29,4 +27,4 @@ export function getAdapters(): SiteAdapter[] {
   return adapters;
 }
 
-export { STVAdapter, UukanshuAdapter, PiaotiaAdapter, CuocengAdapter, SixNineShuAdapter, SixNineShuTwAdapter, JjwxcAdapter, FanqieAdapter };
+export { STVAdapter, UukanshuAdapter, PiaotiaAdapter, CuocengAdapter, SixNineShuAdapter, SixNineShuTwAdapter, JjwxcAdapter };
