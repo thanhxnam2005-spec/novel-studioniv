@@ -55,6 +55,7 @@ export default function DashboardLayout({
     pageTitle = "Đọc truyện";
   if (pathname.match(/^\/novels\/[^/]+\/chapters\/.+$/))
     pageTitle = "Soạn thảo";
+  if (pathname === "/admin") pageTitle = "Quản trị";
   const novelIdMatch = pathname.match(/^\/novels\/([^/]+)/);
   const currentNovelId = novelIdMatch?.[1] ?? null;
   const chapterIdMatch = pathname.match(/^\/novels\/[^/]+\/chapters\/([^/]+)/);
@@ -74,6 +75,8 @@ export default function DashboardLayout({
 
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const isAdmin = Boolean(user?.app_metadata?.isAdmin || user?.user_metadata?.isAdmin);
+  const isVip = Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip);
 
   // Keep name dict panel's novelId in sync with URL
   useEffect(() => {
@@ -154,7 +157,6 @@ export default function DashboardLayout({
     const stored = localStorage.getItem("theme");
     const isDark = stored === "dark";
     document.documentElement.classList.toggle("dark", isDark);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDark(isDark);
   }, []);
   const toggleDark = () => {
@@ -182,22 +184,41 @@ export default function DashboardLayout({
               <span className="font-medium">Đang tải...</span>
             </div>
           ) : user ? (
-            <div className="ml-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-medium">Đã đăng nhập:</span>
-              <span>{user.user_metadata?.full_name || user.email || user.id}</span>
-              <button
-                onClick={handleRefreshAuth}
-                className="ml-1 text-xs text-muted-foreground hover:text-foreground underline"
-                disabled={authLoading}
-              >
-                Làm mới
-              </button>
-              <button
-                onClick={handleLogout}
-                className="ml-1 text-xs text-muted-foreground hover:text-foreground underline"
-              >
-                Đăng xuất
-              </button>
+            <div className="ml-3 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Đã đăng nhập:</span>
+                <span>{user.user_metadata?.full_name || user.email || user.id}</span>
+                {isAdmin && (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                    Admin
+                  </span>
+                )}
+                {isVip && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                    VIP
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleRefreshAuth}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  disabled={authLoading}
+                >
+                  Làm mới
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                >
+                  Đăng xuất
+                </button>
+                {isAdmin ? (
+                  <Link href="/admin" className="text-xs text-primary underline">
+                    Bảng admin
+                  </Link>
+                ) : null}
+              </div>
             </div>
           ) : (
             <div className="ml-3">

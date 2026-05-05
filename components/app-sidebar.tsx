@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Sidebar,
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useNovels } from "@/lib/hooks";
 import { useQTEngineStatus } from "@/lib/hooks/use-qt-engine";
+import { supabase } from "@/lib/supabase";
 import {
   BookOpenIcon,
   BrainIcon,
@@ -32,14 +32,14 @@ import {
   HomeIcon,
   LibraryIcon,
   LoaderIcon,
-  PenLineIcon,
   ServerIcon,
+  ShieldCheckIcon,
   UploadIcon,
   SettingsIcon,
   ChevronRightIcon,
-  LogOutIcon,
   LaptopIcon,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -73,6 +73,28 @@ export function AppSidebar() {
   const pathname = usePathname();
   const novels = useNovels();
   const recentNovels = novels?.slice(0, 5);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!supabase) return;
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error checking admin status:", error);
+        return;
+      }
+      const user = session?.user;
+      setIsAdmin(Boolean(user?.app_metadata?.isAdmin || user?.user_metadata?.isAdmin));
+    };
+
+    checkAdmin();
+  }, []);
+
+  const adminNavItem = {
+    title: "Quản trị",
+    href: "/admin",
+    icon: ShieldCheckIcon,
+  } as const;
 
   const mainNav = navConfig.filter(
     (item) => !item.href.startsWith("/settings"),
@@ -82,6 +104,7 @@ export function AppSidebar() {
   );
 
   const [logoError, setLogoError] = useState(false);
+  const sidebarNav = isAdmin ? [...mainNav, adminNavItem] : mainNav;
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar">
@@ -92,10 +115,12 @@ export function AppSidebar() {
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary overflow-hidden relative">
             {!logoError ? (
-              <img 
-                src="/logo.png" 
-                alt="Logo" 
-                className="w-full h-full object-cover rounded-xl" 
+              <Image
+                src="/logo.png"
+                alt="Logo"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover rounded-xl"
                 onError={() => setLogoError(true)}
               />
             ) : (
@@ -120,7 +145,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Điều hướng</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              {sidebarNav.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
