@@ -555,6 +555,7 @@ export const useScraperStore = create<ScraperState>()(
                 await db.novels.add({
                   id: targetId,
                   title: content.title.split(":")[0]?.trim() || "Truyện Crawl",
+                  description: "",
                   sourceUrl: url,
                   createdAt: now,
                   updatedAt: now,
