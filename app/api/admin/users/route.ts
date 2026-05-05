@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const { data, error } = await supabaseAdmin!.auth.admin.listUsers({ limit: 100 });
+  const { data, error } = await supabaseAdmin!.auth.admin.listUsers({ perPage: 100 });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
