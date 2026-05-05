@@ -1223,7 +1223,7 @@ function STVWaitStep() {
 // ─── Step 3: Progress ──────────────────────────────────────
 
 function ScrapingStep() {
-  const { progress, isLoading, error, abortScraping, scrapedChapters } =
+  const { progress, isLoading, error, abortScraping, scrapedChapters, adapter } =
     useScraperStore();
 
   const percent =
