@@ -99,6 +99,17 @@ export async function scrapeChapters(
       content.title = extTitle || chapter.title;
     }
 
+    // Check if content is identical to previous chapter (STV common issue)
+    if (adapter.name === "STV" && i > 0 && results.length > 0) {
+      const prevContent = results[results.length - 1].content;
+      if (content.content.trim() === prevContent.trim() && content.content.length > 100) {
+         await extensionStopScrape();
+         throw new Error(
+           `Phát hiện nội dung chương "${chapter.title}" giống hệt chương trước. Có thể STV chưa load kịp chương mới. Vui lòng mở tab SangTacViet, bấm load lại chương này, sau đó quay lại đây bấm "Tiếp tục".`
+         );
+      }
+    }
+
     if (timedOut) {
       content.warning = `Timeout — nội dung chưa load được (${content.content.length} ký tự)`;
     } else if (content.content.length < 30) {
@@ -118,12 +129,21 @@ export async function scrapeChapters(
       clickSelector: adapter.chapterClickSelector,
     });
 
+    // For STV, stop IMMEDIATELY if content is missing or too short
+    // This allows the user to reload the tab manually as requested.
+    if (adapter.name === "STV" && (timedOut || content.content.length < 30)) {
+      await extensionStopScrape();
+      throw new Error(
+        `Chương "${chapter.title}" không load được nội dung. Vui lòng mở tab SangTacViet, đảm bảo chương này đã hiện nội dung, sau đó quay lại đây bấm "Tiếp tục".`,
+      );
+    }
+
     if (results.length >= 3) {
       const lastThree = results.slice(-3);
       if (lastThree.every((ch) => ch.warning)) {
         await extensionStopScrape();
         throw new Error(
-          "Đã dừng: 3 chương liên tiếp không load được nội dung. Vui lòng mở trang gốc để đảm bảo trang truyện không bị lỗi.",
+          "Đã dừng: 3 chương liên tiếp không load được nội dung. Vui lòng kiểm tra lại trang nguồn.",
         );
       }
     }

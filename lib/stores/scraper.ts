@@ -10,6 +10,7 @@ import { extensionFetch, checkExtensionStatus, extensionDownloadSTVChapter } fro
 import { novelIndexDebugSummary } from "../scraper/novel-page-diagnostics";
 import { db } from "../db";
 import { stripHtml, countWords } from "../utils";
+import { toast } from "sonner";
 import type {
   ChapterContent,
   ChapterLink,
@@ -60,6 +61,7 @@ interface ScraperState {
   abortScraping: () => void;
   pauseScraping: () => void;
   resumeScraping: () => void;
+  scanForErrors: () => void;
   setStep: (step: ScraperStep) => void;
   setChapterDelay: (delay: number) => void;
   reset: () => void;
@@ -228,10 +230,30 @@ export const useScraperStore = create<ScraperState>()(
         }
         if (!adapter) return;
 
-        const selectedChapters = novelInfo.chapters.filter((ch: ChapterLink) =>
+        let selectedChapters = novelInfo.chapters.filter((ch: ChapterLink) =>
           selectedChapterUrls.has(ch.url),
         );
-        if (selectedChapters.length === 0) return;
+
+        // Filter out duplicates if we know the novel
+        const existingNovel = await db.novels.where("sourceUrl").equals(url).first();
+        if (existingNovel) {
+          const chaptersInDb = await db.chapters.where("novelId").equals(existingNovel.id).toArray();
+          const existingTitles = new Set(chaptersInDb.map(c => c.title.toLowerCase().trim()));
+          const initialCount = selectedChapters.length;
+          selectedChapters = selectedChapters.filter(ch => !existingTitles.has(ch.title.toLowerCase().trim()));
+          const skipped = initialCount - selectedChapters.length;
+          if (skipped > 0) {
+            addLog("Scrape · Duplicates", `Bỏ qua ${skipped} chương đã có trong thư viện.`);
+            toast.info(`Đã tự động bỏ qua ${skipped} chương đã tồn tại trong thư viện.`);
+          }
+        }
+
+        if (selectedChapters.length === 0) {
+          if (novelInfo.chapters.some(ch => selectedChapterUrls.has(ch.url))) {
+             toast.success("Tất cả các chương đã chọn đều đã có trong thư viện.");
+          }
+          return;
+        }
 
         if (adapter.name === "STV") {
           set({ step: "stv-wait", error: null });
@@ -294,9 +316,22 @@ export const useScraperStore = create<ScraperState>()(
         }
         if (!adapter) return;
 
-        const selectedChapters = novelInfo.chapters.filter((ch: ChapterLink) =>
+        let selectedChapters = novelInfo.chapters.filter((ch: ChapterLink) =>
           selectedChapterUrls.has(ch.url),
         );
+
+        // Filter out duplicates if targetNovelId is provided
+        if (novelId) {
+          const chaptersInDb = await db.chapters.where("novelId").equals(novelId).toArray();
+          const existingTitles = new Set(chaptersInDb.map(c => c.title.toLowerCase().trim()));
+          const initialCount = selectedChapters.length;
+          selectedChapters = selectedChapters.filter(ch => !existingTitles.has(ch.title.toLowerCase().trim()));
+          const skipped = initialCount - selectedChapters.length;
+          if (skipped > 0) {
+             addLog("Scrape · Duplicates", `Bỏ qua ${skipped} chương đã có (Background).`);
+          }
+        }
+
         if (selectedChapters.length === 0) return;
 
         let finalNovelId = novelId;
@@ -481,6 +516,18 @@ export const useScraperStore = create<ScraperState>()(
             abortController: null,
           });
         }
+      },
+
+      scanForErrors: () => {
+        const { scrapedChapters } = get();
+        const updated = scrapedChapters.map(ch => {
+          const plain = stripHtml(ch.content).trim();
+          if (plain.length < 30) {
+            return { ...ch, warning: `Chương này có vẻ bị trống hoặc load lỗi (${plain.length} ký tự)` };
+          }
+          return ch;
+        });
+        set({ scrapedChapters: updated });
       },
 
       retryScrapeChapter: async (index: number) => {

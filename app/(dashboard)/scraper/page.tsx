@@ -1248,8 +1248,26 @@ function ScrapingStep() {
         )}
 
         {error && (
-          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
+          <div className="space-y-3">
+            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive border border-destructive/20">
+              <div className="flex items-start gap-2">
+                <AlertTriangleIcon className="size-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            </div>
+            {scrapedChapters.length > 0 && adapter?.name === "STV" && (
+              <div className="flex justify-center">
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  onClick={() => useScraperStore.getState().confirmSTVReady()}
+                  className="bg-green-600 hover:bg-green-700 text-white gap-2 shadow-sm"
+                >
+                  <RefreshCwIcon className="size-3.5" />
+                  Tiếp tục tải các chương còn lại
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1483,10 +1501,6 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
     <Card>
       <CardHeader>
         <CardTitle>Xem trước & Nhập</CardTitle>
-        <CardDescription className="flex items-center gap-2">
-          <span>
-            {scrapedChapters.length} chương · {totalWords.toLocaleString()} từ
-          </span>
           {warnCount > 0 && (
             <Badge
               variant={showOnlyWarnings ? "default" : "secondary"}
@@ -1502,6 +1516,15 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
               {showOnlyWarnings ? `Đang hiện ${warnCount} cảnh báo` : `${warnCount} cảnh báo`}
             </Badge>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] text-muted-foreground hover:text-primary"
+            onClick={() => useScraperStore.getState().scanForErrors()}
+          >
+            <RefreshCwIcon className="mr-1 size-2.5" />
+            Quét chương lỗi
+          </Button>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
