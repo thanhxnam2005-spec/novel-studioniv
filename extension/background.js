@@ -1,91 +1,80 @@
 /**
  * Novel Studio Extension - Background Script
- * Enhanced with Smart Scrape capabilities.
+ * Robust version with "Step-by-Step" reveal logic.
  */
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function handleFetch(url, options = {}) {
-  const { waitSelector, clickSelector, smartScrape, timeout = 15000 } = options;
+  const { smartScrape, timeout = 30000 } = options;
   const logs = [];
   const log = (msg) => logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
 
-  // 1. Try background fetch for simple cases
-  if (!waitSelector && !clickSelector && !smartScrape) {
-    log(`Background fetch: ${url}`);
-    try {
-      const resp = await fetch(url, {
-        method: options.method || "GET",
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          ...(options.headers || {})
-        },
-        body: options.body,
-      });
-      const html = await resp.text();
-      return { ok: true, html, logs };
-    } catch (e) {
-      log(`Background fetch failed, trying tab...`);
-    }
-  }
-
-  // 2. Tab fetch for complex interaction
+  // Tab fetch is mandatory for XTruyen step-by-step reveal
   let tabId, windowId;
   try {
     const window = await chrome.windows.create({ url, state: "minimized" });
     windowId = window.id;
     tabId = window.tabs[0].id;
+    log(`Tab created (id=${tabId})`);
 
-    // Wait for initial load
+    // Wait for initial page stability
     await delay(3000); 
 
     if (smartScrape === "XTRUYEN") {
-      log("Executing XTruyen Smart Scrape script...");
+      log("Starting XTruyen Step-by-Step Reveal...");
+      
       await chrome.scripting.executeScript({
         target: { tabId },
         func: async () => {
+          // STEP 1: Find all volume items
           const items = document.querySelectorAll('li.has-child[data-value]');
+          console.log(`Found ${items.length} volumes to reveal`);
+
           for (const item of items) {
-            item.click();
-            // Force display
+            // STEP 2: Force Reveal (Change none to block)
             const sub = item.querySelector('.sub-chap');
-            if (sub) sub.style.display = 'block';
-            await new Promise(r => setTimeout(r, 200));
+            if (sub) {
+              sub.style.display = 'block';
+              sub.style.visibility = 'visible';
+              sub.style.opacity = '1';
+            }
+            
+            // STEP 3: Trigger Load (Click the header)
+            const header = item.querySelector('.single-chapter-list');
+            if (header) {
+              header.click();
+            }
+            
+            // Small delay to prevent overwhelming the site
+            await new Promise(r => setTimeout(r, 100));
           }
-          // Scroll to bottom to trigger any lazy loading
+
+          // STEP 4: Final Wait for all AJAX to complete
+          // We wait up to 5 seconds for spinners to disappear
+          let stableCount = 0;
+          for (let i = 0; i < 10; i++) {
+            const spinners = document.querySelectorAll('.loading-spinner:not([style*="display: none"])');
+            if (spinners.length === 0) {
+              stableCount++;
+              if (stableCount >= 2) break;
+            } else {
+              stableCount = 0;
+            }
+            await new Promise(r => setTimeout(r, 500));
+          }
+          
+          // Scroll to trigger any last lazy loaders
+          window.scrollTo(0, document.body.scrollHeight / 2);
+          await new Promise(r => setTimeout(r, 500));
           window.scrollTo(0, document.body.scrollHeight);
           await new Promise(r => setTimeout(r, 1000));
         }
       });
-      log("Smart Scrape finished");
-    } else if (clickSelector) {
-      log(`Clicking ${clickSelector}`);
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: (sel) => document.querySelector(sel)?.click(),
-        args: [clickSelector],
-      });
-      await delay(1000);
+      log("XTruyen Reveal completed");
     }
 
-    if (waitSelector) {
-      log(`Waiting for ${waitSelector}`);
-      let found = false;
-      const start = Date.now();
-      while (Date.now() - start < timeout) {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId },
-          func: (sel) => !!document.querySelector(sel),
-          args: [waitSelector],
-        });
-        if (results[0].result) {
-          found = true;
-          break;
-        }
-        await delay(500);
-      }
-    }
-
+    // Extract the fully populated HTML
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => ({
@@ -98,6 +87,7 @@ async function handleFetch(url, options = {}) {
     return { ok: true, html: data.html, contentText: data.innerText, logs };
 
   } catch (err) {
+    log(`Error: ${err.message}`);
     return { ok: false, error: err.message, logs };
   } finally {
     if (windowId) chrome.windows.remove(windowId).catch(() => {});

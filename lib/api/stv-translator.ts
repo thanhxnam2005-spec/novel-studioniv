@@ -9,7 +9,6 @@
  * CORS:   access-control-allow-origin: *  (gọi trực tiếp từ browser)
  */
 
-const STV_API_URL = "https://comic.sangtacvietcdn.xyz/tsm.php?cdn=";
 
 // ── Rate Limiter ────────────────────────────────────────────
 // Tối đa 10.000 ký tự mỗi 2 giây
