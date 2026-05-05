@@ -43,7 +43,6 @@ interface ScraperState {
   debugLogs: DebugLog[];
   chapterDelay: number;
   isPaused: boolean;
-  isBackground: boolean;
   targetNovelId: string | null;
 
   // Actions
@@ -55,7 +54,6 @@ interface ScraperState {
   selectAll: () => void;
   deselectAll: () => void;
   startScraping: () => Promise<void>;
-  startBackgroundScraping: (mode: "new" | "existing", novelId?: string, title?: string, desc?: string) => Promise<void>;
   confirmSTVReady: () => Promise<void>;
   startCrawling: (targetNovelId?: string) => Promise<void>;
   retryScrapeChapter: (index: number) => Promise<void>;
@@ -86,7 +84,6 @@ const initialState = {
   debugLogs: [] as DebugLog[],
   chapterDelay: 2,
   isPaused: false,
-  isBackground: false,
   targetNovelId: null as string | null,
 };
 
@@ -299,177 +296,6 @@ export const useScraperStore = create<ScraperState>()(
             return;
           }
           addLog("Scrape · batch · error", err instanceof Error ? err.message : String(err));
-          set({
-            error: err instanceof Error ? err.message : "Lỗi khi scrape",
-            isLoading: false,
-            abortController: null,
-          });
-        }
-      },
-
-      startBackgroundScraping: async (mode: "new" | "existing", novelId?: string, title?: string, desc?: string) => {
-        let { novelInfo, selectedChapterUrls, adapter, url } = get();
-        if (!novelInfo) return;
-
-        if (!adapter) {
-          adapter = detectAdapter(url);
-          set({ adapter });
-        }
-        if (!adapter) return;
-
-        let selectedChapters = novelInfo.chapters.filter((ch: ChapterLink) =>
-          selectedChapterUrls.has(ch.url),
-        );
-
-        // Filter out duplicates if targetNovelId is provided
-        if (novelId) {
-          const chaptersInDb = await db.chapters.where("novelId").equals(novelId).toArray();
-          const existingTitles = new Set(chaptersInDb.map(c => c.title.toLowerCase().trim()));
-          const initialCount = selectedChapters.length;
-          selectedChapters = selectedChapters.filter((ch: any) => !existingTitles.has(ch.title.toLowerCase().trim()));
-          const skipped = initialCount - selectedChapters.length;
-          if (skipped > 0) {
-             addLog("Scrape · Duplicates", `Bỏ qua ${skipped} chương đã có (Background).`);
-          }
-        }
-
-        if (selectedChapters.length === 0) return;
-
-        let finalNovelId = novelId;
-        const now = new Date();
-
-        if (mode === "new") {
-          finalNovelId = crypto.randomUUID();
-          await db.novels.add({
-            id: finalNovelId,
-            title: (title || novelInfo.title || "Untitled").trim(),
-            description: (desc || novelInfo.description || "").trim(),
-            sourceUrl: url,
-            author: novelInfo.author,
-            coverImage: novelInfo.coverImage,
-            createdAt: now,
-            updatedAt: now,
-          });
-        } else if (novelId) {
-          await db.novels.update(novelId, {
-            sourceUrl: url,
-            updatedAt: now,
-            ...(novelInfo.coverImage ? { coverImage: novelInfo.coverImage } : {}),
-          });
-        } else {
-          return;
-        }
-
-        const abortController = new AbortController();
-        set({
-          isBackground: true,
-          isPaused: false,
-          targetNovelId: finalNovelId!,
-          step: "scraping",
-          isLoading: true,
-          error: null,
-          scrapedChapters: [],
-          progress: { completed: 0, total: selectedChapters.length, current: "" },
-          abortController,
-        });
-
-        try {
-          await scrapeChapters(
-            selectedChapters,
-            adapter,
-            (completed, total, currentTitle) => {
-              set({ progress: { completed, total, current: currentTitle } });
-            },
-            abortController.signal,
-            async (entry) => {
-              const { targetNovelId } = get();
-              if (targetNovelId) {
-                const normalizedTitle = entry.parsed.title.toLowerCase().trim();
-                const existing = await db.chapters
-                  .where("novelId")
-                  .equals(targetNovelId)
-                  .toArray()
-                  .then(chapters => chapters.find(c => c.title.toLowerCase().trim() === normalizedTitle));
-
-                if (existing) {
-                  const scenes = await db.scenes.where("chapterId").equals(existing.id).toArray();
-                  const activeScene = scenes.find(s => s.isActive === 1);
-                  if (activeScene) {
-                    // Update existing chapter content
-                    await db.scenes.update(activeScene.id, {
-                      content: entry.parsed.content,
-                      wordCount: countWords(stripHtml(entry.parsed.content)),
-                      updatedAt: now,
-                    });
-                    addLog("Scrape · Chapter Updated", `Cập nhật: ${entry.parsed.title}`);
-                  }
-                } else {
-                  // Add new chapter
-                  const chapterId = crypto.randomUUID();
-                  const plainText = stripHtml(entry.parsed.content);
-                  const currentOrder = await db.chapters
-                    .where("novelId")
-                    .equals(targetNovelId)
-                    .count();
-
-                  await db.chapters.add({
-                    id: chapterId,
-                    novelId: targetNovelId,
-                    title: entry.parsed.title,
-                    order: entry.parsed.order ?? currentOrder,
-                    createdAt: now,
-                    updatedAt: now,
-                  });
-
-                  await db.scenes.add({
-                    id: crypto.randomUUID(),
-                    chapterId,
-                    novelId: targetNovelId,
-                    title: entry.parsed.title,
-                    content: entry.parsed.content,
-                    order: 0,
-                    wordCount: countWords(plainText),
-                    version: 0,
-                    versionType: "manual",
-                    isActive: 1,
-                    createdAt: now,
-                    updatedAt: now,
-                  });
-                }
-              }
-
-              const prev = get().scrapedChapters;
-              set({ scrapedChapters: [...prev, entry.parsed] });
-              logChapterIssue(entry);
-            },
-            get().chapterDelay * 1000,
-            () => get().isPaused
-          );
-
-          set({
-            isLoading: false,
-            step: "preview",
-            abortController: null,
-          });
-          
-          // Auto-reset after 2 seconds to allow loading next novel
-          setTimeout(() => {
-            if (get().step === "preview" && !get().isLoading) {
-              set({
-                step: "url",
-                scrapedChapters: [],
-                progress: { completed: 0, total: 0, current: "" },
-                isBackground: false,
-                targetNovelId: null,
-              });
-              toast.success("Sẵn sàng để tải truyện tiếp theo!");
-            }
-          }, 2000);
-        } catch (err) {
-          if ((err as Error).name === "AbortError") {
-            set({ isLoading: false, error: "Đã hủy scraping", abortController: null });
-            return;
-          }
           set({
             error: err instanceof Error ? err.message : "Lỗi khi scrape",
             isLoading: false,

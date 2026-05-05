@@ -1,11 +1,8 @@
 "use client";
 
 import { AppSidebar, miscNav, navConfig } from "@/components/app-sidebar";
-import { ChatPanel } from "@/components/chat-panel";
 import { DictInitializer } from "@/components/dict-initializer";
 import { GlobalSearchDialog } from "@/components/global-search-dialog";
-import { NameDictPanel } from "@/components/name-dict/name-dict-panel";
-import { ReaderPanel } from "@/components/reader/reader-panel";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,18 +24,24 @@ import { useReaderPanel } from "@/lib/stores/reader-panel";
 import {
   BookTextIcon,
   BotIcon,
+  Loader2Icon,
   MoonIcon,
   SearchIcon,
   SunIcon,
   Volume2Icon,
 } from "lucide-react";
 import { PageContextSync } from "@/components/chat/page-context-sync";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { type User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { ScraperOverlay } from "@/components/scraper/scraper-overlay";
+
+// Lazy load heavy panel components for faster initial render
+const ChatPanel = lazy(() => import("@/components/chat-panel").then(m => ({ default: m.ChatPanel })));
+const NameDictPanel = lazy(() => import("@/components/name-dict/name-dict-panel").then(m => ({ default: m.NameDictPanel })));
+const ReaderPanel = lazy(() => import("@/components/reader/reader-panel").then(m => ({ default: m.ReaderPanel })));
 
 const pageTitles: Record<string, string> = Object.fromEntries(
   [...navConfig, ...miscNav].map((item) => [item.href, item.title]),
@@ -49,6 +52,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   let pageTitle = pageTitles[pathname] ?? "Novel Studio";
   if (pathname.match(/^\/novels\/[^/]+$/)) pageTitle = "Tiểu thuyết";
@@ -97,6 +101,9 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!supabase) {
+      // If no Supabase and not localhost, redirect to auth
+      router.replace('/auth');
+      return;
       setAuthLoading(false);
       return;
     }
@@ -108,7 +115,10 @@ export default function DashboardLayout({
         if (error) {
           console.error('Error getting session:', error);
         }
-        console.log('Initial session:', session?.user?.email || 'No session');
+        if (!session) {
+          router.replace('/auth');
+          return;
+        }
         setUser(session?.user ?? null);
       } catch (err) {
         console.error('Exception getting session:', err);
@@ -122,20 +132,23 @@ export default function DashboardLayout({
 
     // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email || 'No user');
+      if (event === 'SIGNED_OUT') {
+        router.replace('/auth');
+        return;
+      }
       setUser(session?.user ?? null);
       setAuthLoading(false);
     });
 
     return () => listener.subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
-  };
+  }, []);
 
-  const handleRefreshAuth = async () => {
+  const handleRefreshAuth = useCallback(async () => {
     if (!supabase) return;
     setAuthLoading(true);
     try {
@@ -143,14 +156,13 @@ export default function DashboardLayout({
       if (error) {
         console.error('Refresh auth error:', error);
       }
-      console.log('Refreshed session:', session?.user?.email || 'No session');
       setUser(session?.user ?? null);
     } catch (err) {
       console.error('Refresh auth exception:', err);
     } finally {
       setAuthLoading(false);
     }
-  };
+  }, []);
 
   // Global search shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -193,7 +205,7 @@ export default function DashboardLayout({
           </Breadcrumb>
           {authLoading ? (
             <div className="ml-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-medium">Đang tải...</span>
+              <Loader2Icon className="size-3.5 animate-spin" />
             </div>
           ) : user ? (
             <div className="ml-3 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
@@ -299,9 +311,15 @@ export default function DashboardLayout({
         pathnameChapterId={currentChapterId}
         readerChapterOrder={currentReaderOrder}
       />
-      <ReaderPanel />
-      <ChatPanel />
-      <NameDictPanel />
+      <Suspense fallback={null}>
+        <ReaderPanel />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ChatPanel />
+      </Suspense>
+      <Suspense fallback={null}>
+        <NameDictPanel />
+      </Suspense>
       <DictInitializer />
       <GlobalSearchDialog />
       <WelcomeModal />

@@ -15,6 +15,52 @@ import {
 import type { TranslateChapterResult, TranslateError } from "@/lib/stores/bulk-translate";
 import { cleanGarbageLines } from "@/lib/text-utils";
 
+// ── Retry & Error Handling ──
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY = 2000; // 2s, 4s, 8s exponential backoff
+
+/** Classify API errors and decide if they are retryable */
+function classifyError(err: unknown): { retryable: boolean; message: string } {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+
+  // Rate limit (429)
+  if (lower.includes('rate limit') || lower.includes('429') || lower.includes('too many requests')) {
+    return { retryable: true, message: `Rate limit — đang chờ retry... (${msg})` };
+  }
+  // Server errors (500, 502, 503)
+  if (lower.includes('500') || lower.includes('502') || lower.includes('503') || lower.includes('server error') || lower.includes('internal error')) {
+    return { retryable: true, message: `Server lỗi tạm thời — đang retry... (${msg})` };
+  }
+  // Timeout
+  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('econnreset')) {
+    return { retryable: true, message: `Timeout — đang retry... (${msg})` };
+  }
+  // Auth errors (not retryable)
+  if (lower.includes('401') || lower.includes('403') || lower.includes('unauthorized') || lower.includes('invalid api key') || lower.includes('authentication')) {
+    return { retryable: false, message: `Lỗi xác thực API key — kiểm tra lại cấu hình provider. (${msg})` };
+  }
+  // Model not found
+  if (lower.includes('model not found') || lower.includes('404') || lower.includes('does not exist')) {
+    return { retryable: false, message: `Model không tồn tại hoặc không khả dụng. (${msg})` };
+  }
+  // Insufficient quota
+  if (lower.includes('quota') || lower.includes('insufficient') || lower.includes('billing')) {
+    return { retryable: false, message: `Hết quota/credit API. Kiểm tra billing. (${msg})` };
+  }
+  // Content filter
+  if (lower.includes('content filter') || lower.includes('safety') || lower.includes('blocked')) {
+    return { retryable: false, message: `Nội dung bị chặn bởi bộ lọc an toàn. (${msg})` };
+  }
+  // Default: try once more
+  return { retryable: true, message: msg };
+}
+
+async function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // ── Shared constants & helpers (also used by translate-mode.tsx) ──
 
 export const TITLE_SEPARATOR = "---";
@@ -213,25 +259,56 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
         ? buildTranslateUserPrompt(cleanedJoinedContent, chapter.title, TITLE_SEPARATOR)
         : cleanedJoinedContent;
 
-      // Stream translation
-      const result = streamText({
-        model,
-        system: systemPrompt,
-        prompt: userPrompt,
-        abortSignal: signal,
-        maxOutputTokens: 25000, // Ensure long chapters are not truncated
-      });
-
+      // Stream translation with retry logic
       let accumulated = "";
-      for await (const part of result.fullStream) {
-        if (part.type === "text-delta") {
-          accumulated += part.text ?? "";
+      let lastError: unknown = null;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (signal?.aborted) break;
+
+        try {
+          accumulated = "";
+          const result = streamText({
+            model,
+            system: systemPrompt,
+            prompt: userPrompt,
+            abortSignal: signal,
+            // No maxOutputTokens — let the model decide based on content length
+            // This prevents truncation on long chapters while being efficient on short ones
+          });
+
+          for await (const part of result.fullStream) {
+            if (part.type === "text-delta") {
+              accumulated += part.text ?? "";
+            }
+          }
+
+          const finishReason = await result.finishReason;
+          if (finishReason === "length") {
+            console.warn(`Chapter ${chapter.title} may have been truncated.`);
+          }
+
+          lastError = null;
+          break; // Success — exit retry loop
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") throw err;
+
+          lastError = err;
+          const classified = classifyError(err);
+
+          if (!classified.retryable || attempt >= MAX_RETRIES) {
+            throw new Error(classified.message);
+          }
+
+          // Exponential backoff
+          const backoffMs = RETRY_BASE_DELAY * Math.pow(2, attempt);
+          console.warn(`[Translate] Retry ${attempt + 1}/${MAX_RETRIES} for "${chapter.title}" in ${backoffMs}ms: ${classified.message}`);
+          await delay(backoffMs);
         }
       }
 
-      const finishReason = await result.finishReason;
-      if (finishReason === "length") {
-        console.warn(`Chapter ${chapter.title} was truncated due to length limit.`);
+      if (lastError) {
+        throw lastError;
       }
 
       if (!accumulated.trim()) {

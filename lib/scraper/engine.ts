@@ -2,6 +2,39 @@ import { sanitizeText } from "../utils";
 import { extensionFetch, extensionDownloadSTVChapter, extensionStopScrape } from "./extension-bridge";
 import type { ChapterContent, ChapterLink, SiteAdapter } from "./types";
 
+/** Simple content hash for duplicate detection */
+function hashContent(text: string): string {
+  let hash = 0;
+  const str = text.replace(/\s+/g, '').slice(0, 2000); // Normalize whitespace, use first 2000 chars
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // Convert to 32-bit int
+  }
+  return hash.toString(36);
+}
+
+/** Check similarity between two texts (0-1 ratio) */
+function contentSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const normA = a.replace(/\s+/g, ' ').trim();
+  const normB = b.replace(/\s+/g, ' ').trim();
+  if (normA === normB) return 1;
+  // Quick length-based check
+  const lenRatio = Math.min(normA.length, normB.length) / Math.max(normA.length, normB.length);
+  if (lenRatio < 0.5) return 0; // Too different in length
+  // Compare first/last chunks
+  const chunkSize = Math.min(500, normA.length, normB.length);
+  const headA = normA.slice(0, chunkSize);
+  const headB = normB.slice(0, chunkSize);
+  const tailA = normA.slice(-chunkSize);
+  const tailB = normB.slice(-chunkSize);
+  let matches = 0;
+  if (headA === headB) matches++;
+  if (tailA === tailB) matches++;
+  return matches / 2;
+}
+
 export function sanitizeChapterContent(c: ChapterContent): ChapterContent {
   return {
     ...c,
@@ -35,6 +68,9 @@ export async function scrapeChapters(
   onPauseCheck?: () => boolean,
 ): Promise<ChapterContent[]> {
   const results: ChapterContent[] = [];
+  const contentHashes = new Set<string>();
+  let consecutiveErrors = 0;
+  const MAX_CONSECUTIVE_ERRORS = 3;
 
   const safeDelayMs = Math.max(delayMs, 100);
 
@@ -98,22 +134,32 @@ export async function scrapeChapters(
       content.title = extTitle || chapter.title;
     }
 
-    // Check if content is identical to previous chapter (STV common issue)
-    if (adapter.name === "STV" && i > 0 && results.length > 0) {
-      const prevContent = results[results.length - 1].content;
-      if (content.content.trim() === prevContent.trim() && content.content.length > 100) {
-         await extensionStopScrape();
-         throw new Error(
-           `Phát hiện nội dung chương "${chapter.title}" giống hệt chương trước. Có thể STV chưa load kịp chương mới. Vui lòng mở tab SangTacViet, bấm load lại chương này, sau đó quay lại đây bấm "Tiếp tục".`
-         );
+    // ── Duplicate detection (all adapters) ──
+    const currentHash = hashContent(content.content);
+    if (contentHashes.has(currentHash) && content.content.length > 100) {
+      content.warning = `⚠️ Nội dung trùng lặp với chương trước (hash giống hệt). Có thể trang chưa load kịp.`;
+      consecutiveErrors++;
+    } else if (i > 0 && results.length > 0) {
+      const similarity = contentSimilarity(content.content, results[results.length - 1].content);
+      if (similarity >= 0.8 && content.content.length > 100) {
+        content.warning = `⚠️ Nội dung giống ~${Math.round(similarity * 100)}% chương trước. Có thể bị trùng.`;
+        consecutiveErrors++;
+      } else {
+        consecutiveErrors = 0; // Reset counter on success
       }
+    } else {
+      consecutiveErrors = 0;
     }
+    contentHashes.add(currentHash);
 
     if (timedOut) {
       content.warning = `Timeout — nội dung chưa load được (${content.content.length} ký tự)`;
+      consecutiveErrors++;
     } else if (content.content.length < 30) {
       content.warning = `Nội dung quá ngắn (${content.content.length} ký tự)`;
+      consecutiveErrors++;
     }
+
     results.push(content);
 
     onDebug?.({
@@ -129,7 +175,6 @@ export async function scrapeChapters(
     });
 
     // For STV, stop IMMEDIATELY if content is missing or too short
-    // This allows the user to reload the tab manually as requested.
     if (adapter.name === "STV" && (timedOut || content.content.length < 30)) {
       await extensionStopScrape();
       throw new Error(
@@ -137,14 +182,12 @@ export async function scrapeChapters(
       );
     }
 
-    if (results.length >= 3) {
-      const lastThree = results.slice(-3);
-      if (lastThree.every((ch) => ch.warning)) {
-        await extensionStopScrape();
-        throw new Error(
-          "Đã dừng: 3 chương liên tiếp không load được nội dung. Vui lòng kiểm tra lại trang nguồn.",
-        );
-      }
+    // Auto-stop after consecutive errors (any adapter)
+    if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+      await extensionStopScrape();
+      throw new Error(
+        `Đã dừng: ${MAX_CONSECUTIVE_ERRORS} chương liên tiếp có vấn đề (trùng/lỗi/ngắn). Kiểm tra lại trang nguồn.`,
+      );
     }
   }
 

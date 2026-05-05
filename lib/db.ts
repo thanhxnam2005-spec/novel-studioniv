@@ -40,6 +40,10 @@ export interface Novel {
     type: string;
     description: string;
   }>;
+  /** AI-generated per-novel translation prompt from style analysis. */
+  customTranslatePrompt?: string;
+  /** Timestamp of last style scan. */
+  styleScannedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

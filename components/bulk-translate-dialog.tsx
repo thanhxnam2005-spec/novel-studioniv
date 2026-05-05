@@ -52,11 +52,16 @@ import {
   Minimize2Icon,
   RotateCcwIcon,
   SaveIcon,
+  ScanSearchIcon,
+  SparklesIcon,
   XIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDebouncedCallback } from "@/lib/hooks/use-debounce";
 import { toast } from "sonner";
+import { db } from "@/lib/db";
+import { useLiveQuery } from "dexie-react-hooks";
+import { scanNovelStyle } from "@/lib/chapter-tools/scan-novel-style";
 
 
 
@@ -167,9 +172,59 @@ export function BulkTranslateDialog({
   const [promptText, setPromptText] = useState(effectivePrompt);
   const [promptOpen, setPromptOpen] = useState(false);
 
+  // ── Per-novel custom prompt ──
+  const novel = useLiveQuery(() => db.novels.get(novelId), [novelId]);
+  const novelPrompt = novel?.customTranslatePrompt;
+  const hasNovelPrompt = Boolean(novelPrompt?.trim());
+  const [useNovelPrompt, setUseNovelPrompt] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState("");
+
+  // When novel prompt is loaded, auto-activate it
   useEffect(() => {
-    setPromptText(effectivePrompt);
-  }, [effectivePrompt]);
+    if (hasNovelPrompt && useNovelPrompt) {
+      setPromptText(novelPrompt!);
+    } else if (!useNovelPrompt) {
+      setPromptText(effectivePrompt);
+    }
+  }, [hasNovelPrompt, useNovelPrompt, novelPrompt, effectivePrompt]);
+
+  const resolveModel = useCallback(async () => {
+    const model = await resolveChapterToolModel(
+      settings.translateModel,
+      defaultProvider,
+      chatSettings,
+    );
+    if (!model) {
+      toast.error(getChapterToolModelMissingMessage(defaultProvider));
+    }
+    return model;
+  }, [settings.translateModel, defaultProvider, chatSettings]);
+
+  // Scan novel style handler
+  const handleScanStyle = useCallback(async () => {
+    const model = await resolveModel();
+    if (!model) return;
+
+    setScanning(true);
+    setScanProgress("Bắt đầu quét...");
+    try {
+      const prompt = await scanNovelStyle(
+        novelId,
+        model,
+        undefined,
+        (msg) => setScanProgress(msg),
+      );
+      setPromptText(prompt);
+      setUseNovelPrompt(true);
+      toast.success("Đã quét xong và tạo prompt riêng cho truyện!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Quét thất bại");
+    } finally {
+      setScanning(false);
+      setScanProgress("");
+    }
+  }, [novelId, resolveModel]);
 
   const savePrompt = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -215,17 +270,6 @@ export function BulkTranslateDialog({
     [chapters, selectedChapterIds],
   );
 
-  const resolveModel = useCallback(async () => {
-    const model = await resolveChapterToolModel(
-      settings.translateModel,
-      defaultProvider,
-      chatSettings,
-    );
-    if (!model) {
-      toast.error(getChapterToolModelMissingMessage(defaultProvider));
-    }
-    return model;
-  }, [settings.translateModel, defaultProvider, chatSettings]);
 
   const runTranslate = useCallback(
     async (chapterIds: string[]) => {
@@ -353,6 +397,58 @@ export function BulkTranslateDialog({
             {step === "config" && (
               <>
 
+                {/* Novel Style Scanner */}
+                <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ScanSearchIcon className="size-4 text-primary" />
+                      <div>
+                        <p className="text-xs font-medium">Quét phong cách truyện</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          AI quét 10 chương đầu → tạo prompt dịch riêng cho bộ truyện
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={hasNovelPrompt ? "outline" : "default"}
+                      className="h-8 text-xs gap-1.5"
+                      onClick={handleScanStyle}
+                      disabled={scanning || isRunning || !defaultProvider}
+                    >
+                      {scanning ? (
+                        <><LoaderIcon className="size-3 animate-spin" />{"Đang quét..."}</>
+                      ) : hasNovelPrompt ? (
+                        <><RotateCcwIcon className="size-3" />{"Quét lại"}</>
+                      ) : (
+                        <><SparklesIcon className="size-3" />{"Quét ngay"}</>
+                      )}
+                    </Button>
+                  </div>
+                  {scanning && scanProgress && (
+                    <p className="text-[10px] text-primary animate-pulse">{scanProgress}</p>
+                  )}
+                  {hasNovelPrompt && !scanning && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <Switch
+                        id="use-novel-prompt"
+                        checked={useNovelPrompt}
+                        onCheckedChange={(v) => {
+                          setUseNovelPrompt(v);
+                          setPromptText(v ? novelPrompt! : effectivePrompt);
+                        }}
+                      />
+                      <Label htmlFor="use-novel-prompt" className="text-[10px] cursor-pointer">
+                        Dùng prompt riêng của truyện
+                        {novel?.styleScannedAt && (
+                          <span className="text-muted-foreground ml-1">
+                            (quét lúc {new Date(novel.styleScannedAt).toLocaleDateString("vi")})
+                          </span>
+                        )}
+                      </Label>
+                    </div>
+                  )}
+                </div>
 
                 {/* Model picker */}
                 <div className="space-y-2">

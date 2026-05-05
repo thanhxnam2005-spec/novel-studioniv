@@ -1,10 +1,31 @@
-console.log("%c🚀 Novel Studio Connector v4.1", "color:lime;font-size:16px");
+console.log("%c🚀 Novel Studio Connector v5.0", "color:lime;font-size:16px");
 const contentCache = new Map();
 let stvScrapeActive = true;
 
+// ── Stealth: Random User-Agent pool ──
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+];
+
+function randomUA() {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+/** Random delay with jitter to appear human */
+function humanDelay(baseMs) {
+  const jitter = Math.random() * baseMs * 0.5; // ±50% jitter
+  return baseMs + jitter;
+}
+
+// ── Message handling ──
+
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg.type === "STV_CONTENT_READY" && sender.tab) {
-    console.log(`[BG] ✅ Cache: ${msg.length} chars — ${msg.url}`);
     contentCache.set(sender.tab.id, {
       content: msg.content,
       title: msg.title,
@@ -12,9 +33,6 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
       length: msg.length,
       timestamp: Date.now(),
     });
-  }
-  if (msg.type === "STV_PAGE_LOADED" && sender.tab) {
-    console.log(`[BG] Page loaded: ${msg.url}`);
   }
 });
 
@@ -36,7 +54,6 @@ chrome.runtime.onMessageExternal.addListener(
     }
     if (request.action === "stopScrape") {
       stvScrapeActive = false;
-      console.log("[STV] 🛑 Scrape stopped by user");
       sendResponse({ success: true });
       return false;
     }
@@ -59,6 +76,8 @@ chrome.runtime.onMessageExternal.addListener(
   },
 );
 
+// ── STV Chapter Fetching ──
+
 async function findSTVTab() {
   const tabs = await chrome.tabs.query({
     url: ["*://sangtacviet.com/*", "*://sangtacviet.app/*", "*://sangtacviet.vip/*"],
@@ -76,7 +95,6 @@ async function stvFetchChapter(payload, sendResponse) {
 
     let content = "",
       title = "";
-    // Wait for content (either from cache or direct extract)
     for (let i = 0; i < 40; i++) {
       if (!stvScrapeActive) break;
       const cached = contentCache.get(tabId);
@@ -101,23 +119,17 @@ async function stvFetchChapter(payload, sendResponse) {
       await delay(500);
     }
 
-    console.log(`[STV] Got ${content.length} chars`);
     contentCache.delete(tabId);
 
-    // Only move to next chapter if allowed and not stopped
     const shouldNext = payload.allowNext !== false && stvScrapeActive;
 
     if (shouldNext && content.length > 200) {
       try {
-        console.log("[STV] → Neck chương (Next)");
         await chrome.tabs.sendMessage(tabId, { type: "GO_NEXT" });
         await waitForTabLoad(tabId, 25000);
         for (let i = 0; i < 30; i++) {
           if (!stvScrapeActive) break;
-          if (contentCache.has(tabId)) {
-            console.log("[STV] ✅ Next page cached!");
-            break;
-          }
+          if (contentCache.has(tabId)) break;
           await delay(500);
         }
       } catch (e) {
@@ -149,7 +161,6 @@ async function downloadAllSequential(
   for (let i = 0; i < chapters.length; i++) {
     if (!stvScrapeActive) break;
     const ch = chapters[i];
-    console.log(`[${i + 1}/${chapters.length}] ${ch.title}`);
     const res = await new Promise((r) =>
       stvFetchChapter({ chapterUrl: ch.url, allowNext: i < chapters.length - 1 }, r),
     );
@@ -158,13 +169,17 @@ async function downloadAllSequential(
   sendResponse({ success: true, results, stopped: !stvScrapeActive });
 }
 
+// ── Core Fetch with Full Stealth ──
+
 async function handleFetch(url, waitSelector, clickSelector, timeout) {
   const tab = await chrome.tabs.create({ url, active: false });
   const tabId = tab.id;
   try {
     await waitForTabLoad(tabId, 30000);
-    await injectStealth(tabId);
-    await delay(1000 + Math.random() * 1500);
+    await injectFullStealth(tabId);
+    // Human-like random delay before interacting
+    await delay(humanDelay(1500));
+
     let timedOut = false;
     if (clickSelector && waitSelector) {
       for (let i = 0; i < 3; i++) {
@@ -190,7 +205,7 @@ async function handleFetch(url, waitSelector, clickSelector, timeout) {
           break;
         }
         timedOut = true;
-        await delay(500);
+        await delay(humanDelay(500));
       }
     } else if (waitSelector) {
       timedOut = await waitForSelector(tabId, waitSelector, timeout, 200);
@@ -225,16 +240,23 @@ async function handleFetch(url, waitSelector, clickSelector, timeout) {
   }
 }
 
-async function injectStealth(tabId) {
+// ── Full Stealth Injection ──
+
+async function injectFullStealth(tabId) {
   try {
+    const ua = randomUA();
     await chrome.scripting.executeScript({
       target: { tabId },
       world: "MAIN",
-      func: () => {
+      args: [ua],
+      func: (fakeUA) => {
+        // 1. Hide webdriver flag
         Object.defineProperty(navigator, "webdriver", {
           get: () => undefined,
           configurable: true,
         });
+
+        // 2. Fake visibility (pretend tab is active)
         Object.defineProperty(document, "hidden", {
           get: () => false,
           configurable: true,
@@ -249,10 +271,95 @@ async function injectStealth(tabId) {
           (e) => e.stopImmediatePropagation(),
           true,
         );
+
+        // 3. Fake User-Agent
+        Object.defineProperty(navigator, "userAgent", {
+          get: () => fakeUA,
+          configurable: true,
+        });
+
+        // 4. Fake plugins (headless Chrome has 0 plugins)
+        Object.defineProperty(navigator, "plugins", {
+          get: () => {
+            return [
+              { name: "Chrome PDF Plugin", filename: "internal-pdf-viewer" },
+              { name: "Chrome PDF Viewer", filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai" },
+              { name: "Native Client", filename: "internal-nacl-plugin" },
+            ];
+          },
+          configurable: true,
+        });
+
+        // 5. Fake languages
+        Object.defineProperty(navigator, "languages", {
+          get: () => ["vi-VN", "vi", "en-US", "en"],
+          configurable: true,
+        });
+
+        // 6. Hide automation flags
+        if (window.chrome) {
+          const originalChrome = window.chrome;
+          window.chrome = {
+            ...originalChrome,
+            runtime: {
+              ...originalChrome.runtime,
+              // Keep sendMessage working but hide other indicators
+            },
+          };
+        }
+
+        // 7. Fake hardware concurrency (realistic value)
+        Object.defineProperty(navigator, "hardwareConcurrency", {
+          get: () => 8,
+          configurable: true,
+        });
+
+        // 8. Fake device memory
+        Object.defineProperty(navigator, "deviceMemory", {
+          get: () => 8,
+          configurable: true,
+        });
+
+        // 9. Override permissions query to appear normal
+        const originalQuery = window.Permissions?.prototype?.query;
+        if (originalQuery) {
+          window.Permissions.prototype.query = function (parameters) {
+            if (parameters.name === "notifications") {
+              return Promise.resolve({ state: "prompt", onchange: null });
+            }
+            return originalQuery.call(this, parameters);
+          };
+        }
+
+        // 10. Fake canvas fingerprint (slight noise)
+        const origGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+          const ctx = origGetContext.call(this, type, ...args);
+          if (type === "2d" && ctx) {
+            const origFillText = ctx.fillText.bind(ctx);
+            ctx.fillText = function (...fillArgs) {
+              // Add invisible noise to canvas fingerprint
+              ctx.shadowBlur = Math.random() * 0.01;
+              ctx.shadowColor = "rgba(0,0,0,0.001)";
+              return origFillText(...fillArgs);
+            };
+          }
+          return ctx;
+        };
+
+        // 11. Fake WebGL renderer info
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function (param) {
+          if (param === 37445) return "Intel Inc."; // UNMASKED_VENDOR
+          if (param === 37446) return "Intel Iris OpenGL Engine"; // UNMASKED_RENDERER
+          return getParameter.call(this, param);
+        };
       },
     });
   } catch {}
 }
+
+// ── Utility functions ──
 
 async function waitForSelector(tabId, sel, maxWait, minLen) {
   const start = Date.now();

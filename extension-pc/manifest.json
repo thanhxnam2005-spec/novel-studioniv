@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Novel Studio Connector (PC)",
-  "version": "4.0",
+  "version": "5.0",
   "description": "Auto-extract chapters while user reads",
   "background": {
     "service_worker": "background.js"

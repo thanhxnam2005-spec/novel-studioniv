@@ -53,49 +53,6 @@ function getChromeRuntime(): {
   return null;
 }
 
-// ─── Tampermonkey Bridge ───────────────────────────────────
-
-const tmCallbackMap = new Map<string, (res: any) => void>();
-
-if (typeof window !== "undefined") {
-  window.addEventListener("message", (event) => {
-    const data = event.data;
-    if (data && data.source === "novel-studio-bridge" && data.id) {
-      const cb = tmCallbackMap.get(data.id);
-      if (cb) {
-        cb(data.response);
-        tmCallbackMap.delete(data.id);
-      }
-    }
-  });
-}
-
-function sendTampermonkeyMessage(message: any): Promise<ExtensionResponse> {
-  return new Promise((resolve, reject) => {
-    const id = Math.random().toString(36).substring(7);
-    const timeout = setTimeout(() => {
-      tmCallbackMap.delete(id);
-      reject(new Error("Tampermonkey Bridge timeout"));
-    }, message.timeout || 30000);
-
-    tmCallbackMap.set(id, (response) => {
-      clearTimeout(timeout);
-      resolve(response as ExtensionResponse);
-    });
-
-    window.postMessage(
-      {
-        source: "novel-studio-app",
-        id: id,
-        action: message.type || message.action,
-        url: message.url,
-        payload: message.payload,
-      },
-      "*"
-    );
-  });
-}
-
 // ─── Core Logic ────────────────────────────────────────────
 
 export function isAndroid(): boolean {
@@ -105,35 +62,22 @@ export function isAndroid(): boolean {
 
 function sendMessage(message: unknown): Promise<ExtensionResponse> {
   const extensionId = getExtensionId();
-  
-  // If explicitly set to "tampermonkey" or on Android with no extension ID configured, use userscript bridge
-  if (extensionId === "tampermonkey" || (isAndroid() && !extensionId)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return sendTampermonkeyMessage(message as any);
-  }
 
   return new Promise((resolve, reject) => {
     const runtime = getChromeRuntime();
     if (!runtime) {
-      // Fallback to tampermonkey if chrome runtime is missing but it might be available
-      if (typeof window !== "undefined") {
-        return sendTampermonkeyMessage(message as any).then(resolve).catch(reject);
-      }
-      reject(new Error("Chrome extension API not available"));
+      reject(new Error("Chrome Extension API không khả dụng. Hãy cài extension Novel Studio Connector."));
       return;
     }
 
     if (!extensionId) {
-      reject(new Error("Extension ID chưa được cấu hình. Nếu dùng Android, hãy nhập 'tampermonkey' vào ID."));
+      reject(new Error("Extension ID chưa được cấu hình. Vào Cài đặt → Tiện ích để nhập Extension ID."));
       return;
     }
 
     runtime.sendMessage(extensionId, message, (response: unknown) => {
       if (!response) {
-        // Last resort: try tampermonkey bridge if extension didn't respond
-        sendTampermonkeyMessage(message as any).then(resolve).catch(() => {
-          reject(new Error("Không có phản hồi từ Extension. Hãy kiểm tra ID hoặc dùng Tampermonkey."));
-        });
+        reject(new Error("Không có phản hồi từ Extension. Kiểm tra Extension ID và đảm bảo extension đang hoạt động."));
         return;
       }
       resolve(response as ExtensionResponse);
