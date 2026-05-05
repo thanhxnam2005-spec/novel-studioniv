@@ -783,6 +783,39 @@ function UrlStep() {
                         69Shu
                       </a>
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://www.jjwxc.net/" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-purple-600" />
+                        Jjwxc
+                      </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://www.cuoceng.com/" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-indigo-600" />
+                        CuoCeng
+                      </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://www.69shuba.tw/" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-emerald-600" />
+                        69Shu.TW
+                      </a>
+                    </Button>
                   </div>
                 </div>
               </div>

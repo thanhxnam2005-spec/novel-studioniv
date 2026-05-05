@@ -384,22 +384,27 @@ export const useScraperStore = create<ScraperState>()(
             async (entry) => {
               const { targetNovelId } = get();
               if (targetNovelId) {
+                const normalizedTitle = entry.parsed.title.toLowerCase().trim();
                 const existing = await db.chapters
-                  .where({ novelId: targetNovelId })
-                  .filter(c => c.title === entry.parsed.title)
-                  .first();
+                  .where("novelId")
+                  .equals(targetNovelId)
+                  .toArray()
+                  .then(chapters => chapters.find(c => c.title.toLowerCase().trim() === normalizedTitle));
 
                 if (existing) {
-                  const scenes = await db.scenes.where({ chapterId: existing.id }).toArray();
+                  const scenes = await db.scenes.where("chapterId").equals(existing.id).toArray();
                   const activeScene = scenes.find(s => s.isActive === 1);
                   if (activeScene) {
+                    // Update existing chapter content
                     await db.scenes.update(activeScene.id, {
                       content: entry.parsed.content,
                       wordCount: countWords(stripHtml(entry.parsed.content)),
                       updatedAt: now,
                     });
+                    addLog("Scrape · Chapter Updated", `Cập nhật: ${entry.parsed.title}`);
                   }
                 } else {
+                  // Add new chapter
                   const chapterId = crypto.randomUUID();
                   const plainText = stripHtml(entry.parsed.content);
                   const currentOrder = await db.chapters
@@ -446,6 +451,20 @@ export const useScraperStore = create<ScraperState>()(
             step: "preview",
             abortController: null,
           });
+          
+          // Auto-reset after 2 seconds to allow loading next novel
+          setTimeout(() => {
+            if (get().step === "preview" && !get().isLoading) {
+              set({
+                step: "url",
+                scrapedChapters: [],
+                progress: { completed: 0, total: 0, current: "" },
+                isBackground: false,
+                targetNovelId: null,
+              });
+              toast.success("Sẵn sàng để tải truyện tiếp theo!");
+            }
+          }, 2000);
         } catch (err) {
           if ((err as Error).name === "AbortError") {
             set({ isLoading: false, error: "Đã hủy scraping", abortController: null });
