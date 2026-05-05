@@ -250,7 +250,7 @@ export const useScraperStore = create<ScraperState>()(
         }
 
         if (selectedChapters.length === 0) {
-          if (novelInfo.chapters.some(ch => selectedChapterUrls.has(ch.url))) {
+          if (novelInfo.chapters.some((ch: any) => selectedChapterUrls.has(ch.url))) {
              toast.success("Tất cả các chương đã chọn đều đã có trong thư viện.");
           }
           return;
