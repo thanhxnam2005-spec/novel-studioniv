@@ -138,6 +138,9 @@ export const XTruyenAdapter: SiteAdapter = {
     }
 
     const title = doc.querySelector(".breadcrumb li.active")?.textContent?.trim() || "";
+    
+    // Find Next Chapter Link
+    const nextChapterUrl = (doc.querySelector("a.next_page") as HTMLAnchorElement)?.href || "";
 
     // Clean up
     let text = rawText
@@ -154,6 +157,6 @@ export const XTruyenAdapter: SiteAdapter = {
 
     text = cleanGarbageLines(text);
 
-    return { title, content: text };
+    return { title, content: text, nextChapterUrl };
   },
 };

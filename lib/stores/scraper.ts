@@ -57,6 +57,7 @@ interface ScraperState {
   startScraping: () => Promise<void>;
   startBackgroundScraping: (mode: "new" | "existing", novelId?: string, title?: string, desc?: string) => Promise<void>;
   confirmSTVReady: () => Promise<void>;
+  startCrawling: (targetNovelId?: string) => Promise<void>;
   retryScrapeChapter: (index: number) => Promise<void>;
   abortScraping: () => void;
   pauseScraping: () => void;
@@ -512,6 +513,102 @@ export const useScraperStore = create<ScraperState>()(
           }
           set({
             error: err instanceof Error ? err.message : "Lỗi khi scrape",
+            isLoading: false,
+            abortController: null,
+          });
+        }
+      },
+
+      startCrawling: async (novelId?: string) => {
+        let { url, adapter } = get();
+        if (!adapter) {
+          adapter = detectAdapter(url);
+          set({ adapter });
+        }
+        if (!adapter) return;
+
+        const abortController = new AbortController();
+        set({
+          step: "scraping",
+          isLoading: true,
+          error: null,
+          scrapedChapters: [],
+          progress: { completed: 0, total: 0, current: "" },
+          abortController,
+          targetNovelId: novelId || null,
+        });
+
+        try {
+          const { crawlNovel } = await import("../scraper/engine");
+          
+          await crawlNovel(
+            url,
+            adapter,
+            async (content, currentUrl) => {
+              const state = get();
+              let targetId = state.targetNovelId;
+              const now = new Date();
+
+              // Create novel if it doesn't exist
+              if (!targetId) {
+                targetId = crypto.randomUUID();
+                await db.novels.add({
+                  id: targetId,
+                  title: content.title.split(":")[0]?.trim() || "Truyện Crawl",
+                  sourceUrl: url,
+                  createdAt: now,
+                  updatedAt: now,
+                });
+                set({ targetNovelId: targetId });
+              }
+
+              // Add chapter
+              const chapterId = crypto.randomUUID();
+              const plainText = stripHtml(content.content);
+              const currentOrder = await db.chapters.where("novelId").equals(targetId).count();
+
+              await db.chapters.add({
+                id: chapterId,
+                novelId: targetId,
+                title: content.title,
+                order: currentOrder,
+                createdAt: now,
+                updatedAt: now,
+              });
+
+              await db.scenes.add({
+                id: crypto.randomUUID(),
+                chapterId,
+                novelId: targetId,
+                title: content.title,
+                content: content.content,
+                order: 0,
+                wordCount: countWords(plainText),
+                version: 0,
+                isActive: 1,
+                createdAt: now,
+                updatedAt: now,
+              });
+
+              set({ scrapedChapters: [...get().scrapedChapters, content] });
+            },
+            (completed, currentTitle) => {
+              set({ progress: { completed, total: 0, current: currentTitle } });
+            },
+            abortController.signal,
+            get().chapterDelay * 1000,
+            () => get().isPaused
+          );
+
+          set({ isLoading: false, step: "preview", abortController: null });
+          toast.success("Đã hoàn thành crawl truyện!");
+        } catch (err) {
+          if ((err as Error).name === "AbortError") {
+            set({ isLoading: false, error: "Đã hủy crawling", abortController: null });
+            return;
+          }
+          set({
+            error: err instanceof Error ? err.message : "Lỗi khi crawl",
             isLoading: false,
             abortController: null,
           });

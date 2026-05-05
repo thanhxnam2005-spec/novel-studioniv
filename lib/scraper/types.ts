@@ -42,6 +42,8 @@ export interface ChapterContent {
   warning?: string;
   /** Original order index from the table of contents */
   order?: number;
+  /** Link to the next chapter (for crawling/walking mode) */
+  nextChapterUrl?: string;
 }
 
 export interface ScrapeProgress {

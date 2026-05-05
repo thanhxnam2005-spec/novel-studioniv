@@ -153,6 +153,48 @@ export async function scrapeChapters(
   return results;
 }
 
+export async function crawlNovel(
+  startUrl: string,
+  adapter: SiteAdapter,
+  onChapterScraped: (content: ChapterContent, url: string) => Promise<void>,
+  onProgress?: (completed: number, currentTitle: string) => void,
+  signal?: AbortSignal,
+  delayMs: number = 2000,
+  onPauseCheck?: () => boolean,
+): Promise<void> {
+  let currentUrl = startUrl;
+  let completed = 0;
+
+  while (currentUrl) {
+    signal?.throwIfAborted();
+
+    // Pause loop
+    while (onPauseCheck?.()) {
+      await delay(1000);
+      signal?.throwIfAborted();
+    }
+
+    const fetchRes = await extensionFetch(currentUrl, {
+      waitSelector: adapter.chapterWaitSelector,
+      clickSelector: adapter.chapterClickSelector,
+    });
+
+    const content = sanitizeChapterContent(
+      await adapter.getChapterContent(fetchRes.html, currentUrl, fetchRes.contentText),
+    );
+
+    onProgress?.(++completed, content.title || "Chương không rõ");
+    
+    await onChapterScraped(content, currentUrl);
+
+    currentUrl = content.nextChapterUrl || "";
+    
+    if (currentUrl) {
+      await delay(delayMs);
+    }
+  }
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -685,12 +685,23 @@ function UrlStep() {
                   !url.trim() || !adapter || !extensionAvailable || isLoading
                 }
                 className="shrink-0"
+                variant="outline"
               >
                 {isLoading ? (
                   <LoaderIcon className="size-4 animate-spin" />
                 ) : (
                   "Lấy thông tin"
                 )}
+              </Button>
+              <Button
+                onClick={() => useScraperStore.getState().startCrawling()}
+                disabled={
+                  !url.trim() || !adapter || !extensionAvailable || isLoading
+                }
+                className="shrink-0"
+              >
+                <ArrowRightIcon className="mr-1.5 size-4" />
+                Crawl từ chương này
               </Button>
             </div>
           </div>
