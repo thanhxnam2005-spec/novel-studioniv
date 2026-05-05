@@ -619,7 +619,7 @@ export const useScraperStore = create<ScraperState>()(
 
       scanForErrors: () => {
         const { scrapedChapters } = get();
-        const updated = scrapedChapters.map(ch => {
+        const updated = scrapedChapters.map((ch: ChapterContent) => {
           const plain = stripHtml(ch.content).trim();
           if (plain.length < 30) {
             return { ...ch, warning: `Chương này có vẻ bị trống hoặc load lỗi (${plain.length} ký tự)` };
