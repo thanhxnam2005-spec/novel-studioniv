@@ -22,14 +22,34 @@ export const XTruyenAdapter: SiteAdapter = {
     // Description
     const description = doc.querySelector(".description-summary .summary__content")?.textContent?.trim() || "";
 
-    // Chapters are nested: ul.main -> li.has-child -> ul.sub-chap -> li.wp-manga-chapter a
-    const chapterLinks = doc.querySelectorAll(".list-chap .wp-manga-chapter a");
-    const chapters = [...chapterLinks].map((el, i) => ({
-      title: el.textContent?.trim() || `Chương ${i + 1}`,
-      url: (el as HTMLAnchorElement).href,
-      order: i,
-    })); // Removed reverse() as site is already ascending
+    // XTruyen (Madara theme) specific: chapters can be in .wp-manga-chapter or just .list-chap
+    // We use a broad selector to catch all potential links in the list area
+    const chapterContainers = doc.querySelectorAll('.list-chap, .main.version-chap, #chapter-reading-content');
+    let links: HTMLAnchorElement[] = [];
+    
+    chapterContainers.forEach(container => {
+      const found = container.querySelectorAll('a[href*="/chuong-"], a[href*="/chapter-"]');
+      links.push(...(Array.from(found) as HTMLAnchorElement[]));
+    });
 
+    // Fallback: search everywhere if still empty
+    if (links.length === 0) {
+      links = Array.from(doc.querySelectorAll('a[href*="/chuong-"]')) as HTMLAnchorElement[];
+    }
+
+    // Remove duplicates by URL
+    const uniqueLinks = Array.from(new Map(links.map(l => [l.href, l])).values());
+
+    const chapters = uniqueLinks.map((el, i) => ({
+      title: el.textContent?.trim() || `Chương ${i + 1}`,
+      url: el.href,
+      order: i,
+    }));
+
+    // If chapters are listed newest-first (common in Madara), we should check
+    // If the first chapter URL has a higher number than the last, reverse it.
+    // For now, XTruyen sample was ascending, so we keep it.
+    
     return { title, author, description, coverImage, chapters };
   },
 
