@@ -61,32 +61,39 @@ export const XTruyenAdapter: SiteAdapter = {
        if (m) mangaId = m[1];
     }
 
-    // 2. Fetch all chapters using SMART_SCRAPE mode
-    // This mode tells the extension to open the tab and CLICK all volume items
-    // to reveal the hidden chapter links.
+    // 2. Fetch all chapters by scanning the DOM for all sub-chap-list elements
+    // The user pointed out that chapters are already there, just hidden.
     const allChapterLinks: ChapterLink[] = [];
     
-    try {
-      const response = await extensionFetch(url, {
-        smartScrape: "XTRUYEN",
-        timeout: 30000 // Longer timeout for multi-click
+    // Use the initial HTML we already have
+    const chapterItems = Array.from(doc.querySelectorAll('ul.sub-chap-list li.wp-manga-chapter a'));
+    
+    chapterItems.forEach(a => {
+      allChapterLinks.push({
+        title: a.textContent?.trim() || "Chương không rõ",
+        url: (a as HTMLAnchorElement).href,
+        order: 0
       });
+    });
 
-      if (response.html) {
-        const fullDoc = new DOMParser().parseFromString(response.html, "text/html");
-        // Extract all chapters from the newly revealed DOM
-        const chapterItems = Array.from(fullDoc.querySelectorAll('ul.sub-chap-list li.wp-manga-chapter a'));
-        
-        chapterItems.forEach(a => {
-          allChapterLinks.push({
-            title: a.textContent?.trim() || "Chương không rõ",
-            url: (a as HTMLAnchorElement).href,
-            order: 0
+    // If no chapters found in initial HTML, try one more time via extension (just in case)
+    if (allChapterLinks.length === 0) {
+      try {
+        const response = await extensionFetch(url);
+        if (response.html) {
+          const fullDoc = new DOMParser().parseFromString(response.html, "text/html");
+          const items = Array.from(fullDoc.querySelectorAll('ul.sub-chap-list li.wp-manga-chapter a'));
+          items.forEach(a => {
+            allChapterLinks.push({
+              title: a.textContent?.trim() || "Chương không rõ",
+              url: (a as HTMLAnchorElement).href,
+              order: 0
+            });
           });
-        });
+        }
+      } catch (e) {
+        console.error("XTruyen fallback fetch failed", e);
       }
-    } catch (e) {
-      console.error("XTruyen Smart Scrape failed", e);
     }
 
     // 4. Fallback/Safety: If still no chapters, try the previous global scan on initial HTML
