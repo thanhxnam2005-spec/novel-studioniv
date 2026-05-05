@@ -1512,6 +1512,10 @@ function PreviewStep({ router }: { router: ReturnType<typeof useRouter> }) {
     <Card>
       <CardHeader>
         <CardTitle>Xem trước & Nhập</CardTitle>
+        <CardDescription className="flex items-center gap-2">
+          <span>
+            {scrapedChapters.length} chương · {totalWords.toLocaleString()} từ
+          </span>
           {warnCount > 0 && (
             <Badge
               variant={showOnlyWarnings ? "default" : "secondary"}
