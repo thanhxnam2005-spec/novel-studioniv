@@ -391,6 +391,7 @@ export function ChatPanel() {
           messages: history,
           temperature,
           abortSignal: controller.signal,
+          maxTokens: 4096,
           ...(tools ? { tools, stopWhen: stepCountIs(maxToolSteps) } : {}),
         });
 

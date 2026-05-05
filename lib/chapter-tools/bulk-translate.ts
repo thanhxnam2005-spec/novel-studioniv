@@ -219,13 +219,19 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
         system: systemPrompt,
         prompt: userPrompt,
         abortSignal: signal,
+        maxTokens: 4000, // Ensure long chapters are not truncated
       });
 
       let accumulated = "";
       for await (const part of result.fullStream) {
         if (part.type === "text-delta") {
-          accumulated += part.text;
+          accumulated += part.text ?? "";
         }
+      }
+
+      const finishReason = await result.finishReason;
+      if (finishReason === "length") {
+        console.warn(`Chapter ${chapter.title} was truncated due to length limit.`);
       }
 
       if (!accumulated.trim()) {

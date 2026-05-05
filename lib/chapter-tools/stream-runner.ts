@@ -68,15 +68,21 @@ export async function runChapterToolStream(opts: {
       system: opts.system,
       prompt: opts.prompt,
       abortSignal: controller?.signal,
+      maxTokens: 4000, // Ensure long chapters are not truncated
     });
 
     for await (const part of result.fullStream) {
       if (part.type === "text-delta") {
-        accumulated += part.text;
+        accumulated += part.text ?? "";
         if (!rafId) rafId = requestAnimationFrame(flush);
       }
     }
     cancelAnimationFrame(rafId);
+
+    const finishReason = await result.finishReason;
+    if (finishReason === "length") {
+      toast.warning("Bản dịch bị cắt bớt do vượt quá giới hạn độ dài của AI. Hãy thử chia nhỏ chương hoặc dùng mô hình mạnh hơn.");
+    }
 
     // If user cancelled while buffered chunks were still being consumed,
     // the loop may exit normally without throwing AbortError. Bail out.
