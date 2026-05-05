@@ -52,16 +52,6 @@ const STEPS: { key: Step; label: string; icon: React.ElementType }[] = [
   { key: "confirm", label: "Xác nhận", icon: CheckIcon },
 ];
 
-function countWords(text: string): number {
-  const cjk = text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g);
-  const latin = text
-    .replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  return (cjk?.length ?? 0) + latin.length;
-}
-
 // ─── Component ──────────────────────────────────────────────
 
 export function NovelImportWizard() {
