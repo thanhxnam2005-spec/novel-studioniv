@@ -28,7 +28,7 @@ export const XTruyenAdapter: SiteAdapter = {
       title: el.textContent?.trim() || `Chương ${i + 1}`,
       url: (el as HTMLAnchorElement).href,
       order: i,
-    })).reverse(); // XTruyen often lists newest first, reverse to get 1, 2, 3...
+    })); // Removed reverse() as site is already ascending
 
     return { title, author, description, coverImage, chapters };
   },
