@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { PageContextSync } from "@/components/chat/page-context-sync";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { type User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
@@ -137,7 +138,15 @@ export default function DashboardLayout({
               <span className="font-medium">Đã đăng nhập:</span>
               <span>{user.user_metadata?.full_name || user.email || user.id}</span>
             </div>
-          ) : null}
+          ) : (
+            <div className="ml-3">
+              <Link href="/auth">
+                <button className="inline-flex h-7 items-center rounded-lg bg-secondary px-3 text-sm font-medium text-secondary-foreground transition hover:bg-secondary/90">
+                  Đăng nhập
+                </button>
+              </Link>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"
