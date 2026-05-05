@@ -19,48 +19,99 @@ export const XTruyenAdapter: SiteAdapter = {
     const title = doc.querySelector(".post-title h1")?.textContent?.trim() || "";
     const author = doc.querySelector(".author-content a")?.textContent?.trim() || "Đang cập nhật";
     const coverImage = doc.querySelector(".summary_image img")?.getAttribute("src") || "";
-    
-    // Description
     const description = doc.querySelector(".description-summary .summary__content")?.textContent?.trim() || "";
 
-    // Madara theme (XTruyen) usually loads chapters via AJAX.
-    // The endpoint is [novel-url]ajax/chapters/
-    const ajaxUrl = url.endsWith("/") ? `${url}ajax/chapters/` : `${url}/ajax/chapters/`;
-    
-    let chapterHtml = "";
-    try {
-      const response = await extensionFetch(ajaxUrl, { method: "POST" });
-      chapterHtml = response.html;
-    } catch (e) {
-      console.error("Failed to fetch XTruyen chapters via AJAX", e);
+    // 1. Find Manga ID
+    // Often in body class like "post-1234" or in an article ID
+    let mangaId = "";
+    const bodyClass = doc.body.className;
+    const postMatch = bodyClass.match(/post-(\d+)/);
+    if (postMatch) {
+      mangaId = postMatch[1];
+    } else {
+      // Fallback: check article tag
+      const article = doc.querySelector('article[id^="post-"]');
+      if (article) {
+        mangaId = article.id.replace("post-", "");
+      }
     }
 
-    // If AJAX failed or returned nothing, fallback to current HTML
-    const chapterDoc = chapterHtml 
-      ? new DOMParser().parseFromString(chapterHtml, "text/html")
-      : doc;
+    if (!mangaId) {
+      // Last resort: check if there's any element with data-id or similar
+      const idElem = doc.querySelector('[data-id], #manga-chapters-holder');
+      mangaId = idElem?.getAttribute("data-id") || "";
+    }
 
-    // Global aggressive scan: Find EVERY link that looks like a chapter URL anywhere in the document
-    const allLinks = Array.from(chapterDoc.querySelectorAll('a'));
-    const chapterLinks = allLinks.filter(a => {
-      const href = a.getAttribute('href') || '';
-      // XTruyen patterns: /chuong-1/, /chapter-1/, etc.
-      return /\/chuong-[\d]+/.test(href) || /\/chapter-[\d]+/.test(href);
-    });
+    // 2. Find all Volume ranges (1-to-200, 201-to-400, etc.)
+    const volumeItems = Array.from(doc.querySelectorAll('li.has-child[data-value]'));
+    const ranges = volumeItems.map(li => li.getAttribute('data-value') || "");
+
+    const allChapterLinks: ChapterLink[] = [];
+
+    if (mangaId && ranges.length > 0) {
+      // 3. Fetch each range via the discovered API
+      const apiEndpoint = "https://xtruyen.vn/api/api-chapters.php";
+      
+      const fetchPromises = ranges.map(async (range) => {
+        const [from, to] = range.split("-to-");
+        if (!from || !to) return [];
+
+        try {
+          // Use extensionFetch with URLSearchParams for POST body
+          const params = new URLSearchParams();
+          params.append("manga_id", mangaId);
+          params.append("from", from);
+          params.append("to", to.replace("m", "")); // Handle cases like 5189m
+          params.append("vol", "");
+
+          const response = await extensionFetch(apiEndpoint, {
+            method: "POST",
+            body: params.toString(),
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded"
+            }
+          });
+
+          if (response.html) {
+            const rangeDoc = new DOMParser().parseFromString(response.html, "text/html");
+            const links = Array.from(rangeDoc.querySelectorAll('a'));
+            return links.map(a => ({
+              title: a.textContent?.trim() || "Chương không rõ",
+              url: (a as HTMLAnchorElement).href,
+              order: 0
+            }));
+          }
+        } catch (e) {
+          console.error(`Failed to fetch range ${range} for manga ${mangaId}`, e);
+        }
+        return [];
+      });
+
+      const results = await Promise.all(fetchPromises);
+      results.forEach(list => allChapterLinks.push(...list));
+    }
+
+    // 4. Fallback/Safety: If still no chapters, try the previous global scan on initial HTML
+    if (allChapterLinks.length === 0) {
+      const links = Array.from(doc.querySelectorAll('a')).filter(a => {
+        const href = a.getAttribute('href') || '';
+        return /\/chuong-[\d]+/.test(href) || /\/chapter-[\d]+/.test(href);
+      });
+      allChapterLinks.push(...links.map(a => ({
+        title: a.textContent?.trim() || "Chương không rõ",
+        url: (a as HTMLAnchorElement).href,
+        order: 0
+      })));
+    }
 
     // Deduplicate by URL
     const seenUrls = new Set<string>();
     const uniqueChapters: ChapterLink[] = [];
     
-    chapterLinks.forEach(el => {
-      const url = (el as HTMLAnchorElement).href;
-      if (!seenUrls.has(url)) {
-        seenUrls.add(url);
-        uniqueChapters.push({
-          title: el.textContent?.trim() || "Chương không rõ",
-          url: url,
-          order: 0, // Will set below
-        });
+    allChapterLinks.forEach(ch => {
+      if (!seenUrls.has(ch.url)) {
+        seenUrls.add(ch.url);
+        uniqueChapters.push(ch);
       }
     });
 
