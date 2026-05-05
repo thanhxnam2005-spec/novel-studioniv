@@ -68,7 +68,7 @@ export async function runChapterToolStream(opts: {
       system: opts.system,
       prompt: opts.prompt,
       abortSignal: controller?.signal,
-      max_tokens: 25000, // Ensure long chapters are not truncated
+      maxOutputTokens: 25000, // Ensure long chapters are not truncated
     });
 
     for await (const part of result.fullStream) {

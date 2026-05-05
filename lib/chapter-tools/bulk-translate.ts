@@ -219,7 +219,7 @@ export async function runBulkTranslate(opts: BulkTranslateOptions): Promise<void
         system: systemPrompt,
         prompt: userPrompt,
         abortSignal: signal,
-        max_tokens: 25000, // Ensure long chapters are not truncated
+        maxOutputTokens: 25000, // Ensure long chapters are not truncated
       });
 
       let accumulated = "";
