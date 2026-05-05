@@ -73,6 +73,7 @@ export default function DashboardLayout({
   const toggleNameDict = () => nameDictToggle(currentNovelId);
 
   const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Keep name dict panel's novelId in sync with URL
   useEffect(() => {
@@ -80,18 +81,31 @@ export default function DashboardLayout({
   }, [currentNovelId, nameDictSetNovelId]);
 
   useEffect(() => {
-    if (!supabase) return
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
 
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-    })
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
+    // Listen for auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
 
-    return () => listener.subscription.unsubscribe()
-  }, [])
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+  };
 
   // Global search shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -133,10 +147,20 @@ export default function DashboardLayout({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          {user ? (
+          {authLoading ? (
+            <div className="ml-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="font-medium">Đang tải...</span>
+            </div>
+          ) : user ? (
             <div className="ml-3 flex items-center gap-2 text-sm text-muted-foreground">
               <span className="font-medium">Đã đăng nhập:</span>
               <span>{user.user_metadata?.full_name || user.email || user.id}</span>
+              <button
+                onClick={handleLogout}
+                className="ml-2 text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Đăng xuất
+              </button>
             </div>
           ) : (
             <div className="ml-3">
