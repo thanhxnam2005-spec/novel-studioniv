@@ -22,34 +22,43 @@ export const XTruyenAdapter: SiteAdapter = {
     // Description
     const description = doc.querySelector(".description-summary .summary__content")?.textContent?.trim() || "";
 
-    // XTruyen (Madara theme) specific: chapters can be in .wp-manga-chapter or just .list-chap
-    // We use a broad selector to catch all potential links in the list area
-    const chapterContainers = doc.querySelectorAll('.list-chap, .main.version-chap, #chapter-reading-content');
-    let links: HTMLAnchorElement[] = [];
-    
-    chapterContainers.forEach(container => {
-      const found = container.querySelectorAll('a[href*="/chuong-"], a[href*="/chapter-"]');
-      links.push(...(Array.from(found) as HTMLAnchorElement[]));
+    // Global aggressive scan: Find EVERY link that looks like a chapter URL anywhere in the document
+    const allLinks = Array.from(doc.querySelectorAll('a'));
+    const chapterLinks = allLinks.filter(a => {
+      const href = a.getAttribute('href') || '';
+      // XTruyen patterns: /chuong-1/, /chapter-1/, etc.
+      return /\/chuong-[\d]+/.test(href) || /\/chapter-[\d]+/.test(href);
     });
 
-    // Fallback: search everywhere if still empty
-    if (links.length === 0) {
-      links = Array.from(doc.querySelectorAll('a[href*="/chuong-"]')) as HTMLAnchorElement[];
-    }
-
-    // Remove duplicates by URL
-    const uniqueLinks = Array.from(new Map(links.map(l => [l.href, l])).values());
-
-    const chapters = uniqueLinks.map((el, i) => ({
-      title: el.textContent?.trim() || `Chương ${i + 1}`,
-      url: el.href,
-      order: i,
-    }));
-
-    // If chapters are listed newest-first (common in Madara), we should check
-    // If the first chapter URL has a higher number than the last, reverse it.
-    // For now, XTruyen sample was ascending, so we keep it.
+    // Deduplicate by URL
+    const seenUrls = new Set<string>();
+    const uniqueChapters: ChapterLink[] = [];
     
+    chapterLinks.forEach(el => {
+      const url = (el as HTMLAnchorElement).href;
+      if (!seenUrls.has(url)) {
+        seenUrls.add(url);
+        uniqueChapters.push({
+          title: el.textContent?.trim() || "Chương không rõ",
+          url: url,
+          order: 0, // Will set below
+        });
+      }
+    });
+
+    // Sort chapters by number extracted from URL to ensure correct order
+    // Example: .../chuong-10/ should come after .../chuong-2/
+    const chapters = uniqueChapters.map(ch => {
+      const match = ch.url.match(/chuong-([\d]+)/) || ch.url.match(/chapter-([\d]+)/);
+      const num = match ? parseInt(match[1], 10) : 0;
+      return { ...ch, num };
+    }).sort((a, b) => a.num - b.num)
+      .map((ch, i) => ({
+        title: ch.title,
+        url: ch.url,
+        order: i
+      }));
+
     return { title, author, description, coverImage, chapters };
   },
 
