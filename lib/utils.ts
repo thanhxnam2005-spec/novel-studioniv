@@ -100,3 +100,12 @@ export function sanitizeText(text: string, preserveLineBreaks = false): string {
 export function isHex(v: string) {
   return /^#([0-9a-fA-F]{3,8})$/.test(v);
 }
+
+export function isLocalhost(): boolean {
+  if (typeof window === "undefined") return process.env.NODE_ENV === "development";
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname.startsWith("192.168.")
+  );
+}

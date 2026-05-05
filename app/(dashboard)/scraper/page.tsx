@@ -83,7 +83,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { cn, countWords, stripHtml } from "@/lib/utils";
+import { cn, countWords, stripHtml, isLocalhost } from "@/lib/utils";
 
 
 
@@ -382,20 +382,20 @@ export default function ScraperPage() {
     checkAuth();
   }, []);
 
-  const isAdmin = Boolean(
+   const isAdmin = isLocalhost() || Boolean(
     user?.app_metadata?.isAdmin || 
     user?.user_metadata?.isAdmin || 
     user?.id === '5fe169c6-5e01-49aa-b363-ceaaf7ad4cba' ||
     user?.email === 'thanhxnam2005@gmail.com'
   );
   
-  const isVip = Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
+  const isVip = isLocalhost() || (Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
     (() => {
       const until = user?.app_metadata?.vipUntil || user?.user_metadata?.vipUntil;
       if (!until) return true;
       return new Date(until) > new Date();
     })()
-  );
+  ));
 
   if (authLoading) {
     return (

@@ -22,6 +22,7 @@ import {
 import { useChatPanel } from "@/lib/stores/chat-panel";
 import { useGlobalSearch } from "@/lib/stores/global-search";
 import { useNameDictPanel } from "@/lib/stores/name-dict-panel";
+import { isLocalhost } from "@/lib/utils";
 import { useReaderPanel } from "@/lib/stores/reader-panel";
 import {
   BookTextIcon,
@@ -75,19 +76,19 @@ export default function DashboardLayout({
 
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isAdmin = Boolean(
+  const isAdmin = isLocalhost() || Boolean(
     user?.app_metadata?.isAdmin || 
     user?.user_metadata?.isAdmin || 
     user?.id === '5fe169c6-5e01-49aa-b363-ceaaf7ad4cba' ||
     user?.email === 'thanhxnam2005@gmail.com'
   );
-  const isVip = Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
+  const isVip = isLocalhost() || (Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
     (() => {
       const until = user?.app_metadata?.vipUntil || user?.user_metadata?.vipUntil;
       if (!until) return true; // Default to permanent if no date set but isVip is true
       return new Date(until) > new Date();
     })()
-  );
+  ));
 
   // Keep name dict panel's novelId in sync with URL
   useEffect(() => {

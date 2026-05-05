@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/db";
+import { countWords, stripHtml, isLocalhost } from "@/lib/utils";
 import {
   CHAPTER_PRESETS,
   parseCustomRegex,
@@ -114,7 +115,8 @@ export function NovelImportWizard() {
         setUser(currentUser);
 
         // Check VIP status from user metadata or app_metadata
-        const vipStatus = currentUser?.app_metadata?.isVip ||
+        const vipStatus = isLocalhost() || 
+                         currentUser?.app_metadata?.isVip ||
                          currentUser?.user_metadata?.isVip ||
                          false;
         setIsVip(Boolean(vipStatus));
