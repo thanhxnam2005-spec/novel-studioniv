@@ -1,5 +1,6 @@
 import { cleanGarbageLines } from "../../text-utils";
-import type { SiteAdapter } from "../types";
+import type { SiteAdapter, ChapterLink } from "../types";
+import { extensionFetch } from "../extension-bridge";
 
 /**
  * Adapter for XTruyen.vn
@@ -12,7 +13,7 @@ export const XTruyenAdapter: SiteAdapter = {
   // but usually they are present in the DOM or loaded via JS.
   chapterWaitSelector: "#chapter-reading-content",
 
-  getNovelInfo(html, url) {
+  async getNovelInfo(html, url) {
     const doc = new DOMParser().parseFromString(html, "text/html");
 
     const title = doc.querySelector(".post-title h1")?.textContent?.trim() || "";
@@ -22,8 +23,25 @@ export const XTruyenAdapter: SiteAdapter = {
     // Description
     const description = doc.querySelector(".description-summary .summary__content")?.textContent?.trim() || "";
 
+    // Madara theme (XTruyen) usually loads chapters via AJAX.
+    // The endpoint is [novel-url]ajax/chapters/
+    const ajaxUrl = url.endsWith("/") ? `${url}ajax/chapters/` : `${url}/ajax/chapters/`;
+    
+    let chapterHtml = "";
+    try {
+      const response = await extensionFetch(ajaxUrl, { method: "POST" });
+      chapterHtml = response.html;
+    } catch (e) {
+      console.error("Failed to fetch XTruyen chapters via AJAX", e);
+    }
+
+    // If AJAX failed or returned nothing, fallback to current HTML
+    const chapterDoc = chapterHtml 
+      ? new DOMParser().parseFromString(chapterHtml, "text/html")
+      : doc;
+
     // Global aggressive scan: Find EVERY link that looks like a chapter URL anywhere in the document
-    const allLinks = Array.from(doc.querySelectorAll('a'));
+    const allLinks = Array.from(chapterDoc.querySelectorAll('a'));
     const chapterLinks = allLinks.filter(a => {
       const href = a.getAttribute('href') || '';
       // XTruyen patterns: /chuong-1/, /chapter-1/, etc.
@@ -47,7 +65,6 @@ export const XTruyenAdapter: SiteAdapter = {
     });
 
     // Sort chapters by number extracted from URL to ensure correct order
-    // Example: .../chuong-10/ should come after .../chuong-2/
     const chapters = uniqueChapters.map(ch => {
       const match = ch.url.match(/chuong-([\d]+)/) || ch.url.match(/chapter-([\d]+)/);
       const num = match ? parseInt(match[1], 10) : 0;
