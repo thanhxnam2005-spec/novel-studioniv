@@ -693,123 +693,139 @@ function UrlStep() {
                   "Lấy thông tin"
                 )}
               </Button>
-              <Button
-                onClick={() => useScraperStore.getState().startCrawling()}
-                disabled={
-                  !url.trim() || !adapter || !extensionAvailable || isLoading
-                }
-                className="shrink-0"
-              >
-                <ArrowRightIcon className="mr-1.5 size-4" />
-                Crawl từ chương này
-              </Button>
+              {adapter?.name === "XTruyen" && (
+                <Button
+                  onClick={() => useScraperStore.getState().startCrawling()}
+                  disabled={
+                    !url.trim() || !adapter || !extensionAvailable || isLoading
+                  }
+                  className="shrink-0"
+                >
+                  <ArrowRightIcon className="mr-1.5 size-4" />
+                  Crawl từ chương này
+                </Button>
+              )}
             </div>
           </div>
 
-          {/* Quick Access Groups */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Web Việt */}
-            <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
-              <Label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Web Việt</Label>
-              <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://sangtacviet.com" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-blue-500" />
-                    SangTacViet
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://xtruyen.vn" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-orange-500" />
-                    XTruyen
-                  </a>
-                </Button>
-              </div>
-            </div>
+          {/* Quick Access & Instructions */}
+          <Tabs defaultValue="list" className="w-full">
+            <TabsList className="w-full grid grid-cols-2 h-9">
+              <TabsTrigger value="list" className="text-xs">Danh sách Web</TabsTrigger>
+              <TabsTrigger value="guides" className="text-xs">Hướng dẫn quét</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="list" className="mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Web Việt */}
+                <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
+                  <Label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Web Việt</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://sangtacviet.com" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-blue-500" />
+                        SangTacViet
+                      </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://xtruyen.vn" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-orange-500" />
+                        XTruyen
+                      </a>
+                    </Button>
+                  </div>
+                </div>
 
-            {/* Web Trung */}
-            <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
-              <Label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Web Trung</Label>
-              <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://uukanshu.cc/quanben/" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-red-500" />
-                    Uukanshu
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://www.piaotia.com/" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-red-500" />
-                    PiaoTian
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://www.cuoceng.com/" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-red-500" />
-                    CuoCeng
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://www.69shuba.com/" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-red-500" />
-                    69Shu
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://69shuba.tw/" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-red-500" />
-                    69Shu (TW)
-                  </a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
-                  asChild
-                >
-                  <a href="https://www.jjwxc.net/" target="_blank" rel="noreferrer">
-                    <GlobeIcon className="size-3.5 text-red-500" />
-                    JJWXC
-                  </a>
-                </Button>
+                {/* Web Trung */}
+                <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/20 p-3">
+                  <Label className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70">Web Trung</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://uukanshu.cc/quanben/" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-red-500" />
+                        Uukanshu
+                      </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://www.piaotia.com/" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-green-600" />
+                        PiaoTian
+                      </a>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-2 text-xs bg-background hover:bg-primary/5 hover:text-primary hover:border-primary/50"
+                      asChild
+                    >
+                      <a href="https://www.69shuba.com/" target="_blank" rel="noreferrer">
+                        <GlobeIcon className="size-3.5 text-green-700" />
+                        69Shu
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </TabsContent>
+
+            <TabsContent value="guides" className="mt-4 space-y-3">
+              <div className="rounded-lg border p-4 space-y-4 bg-muted/5">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-orange-600 font-bold text-sm">
+                    <GlobeIcon className="size-4" />
+                    XTruyen.vn (Khuyên dùng)
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Trang này có cơ chế giấu danh sách chương rất phức tạp. Hãy dùng nút <b>"Crawl từ chương này"</b> sau khi dán link chương 1. App sẽ tự động "bò" theo nút "Chương tiếp" để lấy đủ nội dung mà không sợ bị sót.
+                  </p>
+                </div>
+                
+                <div className="h-px bg-border/50" />
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-blue-600 font-bold text-sm">
+                    <GlobeIcon className="size-4" />
+                    SangTacViet.com
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Yêu cầu phải mở Tab SangTacViet trên trình duyệt. Sau khi nhấn "Quét danh sách", App sẽ hướng dẫn bạn nhấn vào chương đầu tiên ở Tab kia để kích hoạt nạp dữ liệu.
+                  </p>
+                </div>
+
+                <div className="h-px bg-border/50" />
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-green-600 font-bold text-sm">
+                    <GlobeIcon className="size-4" />
+                    Web Trung (Uukanshu, Piaotia...)
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Dán link trang chủ truyện và nhấn <b>"Lấy thông tin"</b>. App sẽ tự động lấy toàn bộ danh sách chương.
+                  </p>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <div className="space-y-3">
             <Label className="text-xs text-muted-foreground">Bộ giải mã:</Label>
