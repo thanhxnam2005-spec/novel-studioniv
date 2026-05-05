@@ -2,6 +2,7 @@
 
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
+import { BookOpenIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -51,6 +52,9 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-white shadow-lg shadow-black/20">
+            <BookOpenIcon className="h-8 w-8" />
+          </div>
           <h1 className="text-4xl font-bold text-white mb-2">Novel Studio</h1>
           <p className="text-gray-400">Đăng nhập hoặc đăng ký</p>
         </div>

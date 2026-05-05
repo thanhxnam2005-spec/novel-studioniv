@@ -34,6 +34,8 @@ import {
 import { PageContextSync } from "@/components/chat/page-context-sync";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { type User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { ScraperOverlay } from "@/components/scraper/scraper-overlay";
 
 const pageTitles: Record<string, string> = Object.fromEntries(
@@ -69,10 +71,26 @@ export default function DashboardLayout({
   const nameDictSetNovelId = useNameDictPanel((s) => s.setNovelId);
   const toggleNameDict = () => nameDictToggle(currentNovelId);
 
+  const [user, setUser] = useState<User | null>(null);
+
   // Keep name dict panel's novelId in sync with URL
   useEffect(() => {
     nameDictSetNovelId(currentNovelId);
   }, [currentNovelId, nameDictSetNovelId]);
+
+  useEffect(() => {
+    if (!supabase) return
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
 
   // Global search shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -114,6 +132,12 @@ export default function DashboardLayout({
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+          {user ? (
+            <div className="ml-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="font-medium">Đã đăng nhập:</span>
+              <span>{user.user_metadata?.full_name || user.email || user.id}</span>
+            </div>
+          ) : null}
           <div className="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"
