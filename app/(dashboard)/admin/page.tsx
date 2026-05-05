@@ -49,6 +49,7 @@ export default function AdminPage() {
   }, []);
 
   const getAccessToken = async () => {
+    if (!supabase) return null;
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
   };
