@@ -586,6 +586,7 @@ export const useScraperStore = create<ScraperState>()(
                 order: 0,
                 wordCount: countWords(plainText),
                 version: 0,
+                versionType: "manual",
                 isActive: 1,
                 createdAt: now,
                 updatedAt: now,
