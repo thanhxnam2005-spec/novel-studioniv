@@ -2,24 +2,34 @@
 
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
-import { supabase } from '@/lib/supabase'
-import { useEffect } from 'react'
+import { getSupabaseClient } from '@/lib/supabase'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function AuthPage() {
   const router = useRouter()
+  const [supabaseClient, setSupabaseClient] = useState(() => getSupabaseClient())
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    if (!supabaseClient) {
+      setSupabaseClient(getSupabaseClient())
+      return
+    }
+
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
       if (session) router.push('/')
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabaseClient.auth.onAuthStateChange((event, session) => {
       if (session) router.push('/')
     })
 
     return () => listener.subscription.unsubscribe()
-  }, [router])
+  }, [router, supabaseClient])
+
+  if (!supabaseClient) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">Đang tải...</div>
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -30,7 +40,7 @@ export default function AuthPage() {
         </div>
 
         <Auth
-          supabaseClient={supabase}
+          supabaseClient={supabaseClient}
           appearance={{ theme: ThemeSupa }}
           providers={['google', 'github']}
           redirectTo="https://thuyetthucac.vercel.app/auth/callback"
