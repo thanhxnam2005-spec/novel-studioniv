@@ -1,14 +1,114 @@
-(function() {
-  const _0xpool = ["ImZ1bmN0aW9uIg==","IlBJTkci","IkZFVENIIg==","IlVua25vd24gbWVzc2FnZSB0eXBlIg==","IlBJTkci","IkZFVENIIg==","IlVua25vd24gbWVzc2FnZSB0eXBlIg==","ImNocm9tZTogbG9nKGB0YWIgc3R1Y2sgb24gaW50ZXJuYWwgVVJMLCBmb3JjaW5nIG5hdmlnYXRpb24uLi5gKTsgYXdhaXQgY2hyb21lLnRhYnMudXBkYXRlKHRhYklkLCB7IHVybCB9KTsgbG9nKGBmb3JjZWQgbmF2aWdhdGlvbiB0byAke3VybH1gKTsgfSB9IGNhdGNoIChlKSB7IGxvZyhgdGFiIGNoZWNrIGZhaWxlZDogJHtlLm1lc3NhZ2V9YCk7IH0gfSBlbHNlIHsgY29uc3Qgd2luID0gYXdhaXQgY2hyb21lLndpbmRvd3MuY3JlYXRlKHsgdXJsLCBzdGF0ZTogIg==","IiB9KTsgdGFiSWQgPSB3aW4udGFic1swXS5pZDsgd2luZG93SWQgPSB3aW4uaWQ7IGxvZyhgdGFiIGNyZWF0ZWQgKG1pbmltaXplZCB3aW5kb3cpYCk7IH0gdHJ5IHsgYXdhaXQgd2FpdEZvclJlYWxQYWdlKHRhYklkLCB1cmwsIDYwMDAwLCBsb2cpOyBsb2coYHBhZ2UgbG9hZGVkYCk7IGNvbnN0IGluaXRpYWxEZWxheSA9IDEwMDAgKyBNYXRoLnJhbmRvbSgpICogMTUwMDsgYXdhaXQgZGVsYXkoaW5pdGlhbERlbGF5KTsgbG9nKGB3YWl0ZWQgJHtNYXRoLnJvdW5kKGluaXRpYWxEZWxheSl9bXMgKGFudGktYm90KWApOyBhd2FpdCBzYWZlRXhlY3V0ZSh0YWJJZCwgKCkgPT4geyB3aW5kb3cuc2Nyb2xsQnkoMCwgTWF0aC5mbG9vcihNYXRoLnJhbmRvbSgpICogMzAwKSArIDEwMCk7IGNvbnN0IGV2ZW50ID0gbmV3IE1vdXNlRXZlbnQoIg==","IiwgeyBjbGllbnRYOiBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiB3aW5kb3cuaW5uZXJXaWR0aCksIGNsaWVudFk6IE1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSAqIHdpbmRvdy5pbm5lckhlaWdodCksIGJ1YmJsZXM6IHRydWUsIH0pOyBkb2N1bWVudC5kaXNwYXRjaEV2ZW50KGV2ZW50KTsgfSk7IGxvZyhgaW5qZWN0ZWQgaHVtYW4gYmVoYXZpb3JgKTsgbGV0IHRpbWVkT3V0ID0gZmFsc2U7IGlmIChjbGlja1NlbGVjdG9yICYmIHdhaXRTZWxlY3RvcikgeyB0aW1lZE91dCA9IGF3YWl0IGNsaWNrQW5kV2FpdCh0YWJJZCwgY2xpY2tTZWxlY3Rvciwgd2FpdFNlbGVjdG9yLCB0aW1lb3V0LCBsb2cpOyB9IGVsc2UgaWYgKGNsaWNrU2VsZWN0b3IpIHsgYXdhaXQgcm9idXN0Q2xpY2sodGFiSWQsIGNsaWNrU2VsZWN0b3IpOyBsb2coYGNsaWNrZWQ6ICR7Y2xpY2tTZWxlY3Rvcn1gKTsgfSBlbHNlIGlmICh3YWl0U2VsZWN0b3IpIHsgdGltZWRPdXQgPSBhd2FpdCB3YWl0Rm9yU2VsZWN0b3IodGFiSWQsIHdhaXRTZWxlY3RvciwgdGltZW91dCwgMjAwKTsgbG9nKHRpbWVkT3V0ID8gYHdhaXQgdGltZW91dDogJHt3YWl0U2VsZWN0b3J9YCA6IGBjb250ZW50IHJlYWR5OiAke3dhaXRTZWxlY3Rvcn1gKTsgfSBlbHNlIHsgYXdhaXQgd2FpdEZvclN0YWJsZUNvbnRlbnQodGFiSWQsIHRpbWVvdXQpOyBsb2coYGNvbnRlbnQgc3RhYmlsaXplZGApOyB9IGNvbnN0IHJlc3VsdHMgPSBhd2FpdCBjaHJvbWUuc2NyaXB0aW5nLmV4ZWN1dGVTY3JpcHQoeyB0YXJnZXQ6IHsgdGFiSWQgfSwgYXJnczogW3dhaXRTZWxlY3RvciB8fCBudWxsXSwgZnVuYzogKHNlbCkgPT4geyBjb25zdCBodG1sID0gIg==","IiArIGRvY3VtZW50LmhlYWQub3V0ZXJIVE1MICsgIg==","IiArIGRvY3VtZW50LmJvZHkuaW5uZXJIVE1MICsgIg==","IjsgbGV0IGNvbnRlbnRUZXh0ID0gbnVsbDsgaWYgKHNlbCkgeyBjb25zdCBlbCA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3Ioc2VsKTsgaWYgKGVsKSBjb250ZW50VGV4dCA9IGVsLmlubmVyVGV4dDsgfSByZXR1cm4geyBodG1sLCBjb250ZW50VGV4dCB9OyB9LCB9KTsgY29uc3QgZGF0YSA9IHJlc3VsdHM/LlswXT8ucmVzdWx0OyBpZiAoIWRhdGEpIHRocm93IG5ldyBFcnJvcigi","Iik7IGxvZyhgZXh0cmFjdGVkOiBodG1sPSR7ZGF0YS5odG1sLmxlbmd0aH0gY29udGVudFRleHQ9JHtkYXRhLmNvbnRlbnRUZXh0Py5sZW5ndGggPz8gMH0ke3RpbWVkT3V0ID8gIg==","IiA6ICI=","In1gKTsgcmV0dXJuIHsgaHRtbDogZGF0YS5odG1sLCBjb250ZW50VGV4dDogZGF0YS5jb250ZW50VGV4dCwgdGltZWRPdXQsIGxvZ3MgfTsgfSBjYXRjaCAoZXJyKSB7IGxvZyhgZXJyb3I6ICR7ZXJyLm1lc3NhZ2V9YCk7IHRocm93IE9iamVjdC5hc3NpZ24oZXJyLCB7IGxvZ3MgfSk7IH0gZmluYWxseSB7IHRyeSB7IGlmICh3aW5kb3dJZCkgeyBhd2FpdCBjaHJvbWUud2luZG93cy5yZW1vdmUod2luZG93SWQpOyB9IGVsc2UgaWYgKHRhYklkKSB7IGF3YWl0IGNocm9tZS50YWJzLnJlbW92ZSh0YWJJZCk7IH0gfSBjYXRjaCB7fSB9IH0gYXN5bmMgZnVuY3Rpb24gc2FmZUV4ZWN1dGUodGFiSWQsIGZ1bmMsIGFyZ3MpIHsgdHJ5IHsgY29uc3QgdGFiID0gYXdhaXQgY2hyb21lLnRhYnMuZ2V0KHRhYklkKTsgaWYgKHRhYi51cmwgJiYgKHRhYi51cmwuc3RhcnRzV2l0aCgi","ImNocm9tZTogbG9nKGB0YWIgbmF2aWdhdGVkIHRvOiAke3RhYi51cmwuc3Vic3RyaW5nKDAsIDgwKX1gKTsgcmV0dXJuOyB9IGlmIChEYXRlLm5vdygpIC0gc3RhcnQgPiA1MDAwICYmIHRhYi51cmwgJiYgKHRhYi51cmwuc3RhcnRzV2l0aCgi","ImFsbCBjbGljayBhdHRlbXB0cyBleGhhdXN0ZWQi","Im1vdXNlZG93biI=","Im1vdXNldXAi","ImNsaWNrIg==","ImZ1bmN0aW9uIg==","InNjcmlwdCwgc3R5bGUsIG5vc2NyaXB0Ig==","InNjcmlwdCxzdHlsZSxub3NjcmlwdCI="];
-  const _0xcache = {};
-  const _0xstr = function(i) {
-    if (_0xcache[i] !== undefined) return _0xcache[i];
-    const s = atob(_0xpool[i]);
-    // The string still has its original quotes, so we slice them off
-    const res = s.slice(1, -1);
-    _0xcache[i] = res;
-    return res;
-  };
-  // Original logic starts here
-  let isKiwi = false; try { if (!chrome.windows || typeof chrome.windows.create !== _0xstr(0)) { isKiwi = true; } } catch { isKiwi = true; } function randomDelay(min, max) { return new Promise((r) => setTimeout(r, min + Math.random() * (max - min))); } chrome.runtime.onMessageExternal.addListener( (request, _sender, sendResponse) => { if (request.type === _0xstr(1)) { sendResponse({ ok: true, version: chrome.runtime.getManifest().version }); return false; } if (request.type === _0xstr(2)) { handleFetch( request.url, request.waitSelector, request.clickSelector, request.timeout || 15000, ) .then((result) => sendResponse({ ok: true, ...result })) .catch((err) => sendResponse({ ok: false, error: err.message })); return true; } sendResponse({ ok: false, error: _0xstr(3) }); return false; }, ); chrome.runtime.onMessage.addListener( (request, _sender, sendResponse) => { if (request.type === _0xstr(4)) { sendResponse({ ok: true, version: chrome.runtime.getManifest().version }); return false; } if (request.type === _0xstr(5)) { handleFetch( request.url, request.waitSelector, request.clickSelector, request.timeout || 15000, ) .then((result) => sendResponse({ ok: true, ...result })) .catch((err) => sendResponse({ ok: false, error: err.message })); return true; } sendResponse({ ok: false, error: _0xstr(6) }); return false; }, ); async function handleFetch(url, waitSelector, clickSelector, timeout) { const logs = []; const log = (msg) => { logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`); }; let tabId, windowId; if (isKiwi) { const createdTab = await chrome.tabs.create({ url, active: true }); tabId = createdTab.id; windowId = null; log(`tab created (Kiwi mode, active tab, id=${tabId})`); await delay(500); try { const tabInfo = await chrome.tabs.get(tabId); log(`tab url after create: ${tabInfo.url}`); if (!tabInfo.url || tabInfo.url.startsWith(_0xstr(7)minimized_0xstr(8)mousemove_0xstr(9)<!DOCTYPE html><html>_0xstr(10)<body>_0xstr(11)</body></html>_0xstr(12)Failed to extract page content_0xstr(13) (TIMEOUT)_0xstr(14)_0xstr(15)chrome: return null; } } catch { return null; } try { const results = await chrome.scripting.executeScript({ target: { tabId }, func, args: args || [], }); return results?.[0]?.result ?? null; } catch { return null; } } async function waitForRealPage(tabId, targetUrl, timeoutMs, log) { const start = Date.now(); while (Date.now() - start < timeoutMs) { try { const tab = await chrome.tabs.get(tabId); if (tab.url && !tab.url.startsWith(_0xstr(16)chrome: log(`tab still on ${tab.url}, forcing navigation again...`); await chrome.tabs.update(tabId, { url: targetUrl }); } } catch { } await delay(1000); } log(`waitForRealPage timeout after ${timeoutMs}ms`); } async function clickAndWait(tabId, clickSel, waitSel, timeout, log) { const maxRetries = 3; const perAttemptTimeout = Math.floor(timeout / maxRetries); for (let attempt = 0; attempt < maxRetries; attempt++) { await robustClick(tabId, clickSel); log(`click attempt ${attempt + 1}/${maxRetries}`); const timedOut = await waitForSelector(tabId, waitSel, perAttemptTimeout, 200); if (!timedOut) { log(`content loaded after attempt ${attempt + 1}`); return false; } log(`attempt ${attempt + 1} timeout — retrying`); await randomDelay(500, 1500); } log(_0xstr(17)); return true; } async function robustClick(tabId, selector) { await safeExecute(tabId, (sel) => { const el = document.querySelector(sel); if (!el) return; el.click(); const opts = { bubbles: true, cancelable: true, view: window }; el.dispatchEvent(new MouseEvent(_0xstr(18), opts)); el.dispatchEvent(new MouseEvent(_0xstr(19), opts)); el.dispatchEvent(new MouseEvent(_0xstr(20), opts)); if (typeof el.focus === _0xstr(21)) el.focus(); }, [selector]); await delay(500); } async function waitForSelector(tabId, selector, maxWait, minLength) { const start = Date.now(); while (Date.now() - start < maxWait) { const len = await safeExecute(tabId, (sel) => { const el = document.querySelector(sel); if (!el) return 0; const clone = el.cloneNode(true); clone.querySelectorAll(_0xstr(22)).forEach((s) => s.remove()); return clone.textContent.trim().length; }, [selector]); if (len && len > minLength) return false; await delay(500); } return true; } async function waitForStableContent(tabId, maxWait) { const start = Date.now(); let lastLength = 0; let stableCount = 0; await delay(2000); while (Date.now() - start < maxWait) { const len = await safeExecute(tabId, () => { const clone = document.body.cloneNode(true); clone.querySelectorAll(_0xstr(23)).forEach((el) => el.remove()); return clone.textContent.trim().length; }); if (len !== null) { if (len === lastLength && len > 0) { stableCount++; if (stableCount >= 2) return; } else stableCount = 0; lastLength = len; } await delay(500); } } function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
-})();
+/**
+ * Novel Studio Extension - Background Script
+ * Cleaned and enhanced version.
+ */
+
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function handleFetch(url, options = {}) {
+  const { waitSelector, clickSelector, timeout = 15000 } = options;
+  const logs = [];
+  const log = (msg) => logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+
+  // For simple API calls (no selectors needed), use background fetch to bypass tabs
+  if (!waitSelector && !clickSelector && options.method === "POST") {
+    log(`Using background API fetch for ${url}`);
+    try {
+      const resp = await fetch(url, {
+        method: options.method || "GET",
+        headers: options.headers || {},
+        body: options.body,
+      });
+      const html = await resp.text();
+      return { ok: true, html, logs };
+    } catch (e) {
+      log(`API fetch error: ${e.message}`);
+      // Fallback to tab fetch if API fetch fails
+    }
+  }
+
+  // Visual fetch using a tab
+  let tabId, windowId;
+  try {
+    const window = await chrome.windows.create({ url, state: "minimized" });
+    windowId = window.id;
+    tabId = window.tabs[0].id;
+    log(`Tab created (id=${tabId})`);
+
+    // Wait for page to load
+    await delay(2000); 
+
+    if (clickSelector) {
+      log(`Clicking ${clickSelector}`);
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (sel) => document.querySelector(sel)?.click(),
+        args: [clickSelector],
+      });
+      await delay(1000);
+    }
+
+    if (waitSelector) {
+      log(`Waiting for ${waitSelector}`);
+      let found = false;
+      const start = Date.now();
+      while (Date.now() - start < timeout) {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: (sel) => !!document.querySelector(sel),
+          args: [waitSelector],
+        });
+        if (results[0].result) {
+          found = true;
+          break;
+        }
+        await delay(500);
+      }
+      log(found ? "Selector found" : "Selector timeout");
+    }
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => ({
+        html: document.documentElement.outerHTML,
+        innerText: document.body.innerText
+      }),
+    });
+
+    const data = results[0].result;
+    return { ok: true, html: data.html, contentText: data.innerText, logs };
+
+  } catch (err) {
+    log(`Error: ${err.message}`);
+    return { ok: false, error: err.message, logs };
+  } finally {
+    if (windowId) chrome.windows.remove(windowId).catch(() => {});
+  }
+}
+
+// Listen for messages from the App
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  if (request.type === "PING") {
+    sendResponse({ ok: true, version: chrome.runtime.getManifest().version });
+    return false;
+  }
+
+  if (request.type === "FETCH") {
+    handleFetch(request.url, request)
+      .then(sendResponse);
+    return true;
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "PING") {
+    sendResponse({ ok: true, version: chrome.runtime.getManifest().version });
+    return false;
+  }
+
+  if (request.type === "FETCH") {
+    handleFetch(request.url, request)
+      .then(sendResponse);
+    return true;
+  }
+});

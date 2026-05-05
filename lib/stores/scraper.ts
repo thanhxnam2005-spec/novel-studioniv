@@ -565,11 +565,10 @@ export const useScraperStore = create<ScraperState>()(
               logs.push(err.message);
             }
           } else {
-            const fetchRes = await extensionFetch(
-              chapterLink.url,
-              adapter.chapterWaitSelector,
-              adapter.chapterClickSelector,
-            );
+            const fetchRes = await extensionFetch(chapterLink.url, {
+              waitSelector: adapter.chapterWaitSelector,
+              clickSelector: adapter.chapterClickSelector,
+            });
             html = fetchRes.html;
             contentText = fetchRes.contentText;
             timedOut = fetchRes.timedOut ?? false;

@@ -52,16 +52,16 @@ export const XTruyenAdapter: SiteAdapter = {
       // 3. Fetch each range via the discovered API
       const apiEndpoint = "https://xtruyen.vn/api/api-chapters.php";
       
-      const fetchPromises = ranges.map(async (range) => {
+      // Fetch sequentially to avoid overwhelming the extension/site
+      for (const range of ranges) {
         const [from, to] = range.split("-to-");
-        if (!from || !to) return [];
+        if (!from || !to) continue;
 
         try {
-          // Use extensionFetch with URLSearchParams for POST body
           const params = new URLSearchParams();
           params.append("manga_id", mangaId);
           params.append("from", from);
-          params.append("to", to.replace("m", "")); // Handle cases like 5189m
+          params.append("to", to.replace("m", ""));
           params.append("vol", "");
 
           const response = await extensionFetch(apiEndpoint, {
@@ -75,20 +75,19 @@ export const XTruyenAdapter: SiteAdapter = {
           if (response.html) {
             const rangeDoc = new DOMParser().parseFromString(response.html, "text/html");
             const links = Array.from(rangeDoc.querySelectorAll('a'));
-            return links.map(a => ({
+            const rangeChapters = links.map(a => ({
               title: a.textContent?.trim() || "Chương không rõ",
               url: (a as HTMLAnchorElement).href,
               order: 0
             }));
+            allChapterLinks.push(...rangeChapters);
           }
+          // Small delay between requests for safety
+          await new Promise(r => setTimeout(r, 300));
         } catch (e) {
           console.error(`Failed to fetch range ${range} for manga ${mangaId}`, e);
         }
-        return [];
-      });
-
-      const results = await Promise.all(fetchPromises);
-      results.forEach(list => allChapterLinks.push(...list));
+      }
     }
 
     // 4. Fallback/Safety: If still no chapters, try the previous global scan on initial HTML

@@ -154,11 +154,22 @@ export interface FetchResult {
 
 export async function extensionFetch(
   url: string,
-  waitSelector?: string,
-  clickSelector?: string,
+  options: {
+    waitSelector?: string;
+    clickSelector?: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    timeout?: number;
+  } = {}
 ): Promise<FetchResult> {
-  const timeout = getScrapeTimeout();
-  const response = await sendMessage({ type: "FETCH", url, waitSelector, clickSelector, timeout });
+  const timeout = options.timeout || getScrapeTimeout();
+  const response = await sendMessage({ 
+    type: "FETCH", 
+    url, 
+    ...options,
+    timeout 
+  });
   if (!response.ok) {
     throw new Error(response.error ?? "Extension fetch failed");
   }

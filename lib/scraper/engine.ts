@@ -79,11 +79,10 @@ export async function scrapeChapters(
         logs.push(err.message);
       }
     } else {
-      const fetchRes = await extensionFetch(
-        chapter.url,
-        adapter.chapterWaitSelector,
-        adapter.chapterClickSelector,
-      );
+      const fetchRes = await extensionFetch(chapter.url, {
+        waitSelector: adapter.chapterWaitSelector,
+        clickSelector: adapter.chapterClickSelector,
+      });
       html = fetchRes.html;
       contentText = fetchRes.contentText;
       timedOut = fetchRes.timedOut ?? false;
