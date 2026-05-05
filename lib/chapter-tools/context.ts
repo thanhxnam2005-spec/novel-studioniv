@@ -108,9 +108,16 @@ export async function buildTranslateContext(
   ]);
 
   const parts: string[] = [];
+  parts.push(`## Thông tin chương đang dịch\nThứ tự chương: ${currentChapterOrder}`);
 
   // Novel-level metadata (names for consistency)
   const metaParts: string[] = [];
+  if (novel?.title) {
+    metaParts.push(`Tiểu thuyết: ${novel.title}`);
+  }
+  if (novel?.synopsis && config.includeDetails) {
+    metaParts.push(`Tóm tắt: ${novel.synopsis}`);
+  }
   if (characters.length > 0) {
     metaParts.push(`Nhân vật: ${characters.map((c) => c.name).join(", ")}`);
   }
