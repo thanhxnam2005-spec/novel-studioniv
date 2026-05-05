@@ -87,14 +87,27 @@ export default function DashboardLayout({
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-    });
+    const getInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+        console.log('Initial session:', session?.user?.email || 'No session');
+        setUser(session?.user ?? null);
+      } catch (err) {
+        console.error('Exception getting session:', err);
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    getInitialSession();
 
     // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
+      console.log('Auth state changed:', event, session?.user?.email || 'No user');
       setUser(session?.user ?? null);
       setAuthLoading(false);
     });
@@ -105,6 +118,23 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
+  };
+
+  const handleRefreshAuth = async () => {
+    if (!supabase) return;
+    setAuthLoading(true);
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Refresh auth error:', error);
+      }
+      console.log('Refreshed session:', session?.user?.email || 'No session');
+      setUser(session?.user ?? null);
+    } catch (err) {
+      console.error('Refresh auth exception:', err);
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   // Global search shortcut: Cmd+K / Ctrl+K
@@ -156,8 +186,15 @@ export default function DashboardLayout({
               <span className="font-medium">Đã đăng nhập:</span>
               <span>{user.user_metadata?.full_name || user.email || user.id}</span>
               <button
+                onClick={handleRefreshAuth}
+                className="ml-1 text-xs text-muted-foreground hover:text-foreground underline"
+                disabled={authLoading}
+              >
+                Làm mới
+              </button>
+              <button
                 onClick={handleLogout}
-                className="ml-2 text-xs text-muted-foreground hover:text-foreground underline"
+                className="ml-1 text-xs text-muted-foreground hover:text-foreground underline"
               >
                 Đăng xuất
               </button>
