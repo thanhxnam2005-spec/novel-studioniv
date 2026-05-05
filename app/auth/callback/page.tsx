@@ -13,6 +13,13 @@ export default function AuthCallback() {
     if (!supabase) return
 
     const handleAuthCallback = async () => {
+      if (!supabase) {
+        setStatus('error')
+        setMessage('Supabase client không khả dụng')
+        setTimeout(() => router.push('/auth'), 3000)
+        return
+      }
+
       try {
         setStatus('loading')
         setMessage('Đang xử lý đăng nhập...')
@@ -133,3 +140,4 @@ export default function AuthCallback() {
       </div>
     </div>
   )
+}

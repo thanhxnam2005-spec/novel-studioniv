@@ -10,13 +10,6 @@ const nextConfig: NextConfig = {
     },
     proxyClientMaxBodySize: "5mb",
   },
-  turbopack: {
-    resolveAlias: {
-      fs: { browser: "" },
-      path: { browser: "" },
-      crypto: { browser: "" },
-    },
-  },
   async headers() {
     return [
       {
