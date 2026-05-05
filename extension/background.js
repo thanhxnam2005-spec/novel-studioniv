@@ -1,16 +1,15 @@
 /**
  * Novel Studio Extension - Background Script
- * Robust version with "Step-by-Step" reveal logic.
+ * Strictly follows the user's "Open All, Then Scrape" requirement.
  */
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function handleFetch(url, options = {}) {
-  const { smartScrape, timeout = 30000 } = options;
+  const { smartScrape, timeout = 60000 } = options;
   const logs = [];
   const log = (msg) => logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
 
-  // Tab fetch is mandatory for XTruyen step-by-step reveal
   let tabId, windowId;
   try {
     const window = await chrome.windows.create({ url, state: "minimized" });
@@ -18,63 +17,55 @@ async function handleFetch(url, options = {}) {
     tabId = window.tabs[0].id;
     log(`Tab created (id=${tabId})`);
 
-    // Wait for initial page stability
+    // Wait for initial page load
     await delay(3000); 
 
     if (smartScrape === "XTRUYEN") {
-      log("Starting XTruyen Step-by-Step Reveal...");
+      log("XTruyen: Starting 'Open All' phase...");
       
       await chrome.scripting.executeScript({
         target: { tabId },
         func: async () => {
-          // STEP 1: Find all volume items
           const items = document.querySelectorAll('li.has-child[data-value]');
-          console.log(`Found ${items.length} volumes to reveal`);
+          console.log(`Revealing ${items.length} volumes...`);
 
-          for (const item of items) {
-            // STEP 2: Force Reveal (Change none to block)
+          // 1. PHASE 1: Force all blocks to display: block FIRST
+          items.forEach(item => {
             const sub = item.querySelector('.sub-chap');
             if (sub) {
               sub.style.display = 'block';
               sub.style.visibility = 'visible';
-              sub.style.opacity = '1';
             }
-            
-            // STEP 3: Trigger Load (Click the header)
-            const header = item.querySelector('.single-chapter-list');
-            if (header) {
-              header.click();
-            }
-            
-            // Small delay to prevent overwhelming the site
-            await new Promise(r => setTimeout(r, 100));
-          }
+          });
 
-          // STEP 4: Final Wait for all AJAX to complete
-          // We wait up to 5 seconds for spinners to disappear
-          let stableCount = 0;
-          for (let i = 0; i < 10; i++) {
-            const spinners = document.querySelectorAll('.loading-spinner:not([style*="display: none"])');
-            if (spinners.length === 0) {
-              stableCount++;
-              if (stableCount >= 2) break;
-            } else {
-              stableCount = 0;
+          // 2. PHASE 2: Trigger click on all headers to start loading
+          items.forEach(item => {
+            const header = item.querySelector('.single-chapter-list');
+            if (header) header.click();
+          });
+
+          // 3. PHASE 3: Wait until ALL loading spinners are gone
+          const startWait = Date.now();
+          const maxWait = 45000; // 45 seconds max
+          
+          while (Date.now() - startWait < maxWait) {
+            const activeSpinners = document.querySelectorAll('.loading-spinner:not([style*="display: none"])');
+            if (activeSpinners.length === 0) {
+              // Double check if chapters actually appeared in sub-chap-lists
+              const emptyLists = Array.from(document.querySelectorAll('.sub-chap-list')).filter(ul => ul.children.length === 0);
+              if (emptyLists.length === 0) break; 
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 1000));
           }
           
-          // Scroll to trigger any last lazy loaders
-          window.scrollTo(0, document.body.scrollHeight / 2);
-          await new Promise(r => setTimeout(r, 500));
+          // 4. PHASE 4: Final stabilization
           window.scrollTo(0, document.body.scrollHeight);
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 2000));
         }
       });
-      log("XTruyen Reveal completed");
+      log("XTruyen: All chapters revealed and loaded.");
     }
 
-    // Extract the fully populated HTML
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       func: () => ({

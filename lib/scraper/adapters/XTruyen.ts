@@ -68,7 +68,7 @@ export const XTruyenAdapter: SiteAdapter = {
       // We always use extensionFetch for XTruyen because of its complex hidden DOM
       const response = await extensionFetch(url, {
         smartScrape: "XTRUYEN",
-        timeout: 45000 // Give it plenty of time to reveal 5000+ chapters
+        timeout: 60000 // Give it a full minute to reveal and load everything
       });
 
       if (response.html) {
