@@ -134,7 +134,7 @@ export const XTruyenAdapter: SiteAdapter = {
     if (!rawText && container) {
       // Remove ads and unwanted elements
       container.querySelectorAll(".aam-ad-container, .carousel, script, style").forEach(el => el.remove());
-      rawText = container.innerText;
+      rawText = (container as HTMLElement).innerText;
     }
 
     const title = doc.querySelector(".breadcrumb li.active")?.textContent?.trim() || "";
