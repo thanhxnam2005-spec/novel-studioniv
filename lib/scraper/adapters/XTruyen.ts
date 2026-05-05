@@ -21,30 +21,55 @@ export const XTruyenAdapter: SiteAdapter = {
     const coverImage = doc.querySelector(".summary_image img")?.getAttribute("src") || "";
     const description = doc.querySelector(".description-summary .summary__content")?.textContent?.trim() || "";
 
-    // 1. Find Manga ID
-    // Often in body class like "post-1234" or in an article ID
+    // 1. Find Manga ID - Robust extraction
     let mangaId = "";
+    
+    // Method A: Body class (post-1234)
     const bodyClass = doc.body.className;
     const postMatch = bodyClass.match(/post-(\d+)/);
-    if (postMatch) {
-      mangaId = postMatch[1];
-    } else {
-      // Fallback: check article tag
+    if (postMatch) mangaId = postMatch[1];
+
+    // Method B: Article ID (post-1234)
+    if (!mangaId) {
       const article = doc.querySelector('article[id^="post-"]');
-      if (article) {
-        mangaId = article.id.replace("post-", "");
+      if (article) mangaId = article.id.replace("post-", "");
+    }
+
+    // Method C: Script tags (var manga_id = '1234';)
+    if (!mangaId) {
+      const scripts = Array.from(doc.querySelectorAll('script'));
+      for (const s of scripts) {
+        const content = s.textContent || "";
+        const m = content.match(/manga_id\s*=\s*['"](\d+)['"]/);
+        if (m) {
+          mangaId = m[1];
+          break;
+        }
       }
     }
 
+    // Method D: Hidden inputs or data attributes
     if (!mangaId) {
-      // Last resort: check if there's any element with data-id or similar
-      const idElem = doc.querySelector('[data-id], #manga-chapters-holder');
-      mangaId = idElem?.getAttribute("data-id") || "";
+      const idElem = doc.querySelector('[data-id], #manga-chapters-holder, .rating-post-id');
+      mangaId = idElem?.getAttribute("data-id") || idElem?.getAttribute("value") || "";
+    }
+
+    if (!mangaId) {
+       // Method E: Find any "post-XXX" ID in the document
+       const postElem = doc.querySelector('[id*="post-"]');
+       const m = postElem?.id.match(/post-(\d+)/);
+       if (m) mangaId = m[1];
     }
 
     // 2. Find all Volume ranges (1-to-200, 201-to-400, etc.)
     const volumeItems = Array.from(doc.querySelectorAll('li.has-child[data-value]'));
-    const ranges = volumeItems.map(li => li.getAttribute('data-value') || "");
+    let ranges = volumeItems.map(li => li.getAttribute('data-value') || "");
+
+    // If no ranges found in DOM, maybe they are in the initial chapter list or somewhere else
+    if (ranges.length === 0) {
+       // Sometimes they are hardcoded or loaded later, but we need them to get the full list
+       // For now, if we have mangaId but no ranges, we might try a default range or scan links
+    }
 
     const allChapterLinks: ChapterLink[] = [];
 

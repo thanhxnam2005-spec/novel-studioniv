@@ -10,20 +10,27 @@ async function handleFetch(url, options = {}) {
   const logs = [];
   const log = (msg) => logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
 
-  // For simple API calls (no selectors needed), use background fetch to bypass tabs
-  if (!waitSelector && !clickSelector && options.method === "POST") {
-    log(`Using background API fetch for ${url}`);
+  // Background fetch logic (No tabs)
+  // Triggered if:
+  // 1. No selectors are provided (Simple API or HTML fetch)
+  // 2. OR explicitly requested via a flag (if we added one)
+  if (!waitSelector && !clickSelector) {
+    log(`Using background fetch for ${url} (${options.method || 'GET'})`);
     try {
       const resp = await fetch(url, {
         method: options.method || "GET",
-        headers: options.headers || {},
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          ...(options.headers || {})
+        },
         body: options.body,
       });
       const html = await resp.text();
+      log(`Background fetch successful (${html.length} chars)`);
       return { ok: true, html, logs };
     } catch (e) {
-      log(`API fetch error: ${e.message}`);
-      // Fallback to tab fetch if API fetch fails
+      log(`Background fetch error: ${e.message}. Falling back to tab...`);
+      // Fallback to tab fetch if background fetch fails (might be blocked by Cloudflare)
     }
   }
 
