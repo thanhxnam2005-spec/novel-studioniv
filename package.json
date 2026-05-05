@@ -12,7 +12,7 @@
     "zip:android": "powershell -Command \"Compress-Archive -Path extension\\manifest.json, extension\\background.js -DestinationPath public\\novel-studio-connector-android.zip -Force\"",
     "zip:pc": "powershell -Command \"Compress-Archive -Path extension-pc\\manifest.json, extension-pc\\background.js, extension-pc\\content.js -DestinationPath public\\novel-studio-connector-pc.zip -Force\"",
     "zip:all": "npm run zip:android && npm run zip:pc",
-    "postinstall": "powershell -Command \"if (!(Test-Path public/wasm)) { New-Item -ItemType Directory -Path public/wasm -Force }; if (Test-Path node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm) { Copy-Item -Path node_modules/jieba-wasm/pkg/web/jieba_rs_wasm_bg.wasm -Destination public/wasm/ -Force }\"",
+    "postinstall": "node scripts/postinstall.js",
     "prepare": "husky"
   },
   "dependencies": {
