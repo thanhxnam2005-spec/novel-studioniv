@@ -241,7 +241,7 @@ export const useScraperStore = create<ScraperState>()(
           const chaptersInDb = await db.chapters.where("novelId").equals(existingNovel.id).toArray();
           const existingTitles = new Set(chaptersInDb.map(c => c.title.toLowerCase().trim()));
           const initialCount = selectedChapters.length;
-          selectedChapters = selectedChapters.filter(ch => !existingTitles.has(ch.title.toLowerCase().trim()));
+          selectedChapters = selectedChapters.filter((ch: any) => !existingTitles.has(ch.title.toLowerCase().trim()));
           const skipped = initialCount - selectedChapters.length;
           if (skipped > 0) {
             addLog("Scrape · Duplicates", `Bỏ qua ${skipped} chương đã có trong thư viện.`);
@@ -326,7 +326,7 @@ export const useScraperStore = create<ScraperState>()(
           const chaptersInDb = await db.chapters.where("novelId").equals(novelId).toArray();
           const existingTitles = new Set(chaptersInDb.map(c => c.title.toLowerCase().trim()));
           const initialCount = selectedChapters.length;
-          selectedChapters = selectedChapters.filter(ch => !existingTitles.has(ch.title.toLowerCase().trim()));
+          selectedChapters = selectedChapters.filter((ch: any) => !existingTitles.has(ch.title.toLowerCase().trim()));
           const skipped = initialCount - selectedChapters.length;
           if (skipped > 0) {
              addLog("Scrape · Duplicates", `Bỏ qua ${skipped} chương đã có (Background).`);
