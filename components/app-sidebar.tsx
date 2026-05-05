@@ -252,6 +252,7 @@ export function AppSidebar() {
               </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Cộng đồng</SidebarGroupLabel>
           <SidebarGroupContent>
