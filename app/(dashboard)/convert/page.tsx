@@ -511,7 +511,7 @@ export default function ConvertPage() {
 
       {/* ── Side-by-side editor ── */}
       <div className="flex-1 min-h-[600px] flex flex-col" ref={scrollContainerRef}>
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="mb-2 w-full">
+        <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as "ai" | "stv")} className="mb-2 w-full">
           <div className="flex justify-between items-center bg-muted/30 p-1 rounded-md border">
             <TabsList className="bg-transparent border-none h-8">
               <TabsTrigger value="ai" className="text-xs data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Dịch AI</TabsTrigger>
@@ -583,7 +583,7 @@ export default function ConvertPage() {
                   </div>
                   <Badge variant="outline" className="text-[10px] capitalize h-5">{s.category}</Badge>
                 </div>
-                <p className="text-[10px] text-muted-foreground line-clamp-2 italic">"{s.reason}"</p>
+                <p className="text-[10px] text-muted-foreground line-clamp-2 italic">&ldquo;{s.reason}&rdquo;</p>
                 <Button size="xs" className="w-full mt-1" onClick={() => handleAddTrainingSuggestion(s)}>
                   Thêm vào từ điển
                 </Button>
