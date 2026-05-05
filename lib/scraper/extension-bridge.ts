@@ -161,6 +161,7 @@ export async function extensionFetch(
     headers?: Record<string, string>;
     body?: string;
     timeout?: number;
+    smartScrape?: "XTRUYEN" | string;
   } = {}
 ): Promise<FetchResult> {
   const timeout = options.timeout || getScrapeTimeout();

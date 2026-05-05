@@ -61,58 +61,32 @@ export const XTruyenAdapter: SiteAdapter = {
        if (m) mangaId = m[1];
     }
 
-    // 2. Find all Volume ranges (1-to-200, 201-to-400, etc.)
-    const volumeItems = Array.from(doc.querySelectorAll('li.has-child[data-value]'));
-    let ranges = volumeItems.map(li => li.getAttribute('data-value') || "");
-
-    // If no ranges found in DOM, maybe they are in the initial chapter list or somewhere else
-    if (ranges.length === 0) {
-       // Sometimes they are hardcoded or loaded later, but we need them to get the full list
-       // For now, if we have mangaId but no ranges, we might try a default range or scan links
-    }
-
+    // 2. Fetch all chapters using SMART_SCRAPE mode
+    // This mode tells the extension to open the tab and CLICK all volume items
+    // to reveal the hidden chapter links.
     const allChapterLinks: ChapterLink[] = [];
+    
+    try {
+      const response = await extensionFetch(url, {
+        smartScrape: "XTRUYEN",
+        timeout: 30000 // Longer timeout for multi-click
+      });
 
-    if (mangaId && ranges.length > 0) {
-      // 3. Fetch each range via the discovered API
-      const apiEndpoint = "https://xtruyen.vn/api/api-chapters.php";
-      
-      // Fetch sequentially to avoid overwhelming the extension/site
-      for (const range of ranges) {
-        const [from, to] = range.split("-to-");
-        if (!from || !to) continue;
-
-        try {
-          const params = new URLSearchParams();
-          params.append("manga_id", mangaId);
-          params.append("from", from);
-          params.append("to", to.replace("m", ""));
-          params.append("vol", "");
-
-          const response = await extensionFetch(apiEndpoint, {
-            method: "POST",
-            body: params.toString(),
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded"
-            }
+      if (response.html) {
+        const fullDoc = new DOMParser().parseFromString(response.html, "text/html");
+        // Extract all chapters from the newly revealed DOM
+        const chapterItems = Array.from(fullDoc.querySelectorAll('ul.sub-chap-list li.wp-manga-chapter a'));
+        
+        chapterItems.forEach(a => {
+          allChapterLinks.push({
+            title: a.textContent?.trim() || "Chương không rõ",
+            url: (a as HTMLAnchorElement).href,
+            order: 0
           });
-
-          if (response.html) {
-            const rangeDoc = new DOMParser().parseFromString(response.html, "text/html");
-            const links = Array.from(rangeDoc.querySelectorAll('a'));
-            const rangeChapters = links.map(a => ({
-              title: a.textContent?.trim() || "Chương không rõ",
-              url: (a as HTMLAnchorElement).href,
-              order: 0
-            }));
-            allChapterLinks.push(...rangeChapters);
-          }
-          // Small delay between requests for safety
-          await new Promise(r => setTimeout(r, 300));
-        } catch (e) {
-          console.error(`Failed to fetch range ${range} for manga ${mangaId}`, e);
-        }
+        });
       }
+    } catch (e) {
+      console.error("XTruyen Smart Scrape failed", e);
     }
 
     // 4. Fallback/Safety: If still no chapters, try the previous global scan on initial HTML
