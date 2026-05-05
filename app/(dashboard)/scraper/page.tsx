@@ -60,6 +60,7 @@ import {
   LoaderIcon,
   PlusIcon,
   RefreshCwIcon,
+  ShieldCheckIcon,
   SquareIcon,
   TerminalIcon,
   Trash2Icon,
@@ -68,6 +69,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { type User } from "@supabase/supabase-js";
 import { PasswordGate } from "@/components/password-gate";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -361,71 +364,128 @@ export default function ScraperPage() {
   const router = useRouter();
   const store = useScraperStore();
   const stepIndex = STEPS.findIndex((s) => s.key === store.step);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     store.checkExtension();
-    // Do NOT reset on unmount to allow switching tabs/pages while scraping
+    
+    const checkAuth = async () => {
+      if (!supabase) {
+        setAuthLoading(false);
+        return;
+      }
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    };
+    checkAuth();
   }, []);
 
-  return (
-    <PasswordGate>
-      <main className="mx-auto w-full max-w-4xl px-6 py-8">
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <h1 className="font-heading text-3xl font-bold tracking-tight">
-              Scraper
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Nhập truyện từ website bên ngoài vào hệ thống.
-            </p>
-          </div>
-          <DebugToolbar />
-        </div>
+  const isAdmin = Boolean(
+    user?.app_metadata?.isAdmin || 
+    user?.user_metadata?.isAdmin || 
+    user?.id === '5fe169c6-5e01-49aa-b363-ceaaf7ad4cba' ||
+    user?.email === 'thanhxnam2005@gmail.com'
+  );
+  
+  const isVip = Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
+    (() => {
+      const until = user?.app_metadata?.vipUntil || user?.user_metadata?.vipUntil;
+      if (!until) return true;
+      return new Date(until) > new Date();
+    })()
+  );
 
-        <div className="mx-auto w-full max-w-3xl space-y-6">
-          {/* Step indicator */}
-          <nav className="flex items-center justify-center gap-1">
-            {STEPS.map((s, i) => (
-              <div key={s.key} className="flex items-center gap-1">
-                {i > 0 && (
-                  <ArrowRightIcon
-                    className={`size-3 shrink-0 ${i <= stepIndex ? "text-primary" : "text-border"}`}
-                  />
-                )}
-                <button
-                  onClick={() => {
-                    if (i < stepIndex) store.setStep(s.key);
-                  }}
-                  disabled={i > stepIndex}
-                  className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-all sm:px-3 ${
-                    i === stepIndex
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : i < stepIndex
-                        ? "bg-primary/10 text-primary hover:bg-primary/20"
-                        : "text-muted-foreground/50"
-                  }`}
-                >
-                  <s.icon
-                    className={`size-3.5 shrink-0 sm:size-3 ${i === stepIndex && s.key === "scraping" ? "animate-spin" : ""}`}
-                  />
-                  <span
-                    className={i === stepIndex ? "sm:inline" : "hidden sm:inline"}
-                  >
-                    {s.label}
-                  </span>
-                </button>
-              </div>
-            ))}
-          </nav>
-
-          {store.step === "url" && <UrlStep />}
-          {store.step === "select" && <SelectStep />}
-          {store.step === "stv-wait" && <STVWaitStep />}
-          {store.step === "scraping" && <ScrapingStep />}
-          {store.step === "preview" && <PreviewStep router={router} />}
-        </div>
+  if (authLoading) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-6 py-8 flex items-center justify-center">
+        <LoaderIcon className="size-8 animate-spin text-muted-foreground" />
       </main>
-    </PasswordGate>
+    );
+  }
+
+  if (!isAdmin && !isVip) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-6 py-12">
+        <Card className="border-dashed border-2">
+          <CardHeader className="text-center">
+            <div className="mx-auto size-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-4">
+              <ShieldCheckIcon className="size-6" />
+            </div>
+            <CardTitle>Yêu cầu quyền VIP</CardTitle>
+            <CardDescription>
+              Tính năng Import Truyện chỉ dành cho thành viên VIP hoặc Quản trị viên.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center gap-4">
+            <p className="text-sm text-muted-foreground text-center max-w-md">
+              Vui lòng liên hệ quản trị viên để nâng cấp tài khoản của bạn lên VIP để sử dụng tính năng này.
+            </p>
+            <Button onClick={() => router.push("/dashboard")}>Quay lại trang chủ</Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-4xl px-6 py-8">
+      <div className="mb-8 flex items-end justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">
+            Scraper
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nhập truyện từ website bên ngoài vào hệ thống.
+          </p>
+        </div>
+        <DebugToolbar />
+      </div>
+
+      <div className="mx-auto w-full max-w-3xl space-y-6">
+        {/* Step indicator */}
+        <nav className="flex items-center justify-center gap-1">
+          {STEPS.map((s, i) => (
+            <div key={s.key} className="flex items-center gap-1">
+              {i > 0 && (
+                <ArrowRightIcon
+                  className={`size-3 shrink-0 ${i <= stepIndex ? "text-primary" : "text-border"}`}
+                />
+              )}
+              <button
+                onClick={() => {
+                  if (i < stepIndex) store.setStep(s.key);
+                }}
+                disabled={i > stepIndex}
+                className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-all sm:px-3 ${
+                  i === stepIndex
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : i < stepIndex
+                      ? "bg-primary/10 text-primary hover:bg-primary/20"
+                      : "text-muted-foreground/50"
+                }`}
+              >
+                <s.icon
+                  className={`size-3.5 shrink-0 sm:size-3 ${i === stepIndex && s.key === "scraping" ? "animate-spin" : ""}`}
+                />
+                <span
+                  className={i === stepIndex ? "sm:inline" : "hidden sm:inline"}
+                >
+                  {s.label}
+                </span>
+              </button>
+            </div>
+          ))}
+        </nav>
+
+        {store.step === "url" && <UrlStep />}
+        {store.step === "select" && <SelectStep />}
+        {store.step === "stv-wait" && <STVWaitStep />}
+        {store.step === "scraping" && <ScrapingStep />}
+        {store.step === "preview" && <PreviewStep router={router} />}
+      </div>
+    </main>
   );
 }
 

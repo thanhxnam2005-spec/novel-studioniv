@@ -50,6 +50,7 @@ export async function GET(req: Request) {
     email: user.email,
     createdAt: user.created_at,
     isVip: Boolean(user.app_metadata?.isVip || user.user_metadata?.isVip),
+    vipUntil: user.app_metadata?.vipUntil || user.user_metadata?.vipUntil || null,
     isAdmin: Boolean(user.app_metadata?.isAdmin || user.user_metadata?.isAdmin),
   }));
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { userId, isVip } = body as { userId?: string; isVip?: boolean };
+  const { userId, isVip, vipUntil } = body as { userId?: string; isVip?: boolean; vipUntil?: string | null };
 
   if (!userId || typeof isVip !== "boolean") {
     return NextResponse.json(
@@ -73,13 +74,13 @@ export async function POST(req: Request) {
   }
 
   const { data, error } = await supabaseAdmin!.auth.admin.updateUserById(userId, {
-    app_metadata: { isVip },
-    user_metadata: { isVip },
+    app_metadata: { isVip, vipUntil },
+    user_metadata: { isVip, vipUntil },
   });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ user: { id: data.user?.id, email: data.user?.email, isVip } });
+  return NextResponse.json({ user: { id: data.user?.id, email: data.user?.email, isVip, vipUntil } });
 }

@@ -81,7 +81,13 @@ export default function DashboardLayout({
     user?.id === '5fe169c6-5e01-49aa-b363-ceaaf7ad4cba' ||
     user?.email === 'thanhxnam2005@gmail.com'
   );
-  const isVip = Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip);
+  const isVip = Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
+    (() => {
+      const until = user?.app_metadata?.vipUntil || user?.user_metadata?.vipUntil;
+      if (!until) return true; // Default to permanent if no date set but isVip is true
+      return new Date(until) > new Date();
+    })()
+  );
 
   // Keep name dict panel's novelId in sync with URL
   useEffect(() => {
