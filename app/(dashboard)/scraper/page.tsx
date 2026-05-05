@@ -422,7 +422,24 @@ export default function ScraperPage() {
             <p className="text-sm text-muted-foreground text-center max-w-md">
               Vui lòng liên hệ quản trị viên để nâng cấp tài khoản của bạn lên VIP để sử dụng tính năng này.
             </p>
-            <Button onClick={() => router.push("/dashboard")}>Quay lại trang chủ</Button>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => router.push("/dashboard")}>Quay lại</Button>
+              <Button 
+                onClick={async () => {
+                  setAuthLoading(true);
+                  const { data, error } = await supabase!.auth.refreshSession();
+                  if (error) {
+                    toast.error("Không thể làm mới phiên đăng nhập: " + error.message);
+                  } else {
+                    setUser(data.session?.user ?? null);
+                    toast.success("Đã làm mới quyền truy cập!");
+                  }
+                  setAuthLoading(false);
+                }}
+              >
+                Làm mới quyền
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </main>

@@ -322,7 +322,6 @@ export function NovelImportWizard() {
 
   // ── Render ──────────────────────────────────────────────
 
-  // VIP Gate
   if (authLoading) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -330,7 +329,7 @@ export function NovelImportWizard() {
           <CardContent className="flex items-center justify-center py-12">
             <div className="text-center">
               <div className="mx-auto mb-4 size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="text-sm text-muted-foreground">Đang kiểm tra quyền truy cập...</p>
+              <p className="text-sm text-muted-foreground">Đang tải...</p>
             </div>
           </CardContent>
         </Card>
@@ -338,71 +337,6 @@ export function NovelImportWizard() {
     );
   }
 
-  if (!user || !isVip) {
-    return (
-      <div className="mx-auto w-full max-w-3xl space-y-6">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
-              <CrownIcon className="size-6 text-white" />
-            </div>
-            <CardTitle className="text-xl">Tính năng VIP</CardTitle>
-            <CardDescription>
-              Chức năng nhập tiểu thuyết chỉ dành cho thành viên VIP
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border bg-gradient-to-r from-yellow-50 to-orange-50 p-4 dark:from-yellow-950/20 dark:to-orange-950/20">
-              <div className="flex items-start gap-3">
-                <CrownIcon className="mt-0.5 size-5 text-yellow-600 dark:text-yellow-400" />
-                <div className="space-y-2">
-                  <h4 className="font-medium text-yellow-900 dark:text-yellow-100">
-                    Lợi ích VIP
-                  </h4>
-                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
-                    <li>• Nhập tiểu thuyết từ file TXT hoặc văn bản</li>
-                    <li>• Tự động chia chương thông minh</li>
-                    <li>• Hỗ trợ nhiều định dạng và ngôn ngữ</li>
-                    <li>• Công cụ phân tích và viết AI</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {!user ? (
-              <div className="text-center space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Vui lòng đăng nhập để nâng cấp VIP
-                </p>
-                <Button
-                  onClick={() => router.push("/auth")}
-                  className="w-full"
-                >
-                  Đăng nhập
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Tài khoản của bạn chưa được nâng cấp VIP
-                </p>
-                <Button
-                  onClick={() => {
-                    // TODO: Implement upgrade flow
-                    toast.info("Tính năng nâng cấp VIP sẽ sớm được thêm vào");
-                  }}
-                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
-                >
-                  <CrownIcon className="mr-2 size-4" />
-                  Nâng cấp VIP
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
