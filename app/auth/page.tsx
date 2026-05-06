@@ -1,7 +1,7 @@
 'use client'
 
 import { BookOpenIcon, Loader2Icon } from 'lucide-react'
-import { supabase, supabaseConfig } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -14,14 +14,33 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false)
+      // No Supabase configured - go straight to dashboard
+      window.location.href = '/dashboard'
       return
     }
 
+    // Check session with a timeout to prevent infinite loading
+    let resolved = false
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        setLoading(false)
+      }
+    }, 3000)
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timeout)
       if (session) {
         window.location.href = '/dashboard'
       } else {
+        setLoading(false)
+      }
+    }).catch(() => {
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
         setLoading(false)
       }
     })
@@ -30,7 +49,10 @@ export default function AuthPage() {
       if (session) window.location.href = '/dashboard'
     })
 
-    return () => listener.subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeout)
+      listener.subscription.unsubscribe()
+    }
   }, [router])
 
   const handleGoogleLogin = useCallback(async () => {
@@ -62,31 +84,11 @@ export default function AuthPage() {
     )
   }
 
-  // Supabase not configured
+  // Supabase not configured - useEffect will redirect to dashboard
   if (!supabase) {
-    const missing: string[] = []
-    if (!supabaseConfig.url) missing.push('NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL')
-    if (!supabaseConfig.anonKey)
-      missing.push(
-        'NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY',
-      )
-
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background text-foreground">
-        <div className="max-w-md w-full p-8 rounded-2xl bg-card border border-border shadow-2xl space-y-4">
-          <p className="text-xl font-bold text-destructive">Không thể kết nối Supabase</p>
-          <p className="text-sm text-muted-foreground">Vui lòng kiểm tra biến môi trường.</p>
-          {missing.length > 0 && (
-            <div className="mt-4 p-4 rounded-lg bg-destructive/10 text-destructive text-xs">
-              <p className="font-semibold mb-2">Biến thiếu:</p>
-              <ul className="list-disc pl-4 space-y-1">
-                {missing.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
