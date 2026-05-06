@@ -101,40 +101,27 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!supabase) {
-      // If no Supabase configured, redirect to auth
-      router.replace('/auth');
+      // No Supabase configured - just let users use the app without auth
+      setAuthLoading(false);
       return;
     }
 
     let cancelled = false;
 
-    // Get initial session with retry for race conditions after OAuth callback
-    const getInitialSession = async (retries = 3) => {
+    // Try to get session if available, but don't force login
+    const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase!.auth.getSession();
         if (cancelled) return;
         if (error) {
           console.error('Error getting session:', error);
         }
-        if (session) {
-          setUser(session.user);
-          setAuthLoading(false);
-          return;
-        }
-        // Session not found - retry after a short delay to handle race conditions
-        if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          if (!cancelled) return getInitialSession(retries - 1);
-          return;
-        }
-        // No session after retries, redirect to auth
-        if (!cancelled) router.replace('/auth');
+        setUser(session?.user ?? null);
       } catch (err) {
         console.error('Exception getting session:', err);
-        if (!cancelled) {
-          setUser(null);
-          setAuthLoading(false);
-        }
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
       }
     };
 
@@ -144,13 +131,11 @@ export default function DashboardLayout({
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
       if (event === 'SIGNED_OUT') {
-        router.replace('/auth');
+        setUser(null);
         return;
       }
-      if (session) {
-        setUser(session.user);
-        setAuthLoading(false);
-      }
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
     });
 
     return () => {
