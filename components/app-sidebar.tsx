@@ -88,27 +88,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const novels = useNovels();
   const recentNovels = novels?.slice(0, 5);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (!supabase) return;
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Error checking admin status:", error);
-        return;
-      }
-      const user = session?.user;
-      setIsAdmin(Boolean(
-        user?.app_metadata?.isAdmin || 
-        user?.user_metadata?.isAdmin || 
-        user?.id === '5fe169c6-5e01-49aa-b363-ceaaf7ad4cba' ||
-        user?.email === 'thanhxnam2005@gmail.com'
-      ));
-    };
-
-    checkAdmin();
-  }, []);
+  const isAdmin = true;
 
   const adminNavItem = {
     title: "Quản trị",

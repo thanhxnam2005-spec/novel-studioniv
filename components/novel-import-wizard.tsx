@@ -59,8 +59,7 @@ export function NovelImportWizard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auth & VIP state
-  const [user, setUser] = useState<User | null>(null);
-  const [isVip, setIsVip] = useState(false);
+  // Wizard state hidden logic
   const [authLoading, setAuthLoading] = useState(true);
 
   // Wizard state
@@ -93,34 +92,10 @@ export function NovelImportWizard() {
 
   // Check auth and VIP status
   useEffect(() => {
-    const checkAuth = async () => {
-      if (!supabase) {
-        setAuthLoading(false);
-        return;
-      }
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        // Check VIP status from user metadata or app_metadata
-        const vipStatus = isLocalhost() || 
-                         currentUser?.app_metadata?.isVip ||
-                         currentUser?.user_metadata?.isVip ||
-                         false;
-        setIsVip(Boolean(vipStatus));
-      } catch (error) {
-        console.error('Error checking auth:', error);
-        setUser(null);
-        setIsVip(false);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    checkAuth();
+    setAuthLoading(false);
   }, []);
+
+  const isVip = true;
 
   // ── File Upload ─────────────────────────────────────────
 

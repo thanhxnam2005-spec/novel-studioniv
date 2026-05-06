@@ -367,38 +367,15 @@ export default function ScraperPage() {
   const router = useRouter();
   const store = useScraperStore();
   const stepIndex = STEPS.findIndex((s) => s.key === store.step);
-  const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     store.checkExtension();
-    
-    const checkAuth = async () => {
-      if (!supabase) {
-        setAuthLoading(false);
-        return;
-      }
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-    };
-    checkAuth();
+    setAuthLoading(false);
   }, []);
 
-   const isAdmin = isLocalhost() || Boolean(
-    user?.app_metadata?.isAdmin || 
-    user?.user_metadata?.isAdmin || 
-    user?.id === '5fe169c6-5e01-49aa-b363-ceaaf7ad4cba' ||
-    user?.email === 'thanhxnam2005@gmail.com'
-  );
-  
-  const isVip = isLocalhost() || (Boolean(user?.app_metadata?.isVip || user?.user_metadata?.isVip) && (
-    (() => {
-      const until = user?.app_metadata?.vipUntil || user?.user_metadata?.vipUntil;
-      if (!until) return true;
-      return new Date(until) > new Date();
-    })()
-  ));
+  const isAdmin = true;
+  const isVip = true;
 
   if (authLoading) {
     return (
