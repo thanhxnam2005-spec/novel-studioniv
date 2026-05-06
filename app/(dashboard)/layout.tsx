@@ -101,30 +101,40 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!supabase) {
-      // If no Supabase and not localhost, redirect to auth
+      // If no Supabase configured, redirect to auth
       router.replace('/auth');
-      return;
-      setAuthLoading(false);
       return;
     }
 
-    // Get initial session
-    const getInitialSession = async () => {
+    let cancelled = false;
+
+    // Get initial session with retry for race conditions after OAuth callback
+    const getInitialSession = async (retries = 3) => {
       try {
         const { data: { session }, error } = await supabase!.auth.getSession();
+        if (cancelled) return;
         if (error) {
           console.error('Error getting session:', error);
         }
-        if (!session) {
-          router.replace('/auth');
+        if (session) {
+          setUser(session.user);
+          setAuthLoading(false);
           return;
         }
-        setUser(session?.user ?? null);
+        // Session not found - retry after a short delay to handle race conditions
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          if (!cancelled) return getInitialSession(retries - 1);
+          return;
+        }
+        // No session after retries, redirect to auth
+        if (!cancelled) router.replace('/auth');
       } catch (err) {
         console.error('Exception getting session:', err);
-        setUser(null);
-      } finally {
-        setAuthLoading(false);
+        if (!cancelled) {
+          setUser(null);
+          setAuthLoading(false);
+        }
       }
     };
 
@@ -132,15 +142,21 @@ export default function DashboardLayout({
 
     // Listen for auth changes
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
       if (event === 'SIGNED_OUT') {
         router.replace('/auth');
         return;
       }
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
+      if (session) {
+        setUser(session.user);
+        setAuthLoading(false);
+      }
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
   }, [router]);
 
   const handleLogout = useCallback(async () => {

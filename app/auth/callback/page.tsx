@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, supabaseConfig } from '@/lib/supabase'
 import { Loader2Icon, CheckCircle2Icon, XCircleIcon } from 'lucide-react'
@@ -9,67 +9,98 @@ export default function AuthCallback() {
   const router = useRouter()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('Đang xử lý đăng nhập...')
+  const handledRef = useRef(false)
 
   useEffect(() => {
     if (!supabase) return
+    if (handledRef.current) return
+    handledRef.current = true
 
-    const handleAuthCallback = async () => {
-      if (!supabase) {
-        setStatus('error')
-        setMessage('Supabase client không khả dụng')
-        setTimeout(() => router.replace('/auth'), 3000)
-        return
-      }
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null
 
+    const succeed = () => {
+      setStatus('success')
+      setMessage('Đăng nhập thành công! Đang chuyển hướng...')
+      redirectTimer = setTimeout(() => router.replace('/'), 800)
+    }
+
+    const fail = (msg: string) => {
+      setStatus('error')
+      setMessage(msg)
+      redirectTimer = setTimeout(() => router.replace('/auth'), 3000)
+    }
+
+    const handleCallback = async () => {
       try {
-        setStatus('loading')
-        setMessage('Đang xử lý đăng nhập...')
-
-        const { data, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error('Auth callback error:', error)
-          setStatus('error')
-          setMessage('Lỗi đăng nhập: ' + error.message)
-          setTimeout(() => router.replace('/auth'), 3000)
+        // 1. Check if detectSessionInUrl already picked up the session
+        const { data: { session: existingSession } } = await supabase!.auth.getSession()
+        if (existingSession) {
+          succeed()
           return
         }
 
-        if (data.session) {
-          console.log('Auth callback success:', data.session.user.email)
-          setStatus('success')
-          setMessage('Đăng nhập thành công! Đang chuyển hướng...')
-          setTimeout(() => router.replace('/'), 1000)
-        } else {
+        // 2. Try PKCE flow: extract code from query params
+        const params = new URLSearchParams(window.location.search)
+        const code = params.get('code')
+
+        if (code) {
           setMessage('Đang trao đổi mã xác thực...')
-          const { data: sessionData, error: sessionError } = await supabase.auth.exchangeCodeForSession(window.location.search)
-          
-          if (sessionError) {
-            console.error('Session exchange error:', sessionError)
-            setStatus('error')
-            setMessage('Lỗi trao đổi phiên: ' + sessionError.message)
-            setTimeout(() => router.replace('/auth'), 3000)
-          } else if (sessionData.session) {
-            console.log('Session exchange success:', sessionData.session.user.email)
-            setStatus('success')
-            setMessage('Đăng nhập thành công! Đang chuyển hướng...')
-            setTimeout(() => router.replace('/'), 1000)
+          const { data, error } = await supabase!.auth.exchangeCodeForSession(code)
+          if (error) {
+            console.error('Code exchange error:', error)
+            fail('Lỗi trao đổi phiên: ' + error.message)
+          } else if (data.session) {
+            succeed()
           } else {
-            setStatus('error')
-            setMessage('Không thể xác thực phiên đăng nhập')
-            setTimeout(() => router.replace('/auth'), 3000)
+            fail('Không thể xác thực phiên đăng nhập')
+          }
+          return
+        }
+
+        // 3. Implicit flow: tokens should be in hash fragment
+        //    detectSessionInUrl should handle this, but give it a moment
+        if (window.location.hash && window.location.hash.includes('access_token')) {
+          // Wait a bit for Supabase client to process the hash
+          await new Promise(resolve => setTimeout(resolve, 1500))
+          const { data: { session: hashSession } } = await supabase!.auth.getSession()
+          if (hashSession) {
+            succeed()
+            return
           }
         }
+
+        // 4. Nothing found - wait for onAuthStateChange as last resort
+        //    (handled by the listener below)
+        setMessage('Đang chờ xác thực...')
+
       } catch (err) {
         console.error('Auth callback exception:', err)
-        setStatus('error')
-        setMessage('Lỗi không mong muốn: ' + (err as Error).message)
-        setTimeout(() => router.replace('/auth'), 3000)
+        fail('Lỗi không mong muốn: ' + (err as Error).message)
       }
     }
 
-    handleAuthCallback()
-  }, [router])
+    // Listen for auth state changes (covers all edge cases)
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session) {
+        succeed()
+      }
+    })
+
+    handleCallback()
+
+    // Timeout fallback: if nothing resolves after 15 seconds, show error
+    const timeout = setTimeout(() => {
+      if (status === 'loading') {
+        fail('Hết thời gian xử lý. Vui lòng thử đăng nhập lại.')
+      }
+    }, 15000)
+
+    return () => {
+      listener.subscription.unsubscribe()
+      clearTimeout(timeout)
+      if (redirectTimer) clearTimeout(redirectTimer)
+    }
+  }, [router, status])
 
   if (!supabase) {
     const missing: string[] = []
