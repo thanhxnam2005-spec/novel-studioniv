@@ -20,14 +20,14 @@ export default function AuthPage() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        router.replace('/')
+        window.location.href = '/dashboard'
       } else {
         setLoading(false)
       }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) router.replace('/')
+      if (session) window.location.href = '/dashboard'
     })
 
     return () => listener.subscription.unsubscribe()
